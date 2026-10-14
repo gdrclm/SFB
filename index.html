@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#087ee8" />
+    <title>Speed Fall Ball</title>
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="game-canvas" aria-label="Игровая сцена Speed Fall Ball"></canvas>
+      <div id="interface-layer" aria-live="polite">
+        <header id="top-hud">
+          <div class="hud-stack hud-stack-left">
+            <div class="hud-pill coin-pill">
+              <span class="coin-emblem" aria-hidden="true">★</span>
+              <span id="coin-count" aria-label="Монеты: 0">0</span>
+            </div>
+            <div class="hud-pill energy-pill">
+              <span class="hud-caption">ЭНЕРГИЯ</span>
+              <span id="boost-energy" aria-label="Энергия: 30">30</span>
+              <span class="energy-bolt" aria-hidden="true">ϟ</span>
+            </div>
+          </div>
+
+          <section id="speed-panel" aria-label="Скорость и пробитие">
+            <div class="speed-value-row">
+              <strong id="speed-value">10.0</strong>
+              <span>ЕД/С</span>
+            </div>
+            <div class="breakthrough-row">
+              УРОВЕНЬ ПРОБИТИЯ <strong id="breakthrough-value">10</strong>
+            </div>
+            <small>разрушает платформы с прочностью ≤ <span id="breakthrough-hint">10</span></small>
+          </section>
+
+          <div class="hud-stack hud-stack-right">
+            <button
+              id="pause-button"
+              type="button"
+              aria-label="Открыть меню паузы"
+              aria-controls="pause-menu"
+              aria-expanded="false"
+            >
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+            </button>
+            <p id="lives" aria-label="Жизни: 3 из 3">♥ ♥ ♥</p>
+            <p id="phase-stage" aria-label="Первая фаза, этап 1 из 10">ЭТАП 1/10</p>
+          </div>
+        </header>
+
+        <aside id="run-panel">
+          <span class="hud-caption">ГЛУБИНА</span>
+          <strong id="depth-value">0 М</strong>
+        </aside>
+
+        <p id="status" role="status">Загрузка…</p>
+
+        <div id="boost-panel">
+          <button id="boost-button" type="button" aria-label="Boost">
+            <span class="control-ring boost-cooldown" aria-hidden="true"></span>
+            <span class="control-core" aria-hidden="true"></span>
+            <svg class="boost-ball" viewBox="0 0 100 100" aria-hidden="true">
+              <defs>
+                <radialGradient id="boostBallFill" cx="34%" cy="24%" r="72%">
+                  <stop offset="0" stop-color="#fff"></stop>
+                  <stop offset="0.62" stop-color="#dce7f0"></stop>
+                  <stop offset="1" stop-color="#738aa2"></stop>
+                </radialGradient>
+              </defs>
+              <circle cx="50" cy="49" r="34" fill="url(#boostBallFill)" stroke="#092d58" stroke-width="4"></circle>
+              <ellipse cx="50" cy="22" rx="14" ry="7" fill="#0bd5ff" stroke="#075fb8" stroke-width="4"></ellipse>
+              <ellipse cx="39" cy="50" rx="4" ry="8" fill="#071b31"></ellipse>
+              <ellipse cx="61" cy="50" rx="4" ry="8" fill="#071b31"></ellipse>
+              <path d="M22 66 Q50 82 78 66" fill="none" stroke="#0877cf" stroke-width="6"></path>
+            </svg>
+            <span class="boost-title">BOOST</span>
+            <span class="control-state boost-state">ГОТОВО</span>
+            <span id="boost-cost" class="boost-cost">−1⚡</span>
+          </button>
+        </div>
+        <button
+          id="slow-mode-button"
+          type="button"
+          aria-label="Нажмите, чтобы включить замедление времени до 10 процентов."
+          aria-pressed="false"
+        >
+          <span class="control-ring" aria-hidden="true"></span>
+          <span class="control-core" aria-hidden="true"></span>
+          <span class="slow-mode-value" aria-hidden="true">ϟ</span>
+          <span class="slow-mode-title">ЗАМЕДЛЕНИЕ</span>
+          <span class="control-state slow-mode-state">ГОТОВО</span>
+        </button>
+        <section id="pause-menu" role="dialog" aria-modal="true" aria-labelledby="pause-menu-title" hidden>
+          <div class="pause-card">
+            <header class="pause-card-header">
+              <span class="pause-header-line" aria-hidden="true"></span>
+              <div>
+                <small>SPEED FALL BALL</small>
+                <h1 id="pause-menu-title">ПАУЗА</h1>
+              </div>
+              <span class="pause-header-line" aria-hidden="true"></span>
+            </header>
+
+            <div class="pause-summary" aria-label="Текущий результат забега">
+              <div class="pause-stat pause-distance-stat">
+                <span>ПРОЙДЕНО</span>
+                <strong id="pause-depth-value">0 М</strong>
+              </div>
+              <div class="pause-stat pause-currency-stat">
+                <span class="coin-emblem pause-coin" aria-hidden="true">★</span>
+                <div>
+                  <span>СОБРАНО МОНЕТ</span>
+                  <strong id="pause-coin-value">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <section class="pause-missions" aria-labelledby="pause-missions-title">
+              <h2 id="pause-missions-title">ТЕКУЩИЕ МИССИИ</h2>
+              <ul>
+                <li>
+                  <div class="mission-copy">
+                    <span>Соберите 50 монет</span>
+                    <strong id="mission-coins-value">0/50</strong>
+                  </div>
+                  <div class="mission-track" aria-hidden="true"><span id="mission-coins-progress"></span></div>
+                </li>
+                <li>
+                  <div class="mission-copy">
+                    <span>Разрушьте 10 платформ</span>
+                    <strong id="mission-platforms-value">0/10</strong>
+                  </div>
+                  <div class="mission-track" aria-hidden="true"><span id="mission-platforms-progress"></span></div>
+                </li>
+                <li>
+                  <div class="mission-copy">
+                    <span>Дойдите до этапа 10</span>
+                    <strong id="mission-stage-value">1/10</strong>
+                  </div>
+                  <div class="mission-track" aria-hidden="true"><span id="mission-stage-progress"></span></div>
+                </li>
+              </ul>
+            </section>
+
+            <div class="pause-settings" aria-label="Настройки">
+              <button id="sound-toggle" class="pause-setting" type="button" aria-pressed="true">
+                <span class="setting-icon" aria-hidden="true">♪</span>
+                <span>ЗВУК</span>
+                <strong class="setting-state">ВКЛ</strong>
+              </button>
+              <button id="interface-toggle" class="pause-setting" type="button" aria-pressed="true">
+                <span class="setting-icon" aria-hidden="true">▣</span>
+                <span>ИНТЕРФЕЙС</span>
+                <strong class="setting-state">ВКЛ</strong>
+              </button>
+            </div>
+
+            <div class="pause-actions">
+              <button id="resume-button" class="pause-primary-action" type="button">ВОЗОБНОВИТЬ</button>
+              <button id="pause-restart-button" type="button">НАЧАТЬ ЗАНОВО</button>
+              <button id="exit-button" class="pause-danger-action" type="button">ВЫХОД</button>
+            </div>
+          </div>
+        </section>
+        <section id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title" hidden>
+          <div class="game-over-card">
+            <h1 id="game-over-title">Забег завершён</h1>
+            <p>Все жизни потеряны</p>
+            <button id="restart-button" type="button">Начать новый забег</button>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
