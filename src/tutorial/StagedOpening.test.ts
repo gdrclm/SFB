@@ -20,12 +20,12 @@ describe("staged opening", () => {
     expect(events).toEqual(["spawn:platform", "tip:platform"]);
     opening.fixedUpdate(3.9); expect(random).not.toHaveBeenCalled();
     opening.fixedUpdate(0.1); expect(events.slice(-2)).toEqual(["spawn:coin", "tip:coin"]);
-    opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:boost", "tip:boost"]);
-    opening.fixedUpdate(8); expect(events.slice(-2)).toEqual(["spawn:fork", "tip:fork"]);
-    opening.fixedUpdate(11.9); expect(random).not.toHaveBeenCalled();
+    opening.fixedUpdate(12); expect(events.slice(-2)).toEqual(["spawn:boost", "tip:boost"]);
+    opening.fixedUpdate(7); expect(events.slice(-2)).toEqual(["spawn:fork", "tip:fork"]);
+    opening.fixedUpdate(6.9); expect(random).not.toHaveBeenCalled();
     opening.fixedUpdate(0.1);
     expect(events.slice(-2)).toEqual(["random", "tip:free"]);
-    expect(events.filter((event) => event === "spawn:practice")).toHaveLength(3);
+    expect(events.filter((event) => event === "spawn:practice")).toHaveLength(7);
     expect(complete).toHaveBeenCalledOnce();
     opening.fixedUpdate(100);
     expect(random).toHaveBeenCalledOnce();
@@ -57,7 +57,7 @@ describe("staged opening", () => {
     expect(events).not.toContain("tip:vitality");
     opening.discover("life"); opening.discover("life");
     expect(events.filter((event) => event === "tip:life")).toHaveLength(1);
-    opening.fixedUpdate(4); opening.fixedUpdate(6); opening.fixedUpdate(8); opening.fixedUpdate(12);
+    opening.fixedUpdate(4); opening.fixedUpdate(12); opening.fixedUpdate(7); opening.fixedUpdate(7);
     for (const kind of ["vitality", "time-slow"] as const) {
       opening.platformAppeared(kind); opening.platformAppeared(kind);
       expect(events.filter((event) => event === `tip:${kind}`)).toHaveLength(1);
@@ -78,4 +78,18 @@ describe("staged opening", () => {
     expect(random).toHaveBeenCalledOnce();
     expect(complete).toHaveBeenCalledOnce();
   });
+});
+
+it("waits for a legitimately earned BOOST and offers practice instead of an impossible gate", () => {
+  let ready = false;
+  const events: string[] = [];
+  const opening = new StagedOpening({ spawn: (kind) => { events.push(kind); },
+    explain: vi.fn(), random: vi.fn(), complete: vi.fn(), readyForBoost: () => ready });
+  for (let i = 0; i < 1200; i++) opening.fixedUpdate(.02);
+  expect(events).not.toContain("boost"); expect(events).not.toContain("fork");
+  expect(events.filter(e => e === "practice").length).toBeGreaterThanOrEqual(6);
+  ready = true; opening.fixedUpdate(.02);
+  expect(events.at(-1)).toBe("boost");
+  opening.fixedUpdate(6); expect(events).not.toContain("fork");
+  opening.fixedUpdate(1); expect(events).toContain("fork");
 });

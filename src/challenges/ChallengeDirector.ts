@@ -17,7 +17,10 @@ export class ChallengeDirector {
   public constructor(start: (challenge: Challenge) => void, random = Math.random) {
     this.#start = start; this.#random = random; this.#remaining = this.#interval();
   }
-  #interval(): number { return 20 + Math.max(0, Math.min(1, this.#random())) * 20; }
+  #interval(): number {
+    const spread = this.#next >= 6 ? 5 : this.#next >= 3 ? 10 : 20;
+    return 20 + Math.max(0, Math.min(1, this.#random())) * spread;
+  }
   public fixedUpdate(delta: number): void {
     this.#remaining -= delta;
     while (this.#remaining <= 1e-9) {

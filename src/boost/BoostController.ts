@@ -9,6 +9,7 @@ export type BoostFailureReason =
   | "slow-mode"
   | "bounce-recovery"
   | "game-not-playing"
+  | "combo-required"
   | "insufficient-energy";
 
 export interface SuccessfulBoostResult {
@@ -34,6 +35,8 @@ export class BoostController implements FixedSimulationSystem {
   readonly #config: GameConfig["boost"];
   readonly #listeners = new Set<BoostListener>();
   #cooldownRemaining = 0;
+  #chargeHits = 0;
+  #hasCharge = false;
   readonly #cancelSlowMode: (() => void) | undefined;
 
   public constructor(
@@ -54,6 +57,22 @@ export class BoostController implements FixedSimulationSystem {
     return this.#wallet.energy;
   }
 
+  public get hasCharge(): boolean { return this.#hasCharge; }
+  public get chargeHits(): number { return this.#hasCharge ? this.hitsRequired : this.#chargeHits; }
+  public get hitsRequired(): number { return this.#config.comboHitsRequired; }
+  public get chargeProgress(): number { return this.chargeHits / this.hitsRequired; }
+
+  /** Holding a full charge never banks spare hits or additional BOOSTs. */
+  public recordSuccessfulHit(): boolean {
+    if (this.#hasCharge || (this.#gameState.current !== GameState.Playing && this.#gameState.current !== GameState.SlowMode)) return false;
+    this.#chargeHits++;
+    if (this.#chargeHits < this.hitsRequired) return false;
+    this.#hasCharge = true;
+    return true;
+  }
+
+  public resetComboCharge(): void { this.#chargeHits = 0; }
+
   public get energyCost(): number {
     const completedBands = Math.floor(
       Math.max(0, this.#ball.fallSpeed - this.#config.costBandSpeed) /
@@ -73,6 +92,7 @@ export class BoostController implements FixedSimulationSystem {
   public get canBoost(): boolean {
     return (
       this.#cooldownRemaining <= 0 &&
+      this.#hasCharge &&
       (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode && this.#cancelSlowMode !== undefined) &&
       this.#wallet.energy >= this.energyCost
     );
@@ -98,6 +118,7 @@ export class BoostController implements FixedSimulationSystem {
     if (this.#cooldownRemaining > 0) {
       return { success: false, reason: "cooldown" };
     }
+    if (!this.#hasCharge) return { success: false, reason: "combo-required" };
 
     const energyCost = this.energyCost;
     if (!this.#wallet.spendEnergy(energyCost)) {
@@ -108,6 +129,8 @@ export class BoostController implements FixedSimulationSystem {
     const previousSpeed = this.#ball.fallSpeed;
     this.#ball.fallSpeed = previousSpeed * this.#config.speedMultiplier;
     this.#cooldownRemaining = this.#config.cooldownSeconds;
+    this.#hasCharge = false;
+    this.#chargeHits = 0;
 
     const result: SuccessfulBoostResult = {
       success: true,

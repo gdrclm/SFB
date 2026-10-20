@@ -2277,3 +2277,21 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
   #start-screen .game-over-card { padding-top: 12px; padding-bottom: 8px; }
   #start-screen .main-menu-actions { gap: 8px; }
 }
+
+/* Goals live in their own menu window; only the pinned goal appears in pause. */
+#missions-dialog { border: 2px solid #1ee4ff; background: linear-gradient(155deg, #075095, #032b5b 28%, #02152e); box-shadow: 0 0 0 2px #065eae, 0 0 20px #00c8ff66, inset 0 2px 3px #b8f9ffcc; }
+#missions-dialog::backdrop { background: #010d24d9; backdrop-filter: blur(6px); }
+#missions-dialog .missions-caption { color: #a2d7ed; font-size: .8rem; margin: -4px 0 12px; }
+#missions-dialog .menu-missions { margin: 0; }
+#missions-dialog #mission-list { max-height: min(350px, calc(100dvh - 180px)); gap: 8px; }
+#missions-dialog #mission-list .mission-choice { min-height: 49px; }
+#missions-dialog .mission-choice-title { font-size: .76rem; }
+#missions-dialog #mission-list .mission-choice small { font-size: .65rem; }
+#missions-close { border-color: #1ee4ff; background: linear-gradient(#0c5c9b, #032951); box-shadow: 0 0 7px #00c8ff88, inset 0 1px 2px #b8f9ff; }
+#missions-dialog button:focus-visible { outline: 3px solid #ffe57a; outline-offset: 2px; }
+#boost-button[data-charged="false"] .boost-cooldown { background: conic-gradient(#1fffd3 0 var(--charge-angle, 0deg), #163d60 var(--charge-angle, 0deg) 360deg); }
+#boost-button[data-charged="false"] .boost-state { background: #083857; border-color: #3a90ae; color: #b3e8ec; }
+#boost-button[data-charged="false"] .boost-ball { filter: brightness(.75); }
+@media (max-height: 470px) and (orientation: landscape) { #missions-dialog { width: min(600px, calc(100vw - 24px)); padding: 14px 18px; } #missions-dialog .records-header { margin-bottom: 9px; } #missions-dialog #mission-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: calc(100dvh - 140px); } }
+@media (max-height: 470px) and (orientation: landscape) { #start-screen .menu-training { grid-row: 5; margin-top: 4px; } }
+#boost-button[data-charged="true"].boost-ready .boost-cooldown { background: conic-gradient(#adffe7, #00ecba, #adffe7); box-shadow: 0 0 12px #00edb988; }

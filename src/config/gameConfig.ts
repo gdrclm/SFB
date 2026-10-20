@@ -47,6 +47,7 @@ export interface GameConfig {
     readonly maximumTrailVisibility: number;
   };
   readonly boost: {
+    readonly comboHitsRequired: number;
     readonly speedMultiplier: number;
     readonly cooldownSeconds: number;
     readonly costBandSpeed: number;
@@ -214,6 +215,7 @@ export const gameConfig: GameConfig = Object.freeze({
     maximumTrailVisibility: 0.95,
   }),
   boost: Object.freeze({
+    comboHitsRequired: 6,
     speedMultiplier: 1.5,
     cooldownSeconds: 1,
     costBandSpeed: 10,

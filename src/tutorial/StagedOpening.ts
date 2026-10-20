@@ -7,11 +7,13 @@ export interface OpeningActions {
   explain(tip: GuideTip): void;
   random(): void;
   complete(): void;
+  readyForBoost?(): boolean;
 }
 const sequence = [
-  { at: 0, kind: "platform" }, { at: 4, kind: "coin" },
-  { at: 10, kind: "boost" }, { at: 18, kind: "fork" },
-  { at: 22, kind: "practice" }, { at: 25, kind: "practice" }, { at: 28, kind: "practice" },
+  { at: 0, kind: "platform" }, { at: 2, kind: "practice" }, { at: 4, kind: "coin" },
+  { at: 5, kind: "practice" }, { at: 7, kind: "practice" }, { at: 9, kind: "practice" }, { at: 11, kind: "practice" },
+  { at: 16, kind: "boost" }, { at: 23, kind: "fork" },
+  { at: 26, kind: "practice" }, { at: 28, kind: "practice" },
 ] as const;
 
 export class StagedOpening {
@@ -21,6 +23,8 @@ export class StagedOpening {
   #next = 0;
   #scripted = true;
   #skipped = false;
+  #delay = 0;
+  #lastPractice = -Infinity;
 
   public constructor(actions: OpeningActions) { this.#actions = actions; }
   public get isScripted(): boolean { return this.#scripted; }
@@ -30,7 +34,15 @@ export class StagedOpening {
     if (!this.#scripted) return;
     this.#elapsed += delta;
     let event = sequence[this.#next];
-    while (event !== undefined && this.#elapsed + 1e-9 >= event.at) {
+    while (event !== undefined && this.#elapsed - this.#delay + 1e-9 >= event.at) {
+      if (event.kind === "boost" && this.#actions.readyForBoost?.() === false) {
+        this.#delay = this.#elapsed - event.at;
+        if (this.#elapsed - this.#lastPractice >= 2) {
+          this.#lastPractice = this.#elapsed;
+          this.#actions.spawn("practice");
+        }
+        return;
+      }
       this.#next++;
       if (event.kind === "fork") this.#seen.add("super-heavy");
       this.#actions.spawn(event.kind);
@@ -40,7 +52,7 @@ export class StagedOpening {
       }
       event = sequence[this.#next];
     }
-    if (this.#elapsed + 1e-9 >= 30) {
+    if (this.#elapsed - this.#delay + 1e-9 >= 30) {
       this.#finish();
       this.discover("free");
     }

@@ -68,8 +68,10 @@ If WebGPU is unavailable, the application falls back to WebGL2.
 
 Hold or drag the mouse/finger horizontally on the game canvas to guide the
 falling ball. Releasing the pointer preserves a short horizontal inertia.
-Press the large **BOOST** button to increase fall speed. The button shows its
-one-second cooldown, current energy and the energy cost of the next boost.
+Earn one **BOOST** with six consecutive platform breaks, then press the button
+for +50% fall speed. Its ring and counter show charge progress. Coins and waiting
+do not refill it. An error resets an unfinished charge; a full charge is banked
+until used. Only one charge can be held, with no saved overflow hits.
 
 ## Run results
 
@@ -148,10 +150,11 @@ optional numeric badges. Players do not need numbers for the default cues.
 
 The first run now starts gameplay immediately. Random platform and coin
 production is disabled during the first 30 active simulation seconds. A simple
-platform appears first, a coin at second 4, a boost gate at second 10, and a
-real two-lane fork at second 18. Familiar platforms and coins at seconds
-22/25/28 then provide practice and a natural first combo without new lecture
-cards. Positions are placed ahead of the current ball,
+platform appears first, then practice at seconds 2/5/7/9/11 and the first
+coin at second 4. The boost gate appears at second 16, only when BOOST has
+actually been earned and is available. Otherwise practice continues and the
+remaining sequence waits. A two-lane fork follows seven simulation seconds
+after the gate. Familiar platforms at seconds 26/28 complete the lesson. Positions are placed ahead of the current ball,
 so boosting does not reveal the whole lesson at once. The fork offers a safe
 ordinary platform and a strong dark platform, without a free central corridor.
 Only three short arrows appear: «Веди пальцем», «Собирай», «Ускорься!».
@@ -417,13 +420,14 @@ SVG-монету со звездой и графические сердца. П�
 Переход в кристальную локацию по-прежнему происходит на глубине 500 м;
 повторный забег начинается с небесной локации без пересоздания движка.
 
-### Выбор задания в главном меню
+### Выбор задания в отдельном окне
 
+Кнопка «Задания» в главном меню открывает отдельное окно в стиле настроек.
 Список из пяти заданий показывает прогресс и награду (+10 монет). Выделено
 только одно выбранное задание; в паузе закрепляется оно же. Прогресс остальных
 заданий не растёт. После выполнения награда и отметка сохраняются атомарно,
 выделение снимается, а блок задания исчезает из паузы. Следующее задание игрок
-выбирает в главном меню; частичный прогресс сохраняется при смене выбора.
+выбирает в окне заданий; частичный прогресс сохраняется при смене выбора.
 Выполненные задания остаются в списке без выделения и недоступны для повторной
 награды. После пяти выполнений доступен следующий набор. Старый последовательный
 прогресс переносится при загрузке профиля. Во время падения остаются только
@@ -450,3 +454,19 @@ SVG-монету со звездой и графические сердца. П�
 
 Перед стартом забега атлас должен загрузиться: ошибка оставляет игрока
 в главном меню с возможностью повторить запуск, без невидимых препятствий.
+
+### BOOST за серию и рост давления
+
+В начале каждого забега BOOST пуст. Шесть пробитий без ошибки дают один заряд;
+использование тратит заряд и прежнюю энергию. Ошибка обнуляет только частичное
+накопление. Заработанный заряд сохраняется до использования, максимум — один.
+Пробития при полном заряде не запасаются на следующий. Перезарядка по времени
+не заменяет новую серию. Оценка ближайшей платформы учитывает и этот заряд.
+
+Магазин предлагает «Заряд BOOST»: два уровня за 100 и 200 игровых монет,
+снижающие требование до 5 и 4 пробитий. Улучшение применяется в следующем забеге,
+не выдаёт бесплатного заряда и не отменяет сброс ошибки. После первых трёх
+испытаний интервалы уменьшаются с 20–40 до 20–30 секунд, после шести — до
+20–25 секунд игрового времени. Предсказуемые цвета платформ и безопасная
+альтернатива в генераторе сохраняются. Реальные платежи не подключены;
+текущий магазин использует внутриигровые монеты.

@@ -26,7 +26,7 @@ const steps = [
   {
     title: "Пробитие и BOOST",
     content: `<p>${platform("standard", 7)} <span class="cue-key cue-safe">Бирюзовый — пробьётся.</span> <span class="cue-key cue-boost">ϟ — хватит BOOST.</span> <span class="cue-key">Нейтральный — нужен разгон.</span> <span class="cue-key cue-danger">! — обходите.</span></p>
-      <p>${boost} <strong>+50% скорости.</strong> Общая энергия ${energy} — между кнопками. Перезарядка — 1 секунда.</p>
+      <p>${boost} <strong>Серия пробитий → один заряд.</strong> Нажми: +50% скорости. Ошибка сбрасывает незавершённую серию.</p>
       <p>${heart} Не хватило скорости: −1 жизнь, скорость снова 10.</p>`,
   },
   {
@@ -46,7 +46,7 @@ const steps = [
   },
   {
     title: "Комбо и рекорды",
-    content: `<p><span class="tutorial-key">КОМБО</span> 3 / 6 / 10 / 15 ударов подряд: ×2 / ×3 / ×4 / ×5. Ошибка сбрасывает серию.</p>
+    content: `<p><span class="tutorial-key">КОМБО</span> Комбо заряжает BOOST. Ошибка сбрасывает серию.</p>
       <p>Больше скорости и риска — больше очков. Рекорды и монеты сохраняются автоматически.</p>
       <p>${platform("standard", 7)} Бирюзовый — пробьётся. Янтарная ϟ — хватит BOOST. Красный ! — обходите.</p>`,
   },

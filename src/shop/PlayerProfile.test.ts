@@ -199,3 +199,17 @@ it("migrates existing sequential goals and ignores invalid board selections", ()
   data.setItem(PROFILE_KEY, JSON.stringify(legacy));
   expect(new PlayerProfile(() => data).activeMission).toEqual({ index: 7, progress: 2 });
 });
+
+it("buys a bounded combo-charge upgrade for the next run without granting a free BOOST", () => {
+  const data = storage(); const profile = new PlayerProfile(() => data);
+  profile.creditRuns([result("upgrade-funds", 500)]);
+  expect(createPlayerConfig(gameConfig, profile).boost.comboHitsRequired).toBe(6);
+  expect(profile.buy("combo-charge")).toBe(true);
+  expect(profile.coins).toBe(400);
+  expect(createPlayerConfig(gameConfig, profile).boost.comboHitsRequired).toBe(5);
+  expect(profile.buy("combo-charge")).toBe(true);
+  expect(profile.coins).toBe(200);
+  expect(profile.buy("combo-charge")).toBe(false);
+  expect(createPlayerConfig(gameConfig, new PlayerProfile(() => data)).boost.comboHitsRequired).toBe(4);
+  expect(gameConfig.boost.comboHitsRequired).toBe(6);
+});

@@ -14,6 +14,7 @@ export interface ShopItem {
   readonly preview: string;
 }
 export const SHOP_ITEMS: readonly ShopItem[] = [
+  { id: "combo-charge", category: "upgrade", name: "Заряд BOOST", description: "Серия для заряда: 6 → 5 → 4 пробития. Ошибка по-прежнему сбрасывает прогресс.", price: 100, maxLevel: 2, preview: "×ϟ" },
   { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень.", price: 25, maxLevel: 5, preview: "ϟ" },
   { id: "coin-energy", category: "upgrade", name: "Энергия монет", description: "+1 энергии за монету за уровень.", price: 40, maxLevel: 3, preview: "★ϟ" },
   { id: "ball-classic", category: "ball", name: "Классический", description: "Белый шар с голубыми деталями.", price: 0, preview: "●" },
@@ -43,7 +44,7 @@ export const PROFILE_KEY = "speed-fall-ball.profile.v1";
 const defaults = (): ProfileState => ({
   coins: 0,
   owned: SHOP_ITEMS.filter((item) => item.price === 0).map((item) => item.id),
-  levels: { energy: 0, "coin-energy": 0 },
+  levels: { energy: 0, "coin-energy": 0, "combo-charge": 0 },
   equipped: { ball: "ball-classic", world: "world-sky", props: "props-none", vfx: "vfx-none" },
   creditedRuns: [],
   firstSuccessAt: null,
@@ -201,6 +202,7 @@ export function createPlayerConfig(config: GameConfig, profile: PlayerProfile): 
   const color = profile.equipment.ball === "ball-gold" ? { r: 1, g: 0.72, b: 0.18 }
     : profile.equipment.ball === "ball-mint" ? { r: 0.22, g: 1, b: 0.68 } : null;
   return { ...config,
+    boost: { ...config.boost, comboHitsRequired: Math.max(4, config.boost.comboHitsRequired - profile.level("combo-charge")) },
     economy: { ...config.economy,
       initialEnergy: config.economy.initialEnergy + profile.level("energy") * 5,
       energyPerCoin: config.economy.energyPerCoin + profile.level("coin-energy"),

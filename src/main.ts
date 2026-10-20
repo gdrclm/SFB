@@ -116,7 +116,7 @@ function exitApplication(): void {
   interfaceLayer.inert = true;
   requireElement("#start-error").textContent = "";
   shop.refreshBalance();
-  renderMissionBoard(startScreen, getPlayerProfile());
+  renderMissionBoard(missionsDialog, getPlayerProfile());
   startButton.focus();
 }
 
@@ -125,10 +125,17 @@ restartButton.addEventListener("click", () => {
 });
 
 const startScreen = requireElement("#start-screen");
-renderMissionBoard(startScreen, getPlayerProfile());
+const missionsDialog = requireElement("#missions-dialog");
+if (!(missionsDialog instanceof HTMLDialogElement)) throw new TypeError("#missions-dialog must be a dialog.");
+requireElement("#missions-button").addEventListener("click", () => {
+  renderMissionBoard(missionsDialog, getPlayerProfile());
+  missionsDialog.showModal();
+});
+requireElement("#missions-close").addEventListener("click", () => { missionsDialog.close(); });
+renderMissionBoard(missionsDialog, getPlayerProfile());
 requireElement("#next-missions-button").addEventListener("click", () => {
   const saved = getPlayerProfile().nextMissionBoard();
-  renderMissionBoard(startScreen, getPlayerProfile());
+  renderMissionBoard(missionsDialog, getPlayerProfile());
   const error = requireElement("#mission-error");
   error.hidden = saved;
   error.textContent = saved ? "" : "Не удалось сохранить задания.";

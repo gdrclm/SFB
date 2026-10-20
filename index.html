@@ -67,7 +67,7 @@
 
         </section>
         <aside id="challenge-notice" role="status" hidden><strong></strong><span></span></aside>
-        <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Нажми BOOST или обойди.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
+        <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>6 пробитий подряд заряжают BOOST.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
         <aside id="first-success" role="status" data-complete="false" hidden><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Задание 1 · награда ★ 10 · потеря ♥ сбрасывает прогресс</small><span class="mission-nodes" aria-hidden="true"><i></i><i></i><i></i></span></aside>
         <aside id="run-panel">
           <span class="hud-caption">ГЛУБИНА</span>
@@ -95,7 +95,7 @@
               <path d="M22 66 Q50 82 78 66" fill="none" stroke="#0877cf" stroke-width="6"></path>
             </svg>
             <span class="boost-title">BOOST</span>
-            <span class="control-state boost-state">ГОТОВО</span>
+            <span class="control-state boost-state">0/6</span>
             <span id="boost-cost" class="boost-cost">−1⚡</span>
           </button>
         </div>
@@ -164,14 +164,9 @@
           <h1 id="start-title">Speed Fall Ball</h1>
           <p class="menu-tagline">Падай. Разбивай. Ускоряйся.</p>
           <p class="bank-balance"><span class="coin-emblem" aria-hidden="true">★</span><strong data-bank-coins>0</strong><span class="bank-caption">монет</span></p>
-          <section class="menu-missions" aria-labelledby="missions-title">
-            <h2 id="missions-title">Задания <span>Выбери одно</span></h2>
-            <div id="mission-list" role="group" aria-label="Выбрать задание для забега"></div>
-            <button id="next-missions-button" type="button" hidden>Следующие задания ›</button>
-            <p id="mission-error" role="alert" hidden></p>
-          </section>
           <div class="main-menu-actions">
             <button id="start-run-button" type="button"><span aria-hidden="true">▶︎</span> Начать забег</button>
+            <button id="missions-button" class="menu-tile" type="button" aria-controls="missions-dialog"><span aria-hidden="true">◇</span> Задания<span aria-hidden="true">›</span></button>
             <button id="shop-button" class="menu-tile" type="button"><span aria-hidden="true">▰</span> Магазин<span aria-hidden="true">›</span></button>
             <button class="records-button menu-tile" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
             <button class="menu-tile" type="button" data-open-settings><span aria-hidden="true">⚙︎</span> Настройки<span aria-hidden="true">›</span></button>
@@ -181,6 +176,15 @@
 
         </div>
       </section>
+      <dialog id="missions-dialog" class="arcade-records" aria-labelledby="missions-title">
+        <header class="records-header"><h1 id="missions-title">Задания</h1><button id="missions-close" class="settings-close" type="button" aria-label="Закрыть задания">×</button></header>
+        <p class="missions-caption">Выбери одно для забега</p>
+          <section class="menu-missions" aria-label="Список заданий">
+            <div id="mission-list" role="group" aria-label="Выбрать задание для забега"></div>
+            <button id="next-missions-button" type="button" hidden>Следующие задания ›</button>
+            <p id="mission-error" role="alert" hidden></p>
+          </section>
+      </dialog>
       <dialog id="game-settings" class="arcade-records" aria-labelledby="settings-title">
         <header class="records-header"><h1 id="settings-title">Настройки</h1><button id="settings-close" class="settings-close" type="button" aria-label="Закрыть настройки">×</button></header>
         <div class="feedback-controls">

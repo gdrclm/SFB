@@ -664,6 +664,7 @@ export class GameApplication {
 
   readonly #handleCollision = (collision: PlatformCollision): void => {
     if (this.#lives.remainingLives === 0) return;
+    const boostWasAvailable = this.#boostController?.canBoost ?? false;
     const destroyed = this.#successfulHitHandler?.handle(collision) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
@@ -672,6 +673,7 @@ export class GameApplication {
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
+      if (this.#boostController?.recordSuccessfulHit()) this.#boostButton?.playCharged();
       this.#comboView?.hit(hit);
       this.#updateMission({ type: "hit", combo: hit.count });
       const previousLives = this.#lives.remainingLives;
@@ -692,6 +694,7 @@ export class GameApplication {
       this.#boostCoach.failedImpact();
       this.#updateMission({ type: "life-lost" });
       this.#combo.miss();
+      this.#boostController?.resetComboCharge();
       this.#comboView?.miss();
       this.#renderLives();
       if (this.#gameState.current === GameState.GameOver) {
@@ -705,7 +708,7 @@ export class GameApplication {
         const newRecord = result.score > previousBest;
         this.#gameOverElement.dataset.newRecord = String(newRecord);
         requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = newRecord ? "Новый рекорд!" : "Твой результат";
-        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · поможет BOOST" : "Слишком прочная · смени дорожку";
+        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
         this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("open");
         requireMenuElement(this.#gameOverElement, "#run-result").textContent = result.score.toLocaleString("ru-RU");
         const stats: Record<string, string> = {
@@ -1019,6 +1022,7 @@ export class GameApplication {
       });
     };
     this.#opening = new StagedOpening({
+      readyForBoost: () => this.#boostController?.canBoost ?? false,
       spawn: (kind) => {
         this.#guideStrengths = [];
         document.body.dataset.guideStage = kind === "practice" ? "fork" : kind;
@@ -1027,7 +1031,7 @@ export class GameApplication {
         if (kind === "boost") spawn(ball.position.x, ball.position.y - 8, Math.ceil(ball.fallSpeed * 1.25), 0.72);
         if (kind === "practice") {
           spawn(ball.position.x, ball.position.y - 4, Math.max(1, Math.floor(ball.fallSpeed * 0.7)), 0.55);
-          coins.find((coin) => !coin.isActive)?.reactivate({ x: ball.position.x, y: ball.position.y - 3.1 });
+          if ((this.#opening?.elapsed ?? 0) >= 4) coins.find((coin) => !coin.isActive)?.reactivate({ x: ball.position.x, y: ball.position.y - 3.1 });
         }
         if (kind === "fork") {
           spawn(-2.5, ball.position.y - 9, Math.max(1, Math.floor(ball.fallSpeed * 0.7)), 0.66);
@@ -1062,6 +1066,7 @@ export class GameApplication {
     for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
     requireMenuElement(this.#interfaceLayerElement, "#speed-panel").dataset.warning = String(nearest?.approachState === "danger");
     const opportunity = nearest?.approachState === "boost";
+    requireMenuElement(this.#interfaceLayerElement, "#boost-coach p").textContent = this.#boostController?.hasCharge ? "Используй BOOST или обойди." : `${String(this.#config.boost.comboHitsRequired)} пробитий подряд заряжают BOOST.`;
     this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
     this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
     this.#comboView?.render(this.#combo);

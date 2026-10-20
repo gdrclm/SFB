@@ -32,11 +32,13 @@ export class BoostButtonController {
     this.#button.classList.toggle("boost-ready", this.#boost.canBoost && progress <= 0);
     this.#button.style.setProperty("--cooldown-progress", progress.toString());
     this.#button.style.setProperty("--cooldown-angle", `${String(progress * 360)}deg`);
+    this.#button.style.setProperty("--charge-angle", `${String(this.#boost.chargeProgress * 360)}deg`);
+    this.#button.dataset.charged = String(this.#boost.hasCharge);
     this.#button.setAttribute(
       "aria-label",
-      `Boost: +50% к скорости. Цена ${String(this.#boost.energyCost)}. Энергия ${String(this.#boost.energy)}.`,
+      `BOOST: ${this.#boost.hasCharge ? "заряд готов" : `${String(this.#boost.chargeHits)} из ${String(this.#boost.hitsRequired)} пробитий подряд`}. +50% скорости. Цена ${String(this.#boost.energyCost)} энергии.`,
     );
-    this.#costLabel.hidden = this.#boost.energyCost <= 1 && this.#boost.energy >= this.#boost.energyCost * 3;
+    this.#costLabel.hidden = !this.#boost.hasCharge || this.#boost.energyCost <= 1 && this.#boost.energy >= this.#boost.energyCost * 3;
     this.#costLabel.textContent = `−${String(this.#boost.energyCost)}⚡`;
     this.#energyLabel.textContent = String(this.#boost.energy);
     this.#energyLabel.setAttribute(
@@ -45,8 +47,10 @@ export class BoostButtonController {
     );
     if (this.#stateLabel !== null) {
       this.#stateLabel.textContent =
-        progress > 0
-          ? "ЗАРЯДКА"
+        !this.#boost.hasCharge
+          ? `${String(this.#boost.chargeHits)}/${String(this.#boost.hitsRequired)}`
+          : progress > 0
+            ? "ЖДИ"
           : this.#boost.energy < this.#boost.energyCost
             ? "ПУСТО"
             : this.#boost.canBoost
@@ -58,6 +62,8 @@ export class BoostButtonController {
   public dispose(): void {
     this.#button.removeEventListener("click", this.#onClick);
   }
+
+  public playCharged(): void { this.render(); this.#animateSuccess(); }
 
   readonly #onClick = (event: MouseEvent): void => {
     const result = this.#boost.tryBoost();
