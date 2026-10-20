@@ -1,5 +1,5 @@
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
-import { preloadCrystalBackdrop } from "./createCrystalBackdrop";
+import { preloadCrystalBackdrop } from "./createIllustratedBackdrop";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
