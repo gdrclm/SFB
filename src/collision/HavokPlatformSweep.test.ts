@@ -27,6 +27,18 @@ describe("HavokPlatformSweep", () => {
       throw new Error("The test requires at least one configured platform.");
     }
     const platform = new PlatformController(scene, gameConfig, platformConfig);
+    const defaultOutline = platform.mesh.outlineWidth;
+    platform.setApproachFeedback(10, 0);
+    expect(platform.approachState).toBe("breakable");
+    expect(platform.mesh.outlineWidth).toBeGreaterThan(defaultOutline);
+    platform.setApproachFeedback(6.5, 0.5);
+    expect(platform.approachState).toBe("close");
+    platform.setApproachFeedback(2, 0.5);
+    expect(platform.approachState).toBe("danger");
+    expect(platform.mesh.outlineWidth).toBeGreaterThan(0.08);
+    platform.setApproachFeedback(null);
+    expect(platform.approachState).toBeNull();
+    expect(platform.mesh.outlineWidth).toBe(defaultOutline);
     const standardVertexCount = platform.mesh.getTotalVertices();
     expect(platform.mesh.getTotalVertices()).toBeGreaterThan(24);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.x * 2)

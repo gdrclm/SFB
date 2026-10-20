@@ -35,11 +35,8 @@ export function calculateCameraSize(
   speed: number,
   config: GameConfig["camera"],
 ): number {
-  const extraSpeed = Math.max(0, speed - config.speedThreshold);
-  return (
-    config.orthographicSize +
-    config.speedZoomMultiplier * Math.log1p(extraSpeed / config.speedScale)
-  );
+  const speedRatio = Math.max(1, speed / config.speedThreshold);
+  return config.orthographicSize * speedRatio ** config.speedZoomExponent;
 }
 
 export class CameraController implements FixedSimulationSystem {
@@ -137,9 +134,9 @@ export class CameraController implements FixedSimulationSystem {
   ): number {
     return (
       Math.max(
-        this.#baseOrthographicSize,
+        this.#config.orthographicSize,
         this.#playSpaceHalfWidth / aspectRatio,
-      ) + this.#boostZoomOffset
+      ) * (this.#baseOrthographicSize / this.#config.orthographicSize) + this.#boostZoomOffset
     );
   }
 

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { PhaseOneController } from "./PhaseOneController";
 
-const expectedDurations = [40, 36, 32, 29, 26, 24, 21, 19, 17, 15];
+const expectedDurations = [45, 40, 36, 33, 30, 27, 25, 23, 21, 20];
 const expectedStrengthRanges = [
   [7, 9],
   [9, 11],
@@ -17,7 +17,7 @@ const expectedStrengthRanges = [
 ];
 
 describe("PhaseOneController", () => {
-  it("contains the ten GDD stages and a roughly 4:20 phase", () => {
+  it("contains the ten stages forming a five-minute opening loop", () => {
     const controller = new PhaseOneController(gameConfig);
 
     expect(gameConfig.phaseOne.stages.map((stage) => stage.durationSeconds)).toEqual(
@@ -29,16 +29,16 @@ describe("PhaseOneController", () => {
         stage.platformStrength.maximum,
       ]),
     ).toEqual(expectedStrengthRanges);
-    expect(controller.totalDurationSeconds).toBe(259);
+    expect(controller.totalDurationSeconds).toBe(300);
     expect(controller.totalDurationSeconds).toBeGreaterThan(120);
   });
 
-  it("keeps the relaxed first stage active for forty game seconds", () => {
+  it("keeps the relaxed first stage active for forty-five game seconds", () => {
     const controller = new PhaseOneController(gameConfig);
     const listener = vi.fn<(stageNumber: number) => void>();
     controller.onStageChanged(listener);
 
-    controller.fixedUpdate(39.999);
+    controller.fixedUpdate(44.999);
     expect(controller.currentStageNumber).toBe(1);
     expect(controller.currentDifficulty.platformStrength).toBeCloseTo(9, 3);
 
@@ -58,7 +58,7 @@ describe("PhaseOneController", () => {
       reactionWindowSeconds: 1.8,
     });
 
-    controller.fixedUpdate(20);
+    controller.fixedUpdate(22.5);
 
     expect(controller.currentDifficulty.platformStrength).toBe(8);
     expect(controller.currentDifficulty.reactionWindowSeconds).toBeCloseTo(1.675, 10);
@@ -74,7 +74,7 @@ describe("PhaseOneController", () => {
 
     expect(controller.currentStageNumber).toBe(10);
     expect(controller.isComplete).toBe(true);
-    expect(controller.phaseElapsedSeconds).toBe(259);
+    expect(controller.phaseElapsedSeconds).toBe(300);
     expect(controller.currentDifficulty.platformStrength).toBe(36);
     expect(controller.currentDifficulty.reactionWindowSeconds).toBe(0.45);
     expect(completed).toHaveBeenCalledOnce();
@@ -88,7 +88,7 @@ describe("PhaseOneController", () => {
         throw new Error("Expected duration is missing.");
       }
       expect(current / previous).toBeGreaterThanOrEqual(0.85);
-      expect(current / previous).toBeLessThanOrEqual(0.93);
+      expect(current / previous).toBeLessThanOrEqual(0.96);
     }
     expect(
       expectedDurations.slice(0, 4).reduce((total, value) => total + value, 0),

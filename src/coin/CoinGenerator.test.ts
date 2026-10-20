@@ -112,3 +112,12 @@ describe("CoinGenerator", () => {
     );
   });
 });
+
+it("spawns alternating precision targets on a risky coin trail", () => {
+  const coins = Array.from({ length: 10 }, () => createCoin());
+  const generator = new CoinGenerator({ position: { x: 0, y: 0, z: 0 } }, coins, gameConfig);
+  generator.handlePlatformGenerated(plan({ coinTrail: { x: 2.4, count: 10, spacing: .65, sway: .45 } }));
+  expect(coins[0]?.mesh.position.x).toBeCloseTo(1.95);
+  expect(coins[1]?.mesh.position.x).toBeCloseTo(2.85);
+  expect(coins[2]?.mesh.position.x).toBeCloseTo(1.95);
+});

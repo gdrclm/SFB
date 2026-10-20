@@ -49,6 +49,11 @@ export class CollisionResolver implements FixedSimulationSystem {
   }
 
   public fixedUpdate(): void {
+    // A recovery bounce or stationary contact is not another falling impact.
+    if (this.#ball.position.y >= this.#ball.previousPosition.y) {
+      this.#reportedActivations.clear();
+      return;
+    }
     const platform = this.#sweep.cast(this.#ball.previousPosition, this.#ball.position);
     if (platform === null) {
       this.#reportedActivations.clear();

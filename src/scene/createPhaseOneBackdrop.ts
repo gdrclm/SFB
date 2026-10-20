@@ -97,9 +97,15 @@ function drawIsland(
   context.restore();
 }
 
+export interface WorldAppearance {
+  readonly theme?: string;
+  readonly lanterns?: boolean;
+}
+
 export function createPhaseOneBackdrop(
   scene: Scene,
   cameraRig: TransformNode,
+  appearance: WorldAppearance = {},
 ): Mesh {
   const texture = new DynamicTexture(
     "PhaseOneBackdropTexture",
@@ -109,13 +115,31 @@ export function createPhaseOneBackdrop(
   );
   const context = texture.getContext() as unknown as CanvasRenderingContext2D;
   const sky = context.createLinearGradient(0, 0, 0, 1536);
-  sky.addColorStop(0, "#0758c8");
-  sky.addColorStop(0.34, "#079eed");
-  sky.addColorStop(0.72, "#55c8f6");
-  sky.addColorStop(1, "#b9ecff");
+  const palette = appearance.theme === "world-sunset"
+    ? ["#32205d", "#81458b", "#eb8c93", "#ffd69f"]
+    : appearance.theme === "world-night" ? ["#050b28", "#0d2050", "#214d75", "#566e9c"]
+      : ["#0758c8", "#079eed", "#55c8f6", "#b9ecff"];
+  for (const [index, color] of palette.entries()) sky.addColorStop(index / 3, color);
   context.fillStyle = sky;
   context.fillRect(0, 0, 1024, 1536);
 
+  if (appearance.theme === "world-night") {
+    context.fillStyle = "#e4f7ff";
+    for (let i = 0; i < 65; i++) {
+      context.beginPath(); context.arc((i * 173 + 41) % 1024, (i * 257 + 93) % 1536, i % 3 + 1, 0, Math.PI * 2); context.fill();
+    }
+  }
+  if (appearance.lanterns === true) {
+    for (let i = 0; i < 8; i++) {
+      const x = (i * 337 + 60) % 1024;
+      const y = (i * 229 + 120) % 1536;
+      context.save();
+      context.fillStyle = "#ffd67d"; context.shadowColor = "#ffb338"; context.shadowBlur = 30;
+      context.beginPath(); context.roundRect(x, y, 35, 48, 10); context.fill();
+      context.fillStyle = "#ff8138"; context.fillRect(x + 11, y + 35, 13, 10);
+      context.restore();
+    }
+  }
   drawCloud(context, 120, 330, 1.15);
   drawCloud(context, 870, 530, 0.95);
   drawCloud(context, 400, 940, 0.7);

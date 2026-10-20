@@ -6,7 +6,7 @@ describe("gameConfig speed and platform balance", () => {
   it("slows world movement without changing gameplay speed units", () => {
     expect(gameConfig.ball.startFallSpeed).toBe(10);
     expect(gameConfig.ball.movementScale).toBeCloseTo(1 / 3, 10);
-    expect(gameConfig.boost.speedIncrease).toBe(5);
+    expect(gameConfig.boost.speedMultiplier).toBe(1.5);
     expect(gameConfig.platforms.map(({ strength }) => strength)).toEqual([7, 8, 9]);
   });
 

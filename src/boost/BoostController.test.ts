@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { BallController } from "../ball/BallController";
 import { gameConfig } from "../config/gameConfig";
 import { GameState, type GameStateController } from "../core/GameStateController";
 import { RunWallet } from "../currency/RunWallet";
@@ -30,7 +31,7 @@ describe("BoostController", () => {
     expect(ball.fallSpeed / gameConfig.ball.startFallSpeed).toBeCloseTo(1.5, 10);
   });
 
-  it("always adds the same fixed speed increase", () => {
+  it("adds fifty percent of the current speed on every boost", () => {
     const ball = createBall();
     const boost = new BoostController(ball, createState(), createWallet(), gameConfig);
 
@@ -43,8 +44,29 @@ describe("BoostController", () => {
     const secondIncrease = ball.fallSpeed - secondBefore;
 
     expect(firstIncrease).toBeCloseTo(5, 10);
-    expect(secondIncrease).toBeCloseTo(firstIncrease, 10);
-    expect(secondIncrease / secondBefore).toBeLessThan(firstIncrease / firstBefore);
+    expect(secondIncrease).toBeCloseTo(7.5, 10);
+    expect(secondIncrease / secondBefore).toBeCloseTo(firstIncrease / firstBefore, 10);
+  });
+
+  it("keeps increasing actual falling distance after the third and later boosts", () => {
+    const ball = new BallController(
+      { position: { x: 0, y: 0, z: 0 } },
+      { isActive: false, normalizedPosition: 0 },
+      gameConfig,
+    );
+    const boost = new BoostController(ball, createState(), createWallet(1000), gameConfig);
+    let previousDistance = 0;
+    for (let press = 0; press < 6; press++) {
+      const before = ball.fallSpeed;
+      expect(boost.tryBoost().success).toBe(true);
+      expect(ball.fallSpeed / before).toBeCloseTo(1.5);
+      const y = ball.position.y;
+      ball.fixedUpdate(0.1);
+      const distance = y - ball.position.y;
+      expect(distance).toBeGreaterThan(previousDistance);
+      previousDistance = distance;
+      boost.fixedUpdate(1);
+    }
   });
 
   it("blocks repeated use for exactly one second", () => {
@@ -123,7 +145,7 @@ describe("BoostController", () => {
     );
 
     expect(boost.tryBoost().success).toBe(true);
-    expect(ball.fallSpeed).toBeCloseTo(1_000_000 + 5, 8);
+    expect(ball.fallSpeed).toBeCloseTo(1_000_000 * 1.5, 8);
   });
 
   it("emits a visual-ready event only for successful boosts", () => {

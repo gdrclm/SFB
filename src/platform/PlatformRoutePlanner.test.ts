@@ -119,16 +119,24 @@ describe("PlatformRoutePlanner encounters", () => {
     expect(followUp.routeKind).toBe("boost");
   });
 
-  it("marks a rich lane with one vertical trail of exactly ten coins", () => {
+  it("offers a safe route without the rich trail and a BOOST route with ten coins", () => {
     const planner = plannerFor("rich-lane");
     const plan = planner.planNext(20, 0, difficulty(10));
 
     expect(plan.coinTrail).toEqual({
-      x: plan.x,
+      x: plan.choices?.[0]?.x,
       count: 10,
+      sway: 0.45,
       spacing: gameConfig.coins.richTrailSpacing,
     });
     expect(plan.encounterTheme).toBe("rich-lane");
+    expect(plan.routeKind).toBe("mandatory");
+    expect(plan.strength).toBeLessThanOrEqual(20);
+    expect(plan.coinTrail?.x).not.toBe(plan.x);
+    const risky = plan.choices?.[0];
+    expect(risky?.routeKind).toBe("boost");
+    expect(risky?.strength).toBeGreaterThan(22);
+    expect(risky?.strength).toBeLessThanOrEqual(30);
   });
 
   it("creates a danger lane with three deadly choices", () => {
@@ -195,10 +203,29 @@ describe("PlatformRoutePlanner encounters", () => {
 
     expect(boost?.strength).toBeGreaterThan(20);
     expect(boost?.strength).toBeLessThanOrEqual(
-      20 + gameConfig.boost.speedIncrease,
+      20 * gameConfig.boost.speedMultiplier,
     );
     expect(deadly?.strength).toBeGreaterThan(
-      20 + gameConfig.boost.speedIncrease,
+      20 * gameConfig.boost.speedMultiplier,
     );
   });
+});
+
+it("switches an upcoming encounter before allocating its row, with fresh lane counts", () => {
+  const planner = plannerFor("death-tunnel");
+  expect(planner.getNextRowPlatformCount()).toBe(4);
+  planner.queueEncounter("rich-lane");
+  expect(planner.getNextRowPlatformCount()).toBe(2);
+  const plan = planner.planNext(20, 0, difficulty(10));
+  expect(plan.encounterTheme).toBe("rich-lane");
+  expect(plan.encounterRowIndex).toBe(0);
+  expect(plan.coinTrail).toBeDefined();
+});
+
+it("keeps a scheduled zone recognizable until the next timed event", () => {
+  const planner = plannerFor("chaos");
+  planner.queueEncounter("rich-lane");
+  for (let row = 0; row < 14; row++) expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("rich-lane");
+  planner.queueEncounter("trap");
+  expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("trap");
 });

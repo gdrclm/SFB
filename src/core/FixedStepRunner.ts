@@ -25,7 +25,16 @@ export class FixedStepRunner {
     this.#systems.delete(system);
   }
 
-  public advance(frameDeltaSeconds: number, timeScale = 1): void {
+  public clear(): void {
+    this.#systems.clear();
+    this.#accumulatorSeconds = 0;
+  }
+
+  public advance(
+    frameDeltaSeconds: number,
+    timeScale = 1,
+    shouldContinue: () => boolean = () => true,
+  ): void {
     if (!Number.isFinite(frameDeltaSeconds) || frameDeltaSeconds < 0) {
       throw new RangeError("Frame delta must be a finite non-negative number.");
     }
@@ -41,6 +50,10 @@ export class FixedStepRunner {
 
     for (let step = 0; step < stepCount; step += 1) {
       for (const system of this.#systems) {
+        if (!shouldContinue()) {
+          this.#accumulatorSeconds = 0;
+          return;
+        }
         system.fixedUpdate(
           this.#fixedStepSeconds * timeScale,
           this.#fixedStepSeconds,

@@ -1,0 +1,30 @@
+import type { PlatformEncounterTheme } from "../platform/PlatformRoutePlanner";
+
+export const CHALLENGES = [
+  { theme: "rich-lane", title: "Золотая развилка", text: "Больше монет за прочной платформой. Сверьте скорость и цену BOOST перед входом." },
+  { theme: "trap", title: "Зигзаг", text: "Проход меняет сторону. Планируйте следующий поворот заранее." },
+  { theme: "death-tunnel", title: "Узкий коридор", text: "Держитесь внутри коридора: по краям сверхпрочные платформы." },
+  { theme: "chaos", title: "Мозаика", text: "Несколько типов платформ в одном ряду. Сравнивайте прочность со скоростью." },
+] as const satisfies readonly { theme: PlatformEncounterTheme; title: string; text: string }[];
+export type Challenge = (typeof CHALLENGES)[number];
+
+/** Runs on the simulation clock: pauses, tutorial cards and slow mode apply naturally. */
+export class ChallengeDirector {
+  readonly #random: () => number;
+  readonly #start: (challenge: Challenge) => void;
+  #remaining: number;
+  #next = 0;
+  public constructor(start: (challenge: Challenge) => void, random = Math.random) {
+    this.#start = start; this.#random = random; this.#remaining = this.#interval();
+  }
+  #interval(): number { return 20 + Math.max(0, Math.min(1, this.#random())) * 20; }
+  public fixedUpdate(delta: number): void {
+    this.#remaining -= delta;
+    while (this.#remaining <= 1e-9) {
+      const challenge = CHALLENGES[this.#next % CHALLENGES.length];
+      if (challenge !== undefined) this.#start(challenge);
+      this.#next++;
+      this.#remaining += this.#interval();
+    }
+  }
+}

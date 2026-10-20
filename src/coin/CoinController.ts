@@ -6,7 +6,10 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import type { GameConfig } from "../config/gameConfig";
 
+export interface CoinChain { remaining: number; cancelled: boolean; }
+
 export class CoinController {
+  public chain: CoinChain | null = null;
   public readonly mesh: Mesh;
   public readonly radius: number;
   readonly #material: StandardMaterial;
@@ -109,11 +112,13 @@ export class CoinController {
     }
 
     this.#isActive = false;
+    if (this.chain !== null) this.chain.remaining -= 1;
     this.mesh.setEnabled(false);
     return true;
   }
 
   public deactivate(): void {
+    if (this.#isActive && this.chain !== null) this.chain.cancelled = true;
     this.#isActive = false;
     this.mesh.setEnabled(false);
   }
@@ -123,6 +128,7 @@ export class CoinController {
       return false;
     }
 
+    this.chain = null;
     this.mesh.position.x = position.x;
     this.mesh.position.y = position.y;
     this.mesh.setEnabled(true);

@@ -64,15 +64,15 @@ export class CoinGenerator implements FixedSimulationSystem {
       return;
     }
     const startY = plan.y + this.#config.coins.heightAbovePlatform;
+    const selected = this.#coins.filter((coin) => !coin.isActive).slice(0, trail.count);
+    const chain = { remaining: selected.length, cancelled: selected.length !== trail.count };
     let spawnedCount = 0;
-    for (const coin of this.#coins) {
-      if (coin.isActive) {
-        continue;
-      }
+    for (const coin of selected) {
       coin.reactivate({
-        x: trail.x,
+        x: trail.x + (trail.sway ?? 0) * (spawnedCount % 2 === 0 ? -1 : 1),
         y: startY - spawnedCount * trail.spacing,
       });
+      coin.chain = chain;
       spawnedCount += 1;
       if (spawnedCount >= trail.count) {
         return;

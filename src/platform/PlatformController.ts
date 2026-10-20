@@ -1,3 +1,5 @@
+import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
+import { createPlatformOutline } from "./PlatformOutline";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { FresnelParameters } from "@babylonjs/core/Materials/fresnelParameters";
@@ -28,92 +30,6 @@ export interface PlatformActivationProperties {
   readonly widthScale?: number;
   readonly isTrap?: boolean;
   readonly kind?: PlatformKind;
-}
-
-interface PlatformOutlinePoint {
-  readonly x: number;
-  readonly y: number;
-}
-
-function createPlatformOutline(
-  kind: PlatformKind,
-  width: number,
-  height: number,
-): readonly PlatformOutlinePoint[] {
-  const halfWidth = width / 2;
-  const halfHeight = height / 2;
-  if (kind === "vitality") {
-    return Array.from({ length: 20 }, (_, index) => {
-      const angle = Math.PI / 2 - (index / 20) * Math.PI * 2;
-      const cosine = Math.cos(angle);
-      const sine = Math.sin(angle);
-      return {
-        x:
-          halfWidth *
-          Math.sign(cosine) *
-          Math.abs(cosine) ** 0.42,
-        y:
-          halfHeight *
-          Math.sign(sine) *
-          Math.abs(sine) ** 0.7,
-      };
-    });
-  }
-
-  if (kind === "time-slow") {
-    return [
-      { x: -halfWidth, y: 0 },
-      { x: -halfWidth * 0.88, y: halfHeight * 0.58 },
-      { x: -halfWidth * 0.6, y: halfHeight },
-      { x: -halfWidth * 0.12, y: halfHeight * 0.86 },
-      { x: halfWidth * 0.42, y: halfHeight },
-      { x: halfWidth * 0.86, y: halfHeight * 0.54 },
-      { x: halfWidth, y: 0 },
-      { x: halfWidth * 0.84, y: -halfHeight * 0.56 },
-      { x: halfWidth * 0.38, y: -halfHeight },
-      { x: -halfWidth * 0.16, y: -halfHeight * 0.84 },
-      { x: -halfWidth * 0.64, y: -halfHeight },
-      { x: -halfWidth * 0.9, y: -halfHeight * 0.5 },
-    ];
-  }
-
-  if (kind === "super-heavy") {
-    return [
-      { x: -halfWidth, y: halfHeight * 0.28 },
-      { x: -halfWidth * 0.86, y: halfHeight * 0.78 },
-      { x: -halfWidth * 0.62, y: halfHeight },
-      { x: -halfWidth * 0.42, y: halfHeight * 0.76 },
-      { x: -halfWidth * 0.12, y: halfHeight },
-      { x: halfWidth * 0.1, y: halfHeight * 0.72 },
-      { x: halfWidth * 0.46, y: halfHeight },
-      { x: halfWidth * 0.72, y: halfHeight * 0.76 },
-      { x: halfWidth, y: halfHeight * 0.22 },
-      { x: halfWidth * 0.9, y: -halfHeight * 0.42 },
-      { x: halfWidth * 0.66, y: -halfHeight },
-      { x: halfWidth * 0.32, y: -halfHeight * 0.78 },
-      { x: 0, y: -halfHeight },
-      { x: -halfWidth * 0.3, y: -halfHeight * 0.76 },
-      { x: -halfWidth * 0.7, y: -halfHeight },
-      { x: -halfWidth * 0.92, y: -halfHeight * 0.38 },
-    ];
-  }
-
-  return [
-    { x: -halfWidth, y: halfHeight * 0.35 },
-    { x: -halfWidth * 0.82, y: halfHeight },
-    { x: -halfWidth * 0.42, y: halfHeight * 0.88 },
-    { x: -halfWidth * 0.08, y: halfHeight },
-    { x: halfWidth * 0.28, y: halfHeight * 0.9 },
-    { x: halfWidth * 0.78, y: halfHeight },
-    { x: halfWidth, y: halfHeight * 0.34 },
-    { x: halfWidth * 0.95, y: -halfHeight * 0.38 },
-    { x: halfWidth * 0.76, y: -halfHeight },
-    { x: halfWidth * 0.3, y: -halfHeight * 0.88 },
-    { x: -halfWidth * 0.06, y: -halfHeight },
-    { x: -halfWidth * 0.48, y: -halfHeight * 0.86 },
-    { x: -halfWidth * 0.84, y: -halfHeight },
-    { x: -halfWidth, y: -halfHeight * 0.3 },
-  ];
 }
 
 function createStylizedPlatformVertexData(
@@ -253,10 +169,11 @@ export class PlatformController {
   #routeKind: PlatformRouteKind = "mandatory";
   #kind: PlatformKind = "standard";
   #visualKind: PlatformKind = "standard";
+  #approachState: ApproachState | null = null;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig) {
     this.id = platform.id;
-    this.#strength = platform.strength;
+    this.#strength = requiredSpeed(platform.strength);
     this.#strengthLevel = platform.strengthLevel;
     this.size = platform.size;
     this.#scene = scene;
@@ -341,6 +258,34 @@ export class PlatformController {
     return this.#isBreaking;
   }
 
+  public get approachState(): ApproachState | null { return this.#approachState; }
+
+  public setApproachFeedback(speed: number | null, elapsedSeconds = 0): void {
+    const reinforced = this.#kind === "super-heavy";
+    const baseWidth = reinforced || this.#kind === "time-slow" ? 0.05 : 0.04;
+    if (speed === null || !this.#isActive) {
+      if (this.#approachState !== null) {
+        this.mesh.outlineColor = this.#getOutlineColor(reinforced);
+        this.mesh.outlineWidth = baseWidth;
+        this.#material.emissiveColor = this.#getEmissiveColor(reinforced);
+        this.#approachState = null;
+      }
+      return;
+    }
+    this.#approachState = approachState(speed, this.#strength);
+    const pulse = (Math.sin(elapsedSeconds * Math.PI * 1.6) + 1) / 2;
+    const state = this.#approachState;
+    const color = state === "breakable" ? new Color3(0.5, 0.95, 0.87)
+      : state === "close" ? new Color3(1, 0.73, 0.18)
+        : state === "hard" ? new Color3(1, 0.43, 0.13) : new Color3(1, 0.15, 0.26);
+    this.mesh.outlineColor = color;
+    this.mesh.outlineWidth = state === "breakable" ? baseWidth + 0.012
+      : state === "close" ? 0.065 + pulse * 0.015
+        : state === "hard" ? 0.07 : 0.09 + pulse * 0.025;
+    this.#material.emissiveColor = Color3.Lerp(this.#getEmissiveColor(reinforced), color,
+      state === "breakable" ? 0.12 : state === "danger" ? 0.28 + pulse * 0.08 : 0.18);
+  }
+
   public beginBreak(): boolean {
     if (!this.#isActive) {
       return false;
@@ -421,7 +366,8 @@ export class PlatformController {
   }
 
   #applyActivationProperties(properties: PlatformActivationProperties): void {
-    this.#strength = properties.strength;
+    this.#strength = requiredSpeed(properties.strength);
+    this.#approachState = null;
     this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory";
     this.#kind = properties.kind ?? "standard";
@@ -441,10 +387,10 @@ export class PlatformController {
       this.#kind === "super-heavy" || this.#kind === "time-slow"
         ? 0.05
         : 0.04;
-    this.#drawStoneTexture(properties.strength, reinforced, this.#kind);
+    this.#drawStoneTexture(this.#strength, reinforced, this.#kind);
     this.mesh.metadata = {
       platformId: this.id,
-      strength: properties.strength,
+      strength: this.#strength,
       strengthLevel: properties.strengthLevel,
       routeKind: this.#routeKind,
       kind: this.#kind,
@@ -767,15 +713,15 @@ export class PlatformController {
 
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = "900 84px Impact, Arial Black, sans-serif";
-    context.lineWidth = 12;
+    context.font = "900 92px Impact, Arial Black, sans-serif";
+    context.lineWidth = 14;
     context.strokeStyle = reinforced ? "#1b0803" : "#3b2b20";
     const textX = kind === "standard" || kind === "super-heavy"
       ? width / 2
       : width / 2 + 34;
-    context.strokeText(String(Math.round(strength)), textX, height / 2 + 4);
+    context.strokeText(String(requiredSpeed(strength)), textX, height / 2 + 4);
     context.fillStyle = "#ffffff";
-    context.fillText(String(Math.round(strength)), textX, height / 2 + 4);
+    context.fillText(String(requiredSpeed(strength)), textX, height / 2 + 4);
     texture.update(false);
   }
 

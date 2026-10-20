@@ -74,7 +74,7 @@ describe("BallVisualController", () => {
     engine.dispose();
   });
 
-  it("makes the first Boost stretch stronger than a later equal Boost", () => {
+  it("keeps later equal Boost reactions just as visible as the first", () => {
     const first = createFixture();
     const later = createFixture();
     const firstBoost: SuccessfulBoostResult = {
@@ -86,7 +86,7 @@ describe("BallVisualController", () => {
     const laterBoost: SuccessfulBoostResult = {
       success: true,
       previousSpeed: 30,
-      currentSpeed: 35,
+      currentSpeed: 45,
       energyCost: 3,
     };
 
@@ -95,7 +95,7 @@ describe("BallVisualController", () => {
     first.controller.fixedUpdate(1 / 60);
     later.controller.fixedUpdate(1 / 60);
 
-    expect(first.ball.scaling.y).toBeGreaterThan(later.ball.scaling.y);
+    expect(first.ball.scaling.y).toBeCloseTo(later.ball.scaling.y, 10);
 
     first.scene.dispose();
     first.engine.dispose();

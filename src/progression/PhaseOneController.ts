@@ -105,7 +105,7 @@ export class PhaseOneController implements FixedSimulationSystem {
       remainingSeconds -= consumedSeconds;
 
       if (
-        this.#stageElapsedSeconds + Number.EPSILON <
+        this.#stageElapsedSeconds + 1e-9 <
         this.#currentStage.durationSeconds
       ) {
         continue;
@@ -129,6 +129,7 @@ export class PhaseOneController implements FixedSimulationSystem {
     if (this.#stageIndex >= this.#stages.length - 1) {
       this.#stageElapsedSeconds = this.#currentStage.durationSeconds;
       this.#isComplete = true;
+      this.#phaseElapsedSeconds = this.totalDurationSeconds;
       for (const listener of this.#completionListeners) {
         listener();
       }

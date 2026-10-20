@@ -18,6 +18,7 @@ export class UnsuccessfulPlatformHitHandler implements FixedSimulationSystem {
   readonly #ballRadius: number;
   readonly #repeatProtectionSeconds: number;
   #protectionRemainingSeconds = 0;
+  readonly #damagedActivations = new WeakMap<PlatformController, number>();
 
   public constructor(
     ball: Pick<BallController, "isBouncing" | "startBounce">,
@@ -41,9 +42,12 @@ export class UnsuccessfulPlatformHitHandler implements FixedSimulationSystem {
   public handle(collision: PlatformCollision): boolean {
     if (
       collision.assessment !== "insufficient" ||
+      (this.#gameState.current !== GameState.Playing &&
+        this.#gameState.current !== GameState.SlowMode) ||
+      (this.#damagedActivations.has(collision.platform) &&
+        this.#damagedActivations.get(collision.platform) === collision.platform.activationId) ||
       this.#protectionRemainingSeconds > 0 ||
-      this.#ball.isBouncing ||
-      this.#gameState.current === GameState.BounceRecovery
+      this.#ball.isBouncing
     ) {
       return false;
     }
@@ -57,6 +61,7 @@ export class UnsuccessfulPlatformHitHandler implements FixedSimulationSystem {
     }
 
     this.#protectionRemainingSeconds = this.#repeatProtectionSeconds;
+    this.#damagedActivations.set(collision.platform, collision.platform.activationId);
     this.#gameState.transitionTo(
       this.#lives.remainingLives === 0
         ? GameState.GameOver

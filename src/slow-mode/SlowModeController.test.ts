@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { GameState, GameStateController } from "../core/GameStateController";
 import { RunWallet } from "../currency/RunWallet";
@@ -20,6 +20,18 @@ function createController(energy = gameConfig.economy.initialEnergy): {
 }
 
 describe("SlowModeController", () => {
+  it("emits feedback only for real on/off transitions, including forced expiry", () => {
+    const state = new GameStateController(); state.transitionTo(GameState.Playing);
+    const notify = vi.fn();
+    const controller = new SlowModeController(state, new RunWallet(30, 2), gameConfig, notify);
+    controller.requestStart(); controller.update(0.5); controller.update(0.5);
+    expect(notify).toHaveBeenCalledExactlyOnceWith(true);
+    controller.requestStop(); controller.requestStop();
+    controller.forceStart(3); controller.forceStart(3); controller.update(3);
+    expect(notify.mock.calls).toEqual([[true], [false], [true], [false]]);
+    controller.update(10); expect(notify).toHaveBeenCalledTimes(4);
+  });
+
   it("toggles ten-percent game time on and off", () => {
     const { controller, gameState } = createController();
 

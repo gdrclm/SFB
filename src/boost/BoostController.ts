@@ -102,7 +102,7 @@ export class BoostController implements FixedSimulationSystem {
     }
 
     const previousSpeed = this.#ball.fallSpeed;
-    this.#ball.fallSpeed = previousSpeed + this.#config.speedIncrease;
+    this.#ball.fallSpeed = previousSpeed * this.#config.speedMultiplier;
     this.#cooldownRemaining = this.#config.cooldownSeconds;
 
     const result: SuccessfulBoostResult = {

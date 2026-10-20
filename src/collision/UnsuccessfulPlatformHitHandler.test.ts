@@ -9,13 +9,14 @@ import { UnsuccessfulPlatformHitHandler } from "./UnsuccessfulPlatformHitHandler
 function createPlatform(): PlatformController {
   return {
     strength: 9,
+    activationId: 1,
     size: { width: 7.5, height: 0.6, depth: 1 },
     mesh: { position: new Vector3(0, -5, 0) },
   } as PlatformController;
 }
 
 describe("UnsuccessfulPlatformHitHandler", () => {
-  it("starts one bounce, removes one life and protects against repeated hits", () => {
+  it.each([GameState.Playing, GameState.SlowMode])("starts one bounce and removes one life in %s", (initialState) => {
     const ball = {
       isBouncing: false,
       startBounce: vi.fn((contactY: number) => {
@@ -24,7 +25,7 @@ describe("UnsuccessfulPlatformHitHandler", () => {
       }),
     };
     const state = new GameStateController();
-    state.transitionTo(GameState.Playing);
+    state.transitionTo(initialState);
     const lives = {
       remainingLives: 3,
       loseLife: vi.fn(() => {
@@ -64,6 +65,38 @@ describe("UnsuccessfulPlatformHitHandler", () => {
     expect(state.current).toBe(GameState.Playing);
     expect(handler.handle(collision)).toBe(false);
     expect(lives.loseLife).toHaveBeenCalledOnce();
+  });
+
+  it("never charges the same platform twice, even after the full bounce and cooldown", () => {
+    const ball = { isBouncing: false, startBounce: vi.fn(() => true) };
+    const state = new GameStateController();
+    state.transitionTo(GameState.Playing);
+    const lives = {
+      remainingLives: 3,
+      loseLife: vi.fn(() => { lives.remainingLives -= 1; return true; }),
+    };
+    const handler = new UnsuccessfulPlatformHitHandler(
+      ball, state, lives, { playErrorReaction: vi.fn() }, gameConfig,
+    );
+    const platform = createPlatform();
+    const collision: PlatformCollision = { platform, ballSpeed: 8, assessment: "insufficient" };
+    expect(handler.handle(collision)).toBe(true);
+    handler.fixedUpdate(2);
+    for (let i = 0; i < 120; i++) {
+      expect(handler.handle(collision)).toBe(false);
+      handler.fixedUpdate(1 / 60);
+    }
+    expect(lives.remainingLives).toBe(2);
+    // Pool reuse represents a new obstacle, which may cost a new life.
+    Object.defineProperty(platform, "activationId", { value: 2 });
+    expect(handler.handle(collision)).toBe(true);
+    expect(lives.remainingLives).toBe(1);
+    handler.fixedUpdate(2);
+    expect(handler.handle({ ...collision, platform: createPlatform() })).toBe(true);
+    expect(state.current).toBe(GameState.GameOver);
+    handler.fixedUpdate(2);
+    expect(handler.handle({ ...collision, platform: createPlatform() })).toBe(false);
+    expect(lives.remainingLives).toBe(0);
   });
 
   it("ignores a successful collision", () => {

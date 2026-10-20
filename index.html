@@ -11,8 +11,14 @@
   </head>
   <body>
     <main id="app">
-      <canvas id="game-canvas" aria-label="Игровая сцена Speed Fall Ball"></canvas>
+      <canvas tabindex="0" id="game-canvas" aria-label="Игровая сцена Speed Fall Ball"></canvas>
+      <div id="speed-feedback" class="speed-frozen">
+        <div class="atmosphere-particles" aria-hidden="true"><i style="--particle:0">✦</i><i style="--particle:1">✦</i><i style="--particle:2">✦</i><i style="--particle:3">✦</i><i style="--particle:4">✦</i><i style="--particle:5">✦</i><i style="--particle:6">✦</i><i style="--particle:7">✦</i><i style="--particle:8">✦</i><i style="--particle:9">✦</i></div>
+        <div class="speed-streaks" aria-hidden="true"><i style="--lane:0"></i><i style="--lane:1"></i><i style="--lane:2"></i><i style="--lane:3"></i><i style="--lane:4"></i><i style="--lane:5"></i><i style="--lane:6"></i><i style="--lane:7"></i><i style="--lane:8"></i><i style="--lane:9"></i><i style="--lane:10"></i><i style="--lane:11"></i></div>
+        <p id="boost-feedback" role="status"></p>
+      </div>
       <div id="interface-layer" aria-live="polite">
+        <div id="platform-labels" aria-hidden="true"></div>
         <header id="top-hud">
           <div class="hud-stack hud-stack-left">
             <div class="hud-pill coin-pill">
@@ -34,6 +40,7 @@
             <div class="breakthrough-row">
               УРОВЕНЬ ПРОБИТИЯ <strong id="breakthrough-value">10</strong>
             </div>
+            <span class="score-label">ОЧКИ <strong id="run-score">0</strong></span>
             <small>разрушает платформы с прочностью ≤ <span id="breakthrough-hint">10</span></small>
           </section>
 
@@ -53,6 +60,17 @@
           </div>
         </header>
 
+        <section id="combo-panel" data-tier="1" data-risk="none" aria-label="Серия успешных ударов">
+          <div class="combo-heading"><span>КОМБО</span><strong id="combo-count">0</strong><strong id="combo-multiplier">×1</strong></div>
+          <div class="combo-track" aria-hidden="true"><span id="combo-progress"></span></div>
+          <small id="combo-next">Ещё 3 до ×2</small>
+          <p id="combo-risk">Скорость ×1</p>
+          <p id="combo-message" role="status">Разбейте 3 подряд → множитель ×2</p>
+          <p id="challenge-notice" role="status" hidden><strong></strong><span></span></p>
+          <small id="loop-goal">0:00 / 5:00 · Соберите 3 удара подряд</small>
+        </section>
+        <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Уже два удара о слишком прочные платформы. BOOST увеличивает скорость на 50%: после отскока сравните скорость и прочность, дождитесь готовности кнопки. На тёмной платформе одного BOOST может не хватить.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
+        <aside id="first-success" role="status" data-complete="false"><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Первая цель · награда ★ 25 · потеря ♥ сбрасывает прогресс</small></aside>
         <aside id="run-panel">
           <span class="hud-caption">ГЛУБИНА</span>
           <strong id="depth-value">0 М</strong>
@@ -120,6 +138,7 @@
               </div>
             </div>
 
+            <p id="pause-combo-summary" class="pause-combo-summary">Комбо 0 · лучшее 0 · бонус +0</p>
             <section class="pause-missions" aria-labelledby="pause-missions-title">
               <h2 id="pause-missions-title">ТЕКУЩИЕ МИССИИ</h2>
               <ul>
@@ -148,11 +167,9 @@
             </section>
 
             <div class="pause-settings" aria-label="Настройки">
-              <button id="sound-toggle" class="pause-setting" type="button" aria-pressed="true">
-                <span class="setting-icon" aria-hidden="true">♪</span>
-                <span>ЗВУК</span>
-                <strong class="setting-state">ВКЛ</strong>
-              </button>
+              <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
+              <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>
+              <button class="pause-setting" type="button" data-feedback-setting="vibration" aria-pressed="true"><span aria-hidden="true">≋</span><span>Вибрация</span><strong class="setting-state">ВКЛ</strong></button>
               <button id="interface-toggle" class="pause-setting" type="button" aria-pressed="true">
                 <span class="setting-icon" aria-hidden="true">▣</span>
                 <span>ИНТЕРФЕЙС</span>
@@ -160,10 +177,22 @@
               </button>
             </div>
 
+            <p class="vibration-support" data-vibration-support></p>
+            <p class="personal-bests" data-personal-bests></p>
+            <details class="run-records">
+              <summary>Рекорды · топ-10</summary>
+              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
+              <div class="records-scroll">
+                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
+              </div>
+              <p data-storage-status role="status"></p>
+            </details>
             <div class="pause-actions">
-              <button id="resume-button" class="pause-primary-action" type="button">ВОЗОБНОВИТЬ</button>
+              <button type="button" data-open-tutorial>Как играть</button>
+              <button id="resume-button" class="pause-primary-action" type="button">Продолжить забег</button>
               <button id="pause-restart-button" type="button">НАЧАТЬ ЗАНОВО</button>
-              <button id="exit-button" class="pause-danger-action" type="button">ВЫХОД</button>
+              <button id="exit-button" class="pause-danger-action" type="button">Завершить забег → Главное меню</button>
+              <small class="exit-note">Забег завершится. Собранные монеты и результат сохранятся.</small>
             </div>
           </div>
         </section>
@@ -171,10 +200,84 @@
           <div class="game-over-card">
             <h1 id="game-over-title">Забег завершён</h1>
             <p>Все жизни потеряны</p>
-            <button id="restart-button" type="button">Начать новый забег</button>
+            <div class="death-explanation"><span id="death-platform" aria-hidden="true"></span><p id="death-reason"></p></div>
+            <p id="run-result" aria-live="polite"></p>
+            <button id="restart-button" type="button">Ещё раз</button>
+            <dl class="result-stats">
+              <div><dt>Глубина</dt><dd data-result="depth">0 м</dd></div>
+              <div><dt>Разрушено платформ</dt><dd data-result="platforms">0</dd></div>
+              <div><dt>Монеты за забег</dt><dd data-result="coins">0</dd></div>
+              <div><dt>Максимальная скорость</dt><dd data-result="speed">0 ед/с</dd></div>
+              <div><dt>Лучший результат</dt><dd data-result="best">0 очков</dd></div>
+              <div><dt>Лучшая серия</dt><dd data-result="combo">0</dd></div>
+            </dl>
+            <p id="result-save-status" role="status"></p>
+            <p class="personal-bests" data-personal-bests></p>
+            <details class="run-records">
+              <summary>Рекорды · топ-10</summary>
+              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
+              <div class="records-scroll">
+                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
+              </div>
+              <p data-storage-status role="status"></p>
+            </details>
+            <button id="results-menu-button" class="help-button" type="button">Главное меню</button>
           </div>
         </section>
       </div>
+      <section id="start-screen" aria-labelledby="start-title">
+        <div class="game-over-card">
+          <p class="menu-eyebrow">ГЛАВНОЕ МЕНЮ</p>
+          <h1 id="start-title">Speed Fall Ball</h1>
+          <p class="bank-balance">Монеты: <span aria-hidden="true">★</span> <strong data-bank-coins>0</strong></p>
+          <p>Управляйте шаром, собирайте монеты и побейте свой рекорд.</p>
+          <button id="start-run-button" type="button">Начать забег</button>
+          <button id="shop-button" class="help-button" type="button">Магазин</button>
+          <button id="guided-run-button" type="button" class="help-button">Обучающий забег</button>
+          <details class="feedback-settings"><summary>Настройки</summary>
+            <div class="feedback-controls">              <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
+              <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>
+              <button class="pause-setting" type="button" data-feedback-setting="vibration" aria-pressed="true"><span aria-hidden="true">≋</span><span>Вибрация</span><strong class="setting-state">ВКЛ</strong></button>
+</div>
+            <p class="vibration-support" data-vibration-support></p>
+          </details>
+          <p id="start-error" role="alert"></p>
+          <p class="personal-bests" data-personal-bests></p>
+            <details class="run-records">
+              <summary>Рекорды · топ-10</summary>
+              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
+              <div class="records-scroll">
+                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
+              </div>
+              <p data-storage-status role="status"></p>
+            </details>
+        </div>
+      </section>
+      <dialog id="shop" aria-labelledby="shop-title">
+        <header class="shop-header"><div><h1 id="shop-title">Магазин</h1><p>Монеты: ★ <strong data-bank-coins>0</strong></p></div><button id="shop-close" type="button">В главное меню</button></header>
+        <p>Собирайте монеты в забегах. Покупки сохраняются в этом браузере и применяются в следующем забеге.</p>
+        <nav id="shop-categories" aria-label="Категории магазина"></nav>
+        <p id="shop-message" role="status"></p>
+        <p id="shop-storage-status" role="alert"></p>
+        <div id="shop-items"></div>
+      </dialog>
+      <dialog id="context-guide" aria-labelledby="context-title">
+        <small>ОБУЧЕНИЕ · ИГРА НА ПАУЗЕ</small>
+        <div id="context-picture" aria-hidden="true"></div>
+        <h1 id="context-title" tabindex="-1" autofocus></h1>
+        <p id="context-text"></p>
+        <div class="context-actions"><button id="context-continue" type="button">Продолжить</button><button id="context-skip" type="button">Пропустить обучение</button></div>
+      </dialog>
+      <dialog id="tutorial" aria-labelledby="tutorial-title">
+        <div class="tutorial-header"><span id="tutorial-step"></span><button id="tutorial-close" type="button" aria-label="Закрыть обучение">✕</button></div>
+        <h1 id="tutorial-title"></h1>
+        <div id="tutorial-content"></div>
+        <nav class="tutorial-actions" aria-label="Обучение">
+          <button id="tutorial-back" type="button">Назад</button>
+          <button id="tutorial-next" type="button">Далее</button>
+          <button id="tutorial-skip" type="button">Пропустить</button>
+        </nav>
+      </dialog>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

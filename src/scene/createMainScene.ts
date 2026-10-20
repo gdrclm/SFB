@@ -9,7 +9,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 import type { GameConfig } from "../config/gameConfig";
-import { createPhaseOneBackdrop } from "./createPhaseOneBackdrop";
+import { createPhaseOneBackdrop, type WorldAppearance } from "./createPhaseOneBackdrop";
 
 export interface MainScene {
   readonly scene: Scene;
@@ -22,9 +22,12 @@ export interface MainScene {
 export async function createMainScene(
   engine: AbstractEngine,
   config: GameConfig,
+  appearance: WorldAppearance = {},
 ): Promise<MainScene> {
   const scene = new Scene(engine);
-  scene.clearColor = new Color4(0.03, 0.55, 0.91, 1);
+  scene.clearColor = appearance.theme === "world-night" ? new Color4(0.02, 0.04, 0.16, 1)
+    : appearance.theme === "world-sunset" ? new Color4(0.2, 0.12, 0.36, 1)
+      : new Color4(0.03, 0.55, 0.91, 1);
 
   const cameraRig = new TransformNode("CameraFollowRig", scene);
   const camera = new FreeCamera(
@@ -35,7 +38,7 @@ export async function createMainScene(
   camera.parent = cameraRig;
   camera.mode = FreeCamera.ORTHOGRAPHIC_CAMERA;
   camera.setTarget(Vector3.Zero());
-  createPhaseOneBackdrop(scene, cameraRig);
+  createPhaseOneBackdrop(scene, cameraRig, appearance);
 
   const getAspectRatio = (): number => {
     const renderingCanvas = engine.getRenderingCanvas();

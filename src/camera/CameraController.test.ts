@@ -26,15 +26,30 @@ function createFixture(aspectRatio = 16 / 9) {
 }
 
 describe("CameraController", () => {
-  it("uses the logarithmic GDD camera-size formula without a speed cap", () => {
+  it("scales visible height with the square root of speed without a cap", () => {
     expect(calculateCameraSize(10, gameConfig.camera)).toBe(6);
     expect(calculateCameraSize(20, gameConfig.camera)).toBeCloseTo(
-      6 + 2.2 * Math.log(2),
+      6 * Math.sqrt(2),
       10,
     );
     expect(calculateCameraSize(10_000, gameConfig.camera)).toBeGreaterThan(
       calculateCameraSize(1_000, gameConfig.camera),
     );
+  });
+
+  it.each([9 / 19.5, 16 / 9])("keeps zooming on successive boosts at aspect %s without cancelling perceived acceleration", (aspect) => {
+    const { camera, controller, target } = createFixture(aspect);
+    let previousHeight = Number(camera.orthoTop) * 2;
+    for (let boost = 0; boost < 5; boost++) {
+      target.fallSpeed *= gameConfig.boost.speedMultiplier;
+      controller.playBoostReaction();
+      for (let frame = 0; frame < 240; frame++) controller.fixedUpdate(1 / 60);
+      const height = Number(camera.orthoTop) * 2;
+      expect(height / previousHeight).toBeCloseTo(Math.sqrt(1.5), 5);
+      // Distance travelled per screen-height must still rise after each boost.
+      expect(1.5 / (height / previousHeight)).toBeGreaterThan(1.2);
+      previousHeight = height;
+    }
   });
 
   it("smoothly follows the falling ball and keeps it inside the safe view area", () => {

@@ -1,0 +1,11 @@
+import { expect, it, vi } from "vitest";
+import { type Challenge, ChallengeDirector } from "./ChallengeDirector";
+it("introduces different physical encounter themes every 20–40 simulation seconds", () => {
+  const start = vi.fn<(challenge: Challenge) => void>(); let random = 0;
+  const director = new ChallengeDirector(start, () => { const value = random; random = 1 - random; return value; });
+  director.fixedUpdate(19.99); expect(start).not.toHaveBeenCalled();
+  director.fixedUpdate(.01); expect(start.mock.calls[0]?.[0].theme).toBe("rich-lane");
+  director.fixedUpdate(39.99); expect(start).toHaveBeenCalledTimes(1);
+  director.fixedUpdate(.01); expect(start.mock.calls[1]?.[0].theme).toBe("trap");
+  director.fixedUpdate(20); expect(start.mock.calls[2]?.[0].theme).toBe("death-tunnel");
+});

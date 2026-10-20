@@ -7,6 +7,7 @@ import type { PlatformPool } from "./PlatformPool";
 import {
   PlatformRoutePlanner,
   type PlannedPlatform,
+  type PlatformEncounterTheme,
 } from "./PlatformRoutePlanner";
 import type { PhaseOneController } from "../progression/PhaseOneController";
 
@@ -23,7 +24,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
   readonly #pool: GeneratorPool;
   readonly #difficultySource: DifficultySource;
   readonly #config: GameConfig;
-  readonly #planner: PlatformRoutePlanner;
+  #planner: PlatformRoutePlanner;
+  readonly #random: () => number;
+  public enabled = true;
   readonly #generatedListeners = new Set<PlatformGeneratedListener>();
 
   public constructor(
@@ -33,6 +36,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
     config: GameConfig,
     random: () => number = Math.random,
   ) {
+    this.#random = random;
     this.#ball = ball;
     this.#pool = pool;
     this.#difficultySource = difficultySource;
@@ -46,7 +50,15 @@ export class PlatformGenerator implements FixedSimulationSystem {
     this.#planner = new PlatformRoutePlanner(initialLowestY, config, random);
   }
 
+  public queueEncounter(theme: PlatformEncounterTheme): void { this.#planner.queueEncounter(theme); }
+
+  public resumeFromCurrentPosition(): void {
+    this.#planner = new PlatformRoutePlanner(this.#ball.position.y, this.#config, this.#random);
+    this.enabled = true;
+  }
+
   public fixedUpdate(): void {
+    if (!this.enabled) return;
     this.#recyclePlatformsAbovePlayWindow();
     this.#fillLookAheadWindow();
   }

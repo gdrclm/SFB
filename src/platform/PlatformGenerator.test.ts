@@ -90,6 +90,23 @@ function createPool(platforms: MockPlatform[]): {
 }
 
 describe("PlatformGenerator", () => {
+  it("does not generate random rows while staging and restarts at the ball after training", () => {
+    const platforms = Array.from({ length: 36 }, () => createPlatform(0, false));
+    const { pool, acquire } = createPool(platforms);
+    const ball = { position: { x: 0, y: 4.5, z: 0 }, fallSpeed: 10 };
+    const generator = new PlatformGenerator(ball, pool, difficultySource, gameConfig, () => 0);
+    generator.enabled = false;
+    generator.fixedUpdate();
+    expect(acquire).not.toHaveBeenCalled();
+    ball.position.y = -500;
+    generator.resumeFromCurrentPosition();
+    generator.fixedUpdate();
+    expect(acquire).toHaveBeenCalled();
+    const active = platforms.filter((platform) => platform.isActive);
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.every((platform) => platform.mesh.position.y < -500)).toBe(true);
+  });
+
   it("keeps a continuous look-ahead window using pooled platforms", () => {
     const platforms = [
       createPlatform(1, true),

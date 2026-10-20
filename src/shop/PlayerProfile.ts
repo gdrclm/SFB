@@ -1,0 +1,162 @@
+import { FirstSuccess } from "../run/FirstSuccess";
+import type { GameConfig } from "../config/gameConfig";
+import type { RunResult } from "../run/RunHistory";
+
+export type ShopCategory = "upgrade" | "ball" | "world" | "props" | "vfx";
+export interface ShopItem {
+  readonly id: string;
+  readonly category: ShopCategory;
+  readonly name: string;
+  readonly description: string;
+  readonly price: number;
+  readonly maxLevel?: number;
+  readonly preview: string;
+}
+export const SHOP_ITEMS: readonly ShopItem[] = [
+  { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень. До 5 уровней.", price: 25, maxLevel: 5, preview: "ϟ" },
+  { id: "coin-energy", category: "upgrade", name: "Энергия монет", description: "+1 энергии за собранную монету за уровень. До 3 уровней.", price: 40, maxLevel: 3, preview: "★ϟ" },
+  { id: "ball-classic", category: "ball", name: "Классический", description: "Белый шар с голубыми деталями.", price: 0, preview: "●" },
+  { id: "ball-gold", category: "ball", name: "Золотой", description: "Тёплое золотое свечение шара.", price: 50, preview: "●" },
+  { id: "ball-mint", category: "ball", name: "Мятный", description: "Бирюзовый шар с прохладным свечением.", price: 50, preview: "●" },
+  { id: "world-sky", category: "world", name: "Ясное небо", description: "Знакомое голубое небо.", price: 0, preview: "☁" },
+  { id: "world-sunset", category: "world", name: "Закат", description: "Персиковый горизонт и фиолетовое небо.", price: 80, preview: "☀" },
+  { id: "world-night", category: "world", name: "Лунная ночь", description: "Тёмное звёздное небо.", price: 80, preview: "☾" },
+  { id: "props-none", category: "props", name: "Без дополнений", description: "Базовые декорации мира.", price: 0, preview: "—" },
+  { id: "props-lanterns", category: "props", name: "Небесные фонарики", description: "Светящиеся фонарики на фоне. Не влияют на столкновения.", price: 60, preview: "◈" },
+  { id: "vfx-none", category: "vfx", name: "Без искр", description: "Обычные эффекты скорости.", price: 0, preview: "—" },
+  { id: "vfx-sparkles", category: "vfx", name: "Золотые искры", description: "Мягкие светящиеся частицы. Учитывают настройку уменьшения движения.", price: 60, preview: "✦" },
+];
+
+type Equipment = Record<Exclude<ShopCategory, "upgrade">, string>;
+interface ProfileState {
+  coins: number;
+  owned: string[];
+  levels: Record<string, number>;
+  equipped: Equipment;
+  creditedRuns: string[];
+  firstSuccessAt: string | null;
+}
+export const PROFILE_KEY = "speed-fall-ball.profile.v1";
+const defaults = (): ProfileState => ({
+  coins: 0,
+  owned: SHOP_ITEMS.filter((item) => item.price === 0).map((item) => item.id),
+  levels: { energy: 0, "coin-energy": 0 },
+  equipped: { ball: "ball-classic", world: "world-sky", props: "props-none", vfx: "vfx-none" },
+  creditedRuns: [],
+  firstSuccessAt: null,
+});
+
+function parseProfile(raw: string | null): ProfileState {
+  if (raw === null) return defaults();
+  const value: unknown = JSON.parse(raw);
+  if (typeof value !== "object" || value === null) throw new Error("Invalid profile");
+  const data = value as Record<string, unknown>;
+  const state = defaults();
+  if (typeof data.coins !== "number" || !Number.isSafeInteger(data.coins) || data.coins < 0 ||
+    !Array.isArray(data.owned) || !Array.isArray(data.creditedRuns)) throw new Error("Invalid profile balance");
+  state.firstSuccessAt = typeof data.firstSuccessAt === "string" && Number.isFinite(Date.parse(data.firstSuccessAt)) ? data.firstSuccessAt : null;
+  state.coins = data.coins;
+  state.owned = [...new Set([...state.owned, ...data.owned.filter((id): id is string =>
+    typeof id === "string" && SHOP_ITEMS.some((item) => item.id === id && item.category !== "upgrade"))])];
+  state.creditedRuns = data.creditedRuns.filter((id): id is string => typeof id === "string");
+  if (typeof data.levels === "object" && data.levels !== null) {
+    const levels = data.levels as Record<string, unknown>;
+    for (const item of SHOP_ITEMS) {
+      const level = levels[item.id];
+      if (item.maxLevel !== undefined && typeof level === "number" && Number.isInteger(level) && level >= 0 && level <= item.maxLevel) state.levels[item.id] = level;
+    }
+  }
+  if (typeof data.equipped === "object" && data.equipped !== null) {
+    const equipment = data.equipped as Record<string, unknown>;
+    for (const slot of Object.keys(state.equipped) as (keyof Equipment)[]) {
+      const id = equipment[slot];
+      if (typeof id === "string" && state.owned.includes(id) && SHOP_ITEMS.some((item) => item.id === id && item.category === slot)) state.equipped[slot] = id;
+    }
+  }
+  return state;
+}
+
+export class PlayerProfile {
+  readonly #storage: () => Pick<Storage, "getItem" | "setItem">;
+  #state: ProfileState = defaults();
+  #storageAvailable = true;
+  #readFailed = false;
+
+  public constructor(storage: () => Pick<Storage, "getItem" | "setItem">) {
+    this.#storage = storage;
+    try { this.#state = parseProfile(storage().getItem(PROFILE_KEY)); }
+    catch { this.#storageAvailable = false; this.#readFailed = true; }
+  }
+  public get coins(): number { return this.#state.coins; }
+  public get storageAvailable(): boolean { return this.#storageAvailable; }
+  public get equipment(): Readonly<Equipment> { return { ...this.#state.equipped }; }
+  public level(id: string): number { return this.#state.levels[id] ?? 0; }
+  public owns(id: string): boolean { return this.#state.owned.includes(id); }
+  public price(item: ShopItem): number { return item.price * (this.level(item.id) + 1); }
+
+  #commit(next: ProfileState): boolean {
+    if (this.#readFailed) return false;
+    try {
+      this.#storage().setItem(PROFILE_KEY, JSON.stringify(next));
+      this.#state = next;
+      this.#storageAvailable = true;
+      return true;
+    } catch { this.#storageAvailable = false; return false; }
+  }
+
+  public creditRuns(runs: readonly RunResult[]): boolean {
+    const credited = new Set(this.#state.creditedRuns);
+    let coins = this.#state.coins;
+    for (const run of runs) {
+      if (credited.has(run.id) || !Number.isSafeInteger(run.coins) || run.coins < 0) continue;
+      credited.add(run.id);
+      coins += run.coins;
+    }
+    if (credited.size === this.#state.creditedRuns.length) return true;
+    if (!Number.isSafeInteger(coins)) return false;
+    return this.#commit({ ...this.#state, coins, creditedRuns: [...credited] });
+  }
+
+  public get firstSuccessAt(): string | null { return this.#state.firstSuccessAt; }
+
+  public completeFirstSuccess(): boolean {
+    if (this.#state.firstSuccessAt !== null) return true;
+    const coins = this.coins + FirstSuccess.reward;
+    if (!Number.isSafeInteger(coins)) return false;
+    return this.#commit({ ...this.#state, coins, firstSuccessAt: new Date().toISOString() });
+  }
+
+  public buy(id: string): boolean {
+    const item = SHOP_ITEMS.find((entry) => entry.id === id);
+    if (item === undefined || item.maxLevel === undefined && this.owns(id)) return false;
+    if (item.maxLevel !== undefined && this.level(id) >= item.maxLevel) return false;
+    const price = this.price(item);
+    if (this.coins < price) return false;
+    return this.#commit({ ...this.#state, coins: this.coins - price,
+      owned: item.category === "upgrade" ? [...this.#state.owned] : [...this.#state.owned, id],
+      levels: item.category === "upgrade" ? { ...this.#state.levels, [id]: this.level(id) + 1 } : { ...this.#state.levels },
+    });
+  }
+
+  public equip(id: string): boolean {
+    const item = SHOP_ITEMS.find((entry) => entry.id === id);
+    if (item === undefined || item.category === "upgrade" || !this.owns(id)) return false;
+    return this.#commit({ ...this.#state, equipped: { ...this.#state.equipped, [item.category]: id } });
+  }
+}
+
+export function createPlayerConfig(config: GameConfig, profile: PlayerProfile): GameConfig {
+  const color = profile.equipment.ball === "ball-gold" ? { r: 1, g: 0.72, b: 0.18 }
+    : profile.equipment.ball === "ball-mint" ? { r: 0.22, g: 1, b: 0.68 } : null;
+  return { ...config,
+    economy: { ...config.economy,
+      initialEnergy: config.economy.initialEnergy + profile.level("energy") * 5,
+      energyPerCoin: config.economy.energyPerCoin + profile.level("coin-energy"),
+    },
+    ballVisual: { ...config.ballVisual, ...(color === null ? {} : { baseColor: color, speedColor: color }) },
+  };
+}
+let browserProfile: PlayerProfile | null = null;
+export function getPlayerProfile(): PlayerProfile {
+  return browserProfile ??= new PlayerProfile(() => window.localStorage);
+}

@@ -35,6 +35,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #trailMaterial: StandardMaterial;
   readonly #ballConfig: GameConfig["ball"];
   readonly #config: GameConfig["ballVisual"];
+  readonly #boostSpeedMultiplier: number;
   readonly #baseScale: Vector3;
   readonly #baseColor: Color3;
   readonly #speedColor: Color3;
@@ -58,6 +59,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#motion = motion;
     this.#ballConfig = config.ball;
     this.#config = config.ballVisual;
+    this.#boostSpeedMultiplier = config.boost.speedMultiplier;
     this.#baseScale = ball.scaling.clone();
     this.#baseColor = toColor3(this.#config.baseColor);
     this.#speedColor = toColor3(this.#config.speedColor);
@@ -91,10 +93,10 @@ export class BallVisualController implements FixedSimulationSystem {
   }
 
   public playBoostReaction(result: SuccessfulBoostResult): void {
-    const relativeIncrease =
-      (result.currentSpeed - result.previousSpeed) /
-      Math.max(result.previousSpeed, Number.EPSILON);
-    this.#boostStrength = clamp01(relativeIncrease / 0.5);
+    this.#boostStrength = clamp01(
+      (result.currentSpeed / Math.max(result.previousSpeed, Number.EPSILON) - 1) /
+        (this.#boostSpeedMultiplier - 1),
+    );
     this.#boostElapsedSeconds = 0;
   }
 

@@ -47,7 +47,7 @@ export interface GameConfig {
     readonly maximumTrailVisibility: number;
   };
   readonly boost: {
-    readonly speedIncrease: number;
+    readonly speedMultiplier: number;
     readonly cooldownSeconds: number;
     readonly costBandSpeed: number;
   };
@@ -134,8 +134,7 @@ export interface GameConfig {
     readonly distance: number;
     readonly orthographicSize: number;
     readonly speedThreshold: number;
-    readonly speedScale: number;
-    readonly speedZoomMultiplier: number;
+    readonly speedZoomExponent: number;
     readonly followSharpness: number;
     readonly zoomSharpness: number;
     readonly safeVerticalRatio: number;
@@ -213,7 +212,7 @@ export const gameConfig: GameConfig = Object.freeze({
     maximumTrailVisibility: 0.58,
   }),
   boost: Object.freeze({
-    speedIncrease: 5,
+    speedMultiplier: 1.5,
     cooldownSeconds: 1,
     costBandSpeed: 10,
   }),
@@ -267,16 +266,16 @@ export const gameConfig: GameConfig = Object.freeze({
   ]),
   phaseOne: Object.freeze({
     stages: Object.freeze([
-      Object.freeze({ number: 1, durationSeconds: 40, platformStrength: Object.freeze({ minimum: 7, maximum: 9 }), reactionWindowSeconds: Object.freeze({ minimum: 1.55, maximum: 1.8 }) }),
-      Object.freeze({ number: 2, durationSeconds: 36, platformStrength: Object.freeze({ minimum: 9, maximum: 11 }), reactionWindowSeconds: Object.freeze({ minimum: 1.3, maximum: 1.55 }) }),
-      Object.freeze({ number: 3, durationSeconds: 32, platformStrength: Object.freeze({ minimum: 11, maximum: 13 }), reactionWindowSeconds: Object.freeze({ minimum: 1.1667, maximum: 1.3 }) }),
-      Object.freeze({ number: 4, durationSeconds: 29, platformStrength: Object.freeze({ minimum: 13, maximum: 15 }), reactionWindowSeconds: Object.freeze({ minimum: 1.0333, maximum: 1.1667 }) }),
-      Object.freeze({ number: 5, durationSeconds: 26, platformStrength: Object.freeze({ minimum: 15, maximum: 18 }), reactionWindowSeconds: Object.freeze({ minimum: 0.9, maximum: 1.0333 }) }),
-      Object.freeze({ number: 6, durationSeconds: 24, platformStrength: Object.freeze({ minimum: 18, maximum: 21 }), reactionWindowSeconds: Object.freeze({ minimum: 0.8, maximum: 0.9 }) }),
-      Object.freeze({ number: 7, durationSeconds: 21, platformStrength: Object.freeze({ minimum: 21, maximum: 24 }), reactionWindowSeconds: Object.freeze({ minimum: 0.7, maximum: 0.8 }) }),
-      Object.freeze({ number: 8, durationSeconds: 19, platformStrength: Object.freeze({ minimum: 24, maximum: 28 }), reactionWindowSeconds: Object.freeze({ minimum: 0.6, maximum: 0.7 }) }),
-      Object.freeze({ number: 9, durationSeconds: 17, platformStrength: Object.freeze({ minimum: 28, maximum: 32 }), reactionWindowSeconds: Object.freeze({ minimum: 0.525, maximum: 0.6 }) }),
-      Object.freeze({ number: 10, durationSeconds: 15, platformStrength: Object.freeze({ minimum: 32, maximum: 36 }), reactionWindowSeconds: Object.freeze({ minimum: 0.45, maximum: 0.525 }) }),
+      Object.freeze({ number: 1, durationSeconds: 45, platformStrength: Object.freeze({ minimum: 7, maximum: 9 }), reactionWindowSeconds: Object.freeze({ minimum: 1.55, maximum: 1.8 }) }),
+      Object.freeze({ number: 2, durationSeconds: 40, platformStrength: Object.freeze({ minimum: 9, maximum: 11 }), reactionWindowSeconds: Object.freeze({ minimum: 1.3, maximum: 1.55 }) }),
+      Object.freeze({ number: 3, durationSeconds: 36, platformStrength: Object.freeze({ minimum: 11, maximum: 13 }), reactionWindowSeconds: Object.freeze({ minimum: 1.1667, maximum: 1.3 }) }),
+      Object.freeze({ number: 4, durationSeconds: 33, platformStrength: Object.freeze({ minimum: 13, maximum: 15 }), reactionWindowSeconds: Object.freeze({ minimum: 1.0333, maximum: 1.1667 }) }),
+      Object.freeze({ number: 5, durationSeconds: 30, platformStrength: Object.freeze({ minimum: 15, maximum: 18 }), reactionWindowSeconds: Object.freeze({ minimum: 0.9, maximum: 1.0333 }) }),
+      Object.freeze({ number: 6, durationSeconds: 27, platformStrength: Object.freeze({ minimum: 18, maximum: 21 }), reactionWindowSeconds: Object.freeze({ minimum: 0.8, maximum: 0.9 }) }),
+      Object.freeze({ number: 7, durationSeconds: 25, platformStrength: Object.freeze({ minimum: 21, maximum: 24 }), reactionWindowSeconds: Object.freeze({ minimum: 0.7, maximum: 0.8 }) }),
+      Object.freeze({ number: 8, durationSeconds: 23, platformStrength: Object.freeze({ minimum: 24, maximum: 28 }), reactionWindowSeconds: Object.freeze({ minimum: 0.6, maximum: 0.7 }) }),
+      Object.freeze({ number: 9, durationSeconds: 21, platformStrength: Object.freeze({ minimum: 28, maximum: 32 }), reactionWindowSeconds: Object.freeze({ minimum: 0.525, maximum: 0.6 }) }),
+      Object.freeze({ number: 10, durationSeconds: 20, platformStrength: Object.freeze({ minimum: 32, maximum: 36 }), reactionWindowSeconds: Object.freeze({ minimum: 0.45, maximum: 0.525 }) }),
     ]),
   }),
   platformGeneration: Object.freeze({
@@ -337,8 +336,7 @@ export const gameConfig: GameConfig = Object.freeze({
     distance: 10,
     orthographicSize: 6,
     speedThreshold: 10,
-    speedScale: 10,
-    speedZoomMultiplier: 2.2,
+    speedZoomExponent: 0.5,
     followSharpness: 7,
     zoomSharpness: 4,
     safeVerticalRatio: 0.6,

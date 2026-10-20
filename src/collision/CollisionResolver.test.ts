@@ -27,6 +27,17 @@ describe("assessPlatformHit", () => {
 });
 
 describe("CollisionResolver", () => {
+  it.each([0, 1])("does not award or damage on stationary/upward recovery movement to y=%s", (y) => {
+    const cast = vi.fn(() => createPlatform(7));
+    const ball: CollisionBallState = { fallSpeed: 10,
+      previousPosition: { x: 0, y: 0, z: 0 }, position: { x: 0, y, z: 0 } };
+    const resolver = new CollisionResolver(ball, { cast, dispose: vi.fn() });
+    const listener = vi.fn(); resolver.onCollision(listener);
+    resolver.fixedUpdate();
+    expect(cast).not.toHaveBeenCalled();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("sweeps the complete movement segment and reports a high-speed crossing", () => {
     const platform = createPlatform(9);
     const ball: CollisionBallState = {

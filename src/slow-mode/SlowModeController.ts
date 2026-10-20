@@ -10,15 +10,18 @@ export class SlowModeController {
   readonly #config: GameConfig["slowMode"];
   #elapsedRealSeconds = 0;
   #forcedRemainingRealSeconds = 0;
+  readonly #onActiveChanged: (active: boolean) => void;
 
   public constructor(
     gameState: Pick<GameStateController, "current" | "transitionTo">,
     wallet: Pick<RunWallet, "energy" | "drainEnergy">,
     config: GameConfig,
+    onActiveChanged: (active: boolean) => void = () => {},
   ) {
     this.#gameState = gameState;
     this.#wallet = wallet;
     this.#config = config.slowMode;
+    this.#onActiveChanged = onActiveChanged;
   }
 
   public get isActive(): boolean {
@@ -59,6 +62,7 @@ export class SlowModeController {
 
     this.#elapsedRealSeconds = 0;
     this.#gameState.transitionTo(GameState.SlowMode);
+    this.#onActiveChanged(true);
     return true;
   }
 
@@ -69,6 +73,7 @@ export class SlowModeController {
     this.#elapsedRealSeconds = 0;
     if (this.isActive) {
       this.#gameState.transitionTo(GameState.Playing);
+      this.#onActiveChanged(false);
     }
   }
 
@@ -83,12 +88,14 @@ export class SlowModeController {
       return false;
     }
 
+    const wasActive = this.isActive;
     this.#elapsedRealSeconds = 0;
     this.#forcedRemainingRealSeconds = Math.max(
       this.#forcedRemainingRealSeconds,
       durationRealSeconds,
     );
     this.#gameState.transitionTo(GameState.SlowMode);
+    if (!wasActive) this.#onActiveChanged(true);
     return true;
   }
 
@@ -119,6 +126,7 @@ export class SlowModeController {
       this.#forcedRemainingRealSeconds = nextForcedRemainingSeconds;
       if (nextForcedRemainingSeconds <= ENERGY_EPSILON) {
         this.#gameState.transitionTo(GameState.Playing);
+        this.#onActiveChanged(false);
       }
       return this.#config.timeScale;
     }

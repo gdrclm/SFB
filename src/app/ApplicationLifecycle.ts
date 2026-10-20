@@ -1,5 +1,6 @@
 export interface LifecycleApplication {
   start(): Promise<void>;
+  reset(): Promise<void>;
   dispose(): void;
 }
 
@@ -12,12 +13,13 @@ export class ApplicationLifecycle {
   }
 
   public async restart(): Promise<void> {
-    this.dispose();
-    const application = this.#createApplication();
+    const application = this.#application ?? this.#createApplication();
+    const reusing = this.#application !== null;
     this.#application = application;
 
     try {
-      await application.start();
+      if (reusing) await application.reset();
+      else await application.start();
     } catch (error: unknown) {
       if (this.#application === application) {
         application.dispose();

@@ -18,6 +18,7 @@ export interface PlannedCoinTrail {
   readonly x: number;
   readonly count: number;
   readonly spacing: number;
+  readonly sway?: number;
 }
 
 export interface PlannedPlatform {
@@ -57,7 +58,8 @@ interface RowMember {
 interface RowBlueprint {
   readonly lanes: readonly RowMember[];
   readonly primaryLaneIndex: number;
-  readonly coinTrail?: Readonly<{ count: number; spacing: number }>;
+  readonly coinTrail?: Readonly<{ count: number; spacing: number; sway?: number }>;
+  readonly coinLaneIndex?: number;
 }
 
 interface PlannedRowMember extends PlannedPlatformChoice {
@@ -100,6 +102,7 @@ export class PlatformRoutePlanner {
   #nextY: number;
   #lastTheme: PlatformEncounterTheme | null = null;
   #activeTheme: PlatformEncounterTheme | null = null;
+  #scheduledTheme: PlatformEncounterTheme | null = null;
   #encounterRowIndex = 0;
   #encounterVariant = 0;
   #pendingBlueprint: RowBlueprint | null = null;
@@ -116,6 +119,14 @@ export class PlatformRoutePlanner {
     this.#nextY = initialLowestY;
     this.#config = config;
     this.#random = random;
+  }
+
+  public queueEncounter(theme: PlatformEncounterTheme): void {
+    this.#scheduledTheme = theme;
+    this.#activeTheme = theme;
+    this.#encounterVariant = this.#randomIndex(4);
+    this.#encounterRowIndex = 0;
+    this.#pendingBlueprint = null;
   }
 
   public getNextRowPlatformCount(): number {
@@ -176,9 +187,10 @@ export class PlatformRoutePlanner {
       blueprint.coinTrail === undefined
         ? undefined
         : {
-            x: primary.x,
+            x: row[blueprint.coinLaneIndex ?? blueprint.primaryLaneIndex]?.x ?? primary.x,
             count: blueprint.coinTrail.count,
             spacing: blueprint.coinTrail.spacing,
+            ...(blueprint.coinTrail.sway === undefined ? {} : { sway: blueprint.coinTrail.sway }),
           };
     const plan: PlannedPlatform = {
       x: primary.x,
@@ -251,7 +263,7 @@ export class PlatformRoutePlanner {
       const candidates = ENCOUNTER_THEMES.filter(
         (theme) => theme !== this.#lastTheme,
       );
-      const selected = candidates[this.#randomIndex(candidates.length)];
+      const selected = this.#scheduledTheme ?? candidates[this.#randomIndex(candidates.length)];
       if (selected === undefined) {
         throw new Error("At least one encounter theme must be available.");
       }
@@ -342,20 +354,20 @@ export class PlatformRoutePlanner {
 
   #createRichLaneBlueprint(rowIndex: number): RowBlueprint {
     const primaryLaneIndex = this.#encounterVariant % 2;
-    const lanes: RowMember[] = [DEADLY_BLACK, DEADLY_BLACK];
-    lanes[primaryLaneIndex] = rowIndex % 2 === 0 ? SAFE_STANDARD : SAFE_VITALITY;
-    lanes[(primaryLaneIndex + 1) % 2] =
-      rowIndex % 2 === 0 ? DEADLY_BLACK : BOOST_STANDARD;
+    const lanes: RowMember[] = [BOOST_STANDARD, BOOST_STANDARD];
+    lanes[primaryLaneIndex] = SAFE_STANDARD;
     const coinTrail =
       rowIndex === 0
         ? {
             count: this.#config.coins.richTrailCount,
             spacing: this.#config.coins.richTrailSpacing,
+            sway: 0.45,
           }
         : undefined;
     return {
       lanes,
       primaryLaneIndex,
+      coinLaneIndex: (primaryLaneIndex + 1) % 2,
       ...(coinTrail === undefined ? {} : { coinTrail }),
     };
   }
@@ -400,11 +412,11 @@ export class PlatformRoutePlanner {
   > {
     const generation = this.#config.platformGeneration;
     if (member.role === "deadly") {
-      const strength = Math.max(
+      const strength = Math.ceil(Math.max(
         baseStrength * generation.superHeavyStrengthMultiplier,
-        predictedSpeedAtCollision +
-          this.#config.boost.speedIncrease * generation.superHeavyBoostMargin,
-      );
+        predictedSpeedAtCollision *
+          this.#config.boost.speedMultiplier ** generation.superHeavyBoostMargin,
+      ));
       return {
         strength,
         strengthLevel: "high",
@@ -414,13 +426,14 @@ export class PlatformRoutePlanner {
     }
 
     if (member.role === "boost") {
-      const strength = Math.min(
-        predictedSpeedAtCollision + this.#config.boost.speedIncrease,
+      const strength = Math.floor(Math.min(
+        Math.floor(predictedSpeedAtCollision * this.#config.boost.speedMultiplier),
         Math.max(
           baseStrength,
           predictedSpeedAtCollision + generation.boostGateStrengthMargin,
+          this.#activeTheme === "rich-lane" ? predictedSpeedAtCollision * 1.3 : 0,
         ),
-      );
+      ));
       return {
         strength,
         strengthLevel: this.#getStrengthLevel(strength),
@@ -429,7 +442,7 @@ export class PlatformRoutePlanner {
       };
     }
 
-    const strength = Math.min(baseStrength, predictedSpeedAtCollision);
+    const strength = Math.max(1, Math.floor(Math.min(baseStrength, predictedSpeedAtCollision)));
     return {
       strength,
       strengthLevel: this.#getStrengthLevel(strength),
