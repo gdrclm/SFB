@@ -6,7 +6,6 @@ export class ComboView {
   readonly #number: HTMLElement;
   readonly #multiplier: HTMLElement;
   readonly #heading: HTMLElement;
-  readonly #fill: HTMLElement;
   readonly #flare: HTMLElement;
   #animations: Animation[] = [];
   readonly #visibility = new ComboVisibility();
@@ -21,7 +20,6 @@ export class ComboView {
     };
     this.#number = element("#combo-count"); this.#multiplier = element("#combo-multiplier");
     this.#heading = element(".combo-heading");
-    this.#fill = element("#combo-fill");
     this.#flare = document.createElement("span");
     this.#flare.className = "combo-flare";
     this.#flare.setAttribute("aria-hidden", "true");
@@ -32,7 +30,6 @@ export class ComboView {
     this.#number.textContent = String(combo.count);
     this.#multiplier.textContent = `×${String(combo.multiplier)}`;
     this.#panel.dataset.tier = String(combo.multiplier);
-    this.#fill.style.transform = `scaleX(${String(combo.progress)})`;
   }
 
   public hit(hit: ComboHit): void {

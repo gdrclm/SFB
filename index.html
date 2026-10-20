@@ -64,7 +64,6 @@
 
         <section id="combo-panel" data-tier="1" data-risk="none" aria-label="Серия успешных ударов">
           <div class="combo-heading"><span>КОМБО</span><strong id="combo-count">0</strong><strong id="combo-multiplier">×1</strong></div>
-          <span class="combo-meter" aria-hidden="true"><i id="combo-fill"></i></span><span class="combo-star" aria-hidden="true">★</span>
 
         </section>
         <aside id="challenge-notice" role="status" hidden><strong></strong><span></span></aside>
@@ -125,7 +124,7 @@
               <button id="exit-button" class="pause-menu-exit" type="button">В главное меню</button>
             </div>
             <nav class="pause-secondary" aria-label="Дополнительно">
-              <button type="button" data-open-settings><span aria-hidden="true">⚙</span> Настройки</button>
+              <button type="button" data-open-settings><span aria-hidden="true">⚙︎</span> Настройки</button>
               <button type="button" data-open-tutorial><span aria-hidden="true">?</span> Как играть</button>
               <button type="button" data-open-records><span aria-hidden="true">★</span> Рекорды</button>
             </nav>
@@ -162,20 +161,17 @@
         <div class="game-over-card">
           <p class="menu-eyebrow">ГЛАВНОЕ МЕНЮ</p>
           <h1 id="start-title">Speed Fall Ball</h1>
-          <p class="bank-balance">Монеты: <span aria-hidden="true">★</span> <strong data-bank-coins>0</strong></p>
-          <p>Управляйте шаром, собирайте монеты и побейте свой рекорд.</p>
-          <button id="start-run-button" type="button">Начать забег</button>
-          <button id="shop-button" class="help-button" type="button">Магазин</button>
-          <button id="guided-run-button" type="button" class="help-button">Обучающий забег</button>
-          <details class="feedback-settings"><summary>Настройки</summary>
-            <div class="feedback-controls">              <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
-              <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>
-              <button class="pause-setting" type="button" data-feedback-setting="vibration" aria-pressed="true"><span aria-hidden="true">≋</span><span>Вибрация</span><strong class="setting-state">ВКЛ</strong></button>
-</div>
-            <p class="vibration-support" data-vibration-support></p>
-          </details>
+          <p class="menu-tagline">Падай. Разбивай. Ускоряйся.</p>
+          <p class="bank-balance"><span class="coin-emblem" aria-hidden="true">★</span><strong data-bank-coins>0</strong><span class="bank-caption">монет</span></p>
+          <div class="main-menu-actions">
+            <button id="start-run-button" type="button"><span aria-hidden="true">▶︎</span> Начать забег</button>
+            <button id="shop-button" class="menu-tile" type="button"><span aria-hidden="true">▰</span> Магазин<span aria-hidden="true">›</span></button>
+            <button class="records-button menu-tile" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
+            <button class="menu-tile" type="button" data-open-settings><span aria-hidden="true">⚙︎</span> Настройки<span aria-hidden="true">›</span></button>
+          </div>
+          <button id="guided-run-button" type="button" class="menu-training">↔ Обучающий забег</button>
           <p id="start-error" role="alert"></p>
-          <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
+
         </div>
       </section>
       <dialog id="game-settings" class="arcade-records" aria-labelledby="settings-title">

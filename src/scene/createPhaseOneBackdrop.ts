@@ -1,3 +1,4 @@
+import { createCrystalBackdrop } from "./createCrystalBackdrop";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
@@ -109,6 +110,7 @@ export function createPhaseOneBackdrop(
   appearance: WorldAppearance = {},
   location: DepthLocation = "sky",
 ): Mesh {
+  if (location === "crystal") return createCrystalBackdrop(scene, cameraRig, appearance);
   const texture = new DynamicTexture(
     "PhaseOneBackdropTexture",
     { width: 1024, height: 1536 },
@@ -117,8 +119,7 @@ export function createPhaseOneBackdrop(
   );
   const context = texture.getContext() as unknown as CanvasRenderingContext2D;
   const sky = context.createLinearGradient(0, 0, 0, 1536);
-  const palette = location === "crystal" ? ["#061d37", "#104259", "#166b7c", "#10334e"]
-    : location === "lava" ? ["#230c24", "#55223a", "#963d35", "#ed8749"]
+  const palette = location === "lava" ? ["#230c24", "#55223a", "#963d35", "#ed8749"]
       : location === "abyss" ? ["#050b22", "#131b45", "#2b2258", "#12345d"]
         : appearance.theme === "world-sunset"
     ? ["#32205d", "#81458b", "#eb8c93", "#ffd69f"]
@@ -166,15 +167,10 @@ export function createPhaseOneBackdrop(
       for (const side of [-1, 1]) {
         const x = side < 0 ? 0 : 1024;
         const reach = 85 + (i * 47 % 100);
-        context.fillStyle = location === "lava" ? "#341a30" : location === "crystal" ? "#092b43" : "#0a183a";
+        context.fillStyle = location === "lava" ? "#341a30" : "#0a183a";
         context.beginPath(); context.moveTo(x, y - 50); context.lineTo(x - side * reach, y + 30);
         context.lineTo(x - side * reach * .65, y + 120); context.lineTo(x, y + 180); context.fill();
-        if (location === "crystal") {
-          const cx = x - side * reach * .6;
-          context.fillStyle = i % 2 ? "#4aa3b7" : "#6884bb";
-          context.beginPath(); context.moveTo(cx, y + 95); context.lineTo(cx - side * 25, y + 20);
-          context.lineTo(cx - side * 50, y + 85); context.lineTo(cx - side * 28, y + 120); context.fill();
-        } else if (location === "lava") {
+        if (location === "lava") {
           context.strokeStyle = "#ffb464"; context.lineWidth = 5; context.beginPath();
           context.moveTo(x - side * 30, y); context.lineTo(x - side * 65, y + 55);
           context.lineTo(x - side * 38, y + 110); context.stroke();

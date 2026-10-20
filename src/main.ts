@@ -130,7 +130,10 @@ interfaceLayer.inert = true;
 const settingsDialog = requireElement("#game-settings");
 if (!(settingsDialog instanceof HTMLDialogElement)) throw new TypeError("#game-settings must be a dialog.");
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-settings]")) {
-  button.addEventListener("click", () => { settingsDialog.showModal(); });
+  button.addEventListener("click", () => {
+    requireElement("#interface-toggle").hidden = !startScreen.hidden;
+    settingsDialog.showModal();
+  });
 }
 requireElement("#settings-close").addEventListener("click", () => { settingsDialog.close(); });
 const recordsDialog = requireElement("#records");
