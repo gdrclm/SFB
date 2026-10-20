@@ -20,7 +20,7 @@ export class ContextGuide {
     this.#dialog = dialog; this.#skip = skip;
     this.#arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.#arrow.id = "guide-arrow"; this.#arrow.setAttribute("aria-hidden", "true");
-    this.#arrow.innerHTML = '<defs><marker id="guide-arrow-head" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#ffe78b" stroke-width="2"/></marker></defs><path class="guide-line" fill="none" stroke="#ffe78b" stroke-width="3" marker-end="url(#guide-arrow-head)"/>';
+    this.#arrow.innerHTML = '<defs><marker id="guide-arrow-head" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#e9ffff" stroke-width="2"/></marker></defs><path class="guide-line" fill="none" stroke="#e9ffff" stroke-width="4" marker-end="url(#guide-arrow-head)"/>';
     this.#arrow.style.display = "none"; document.body.append(this.#arrow);
     dialog.querySelector("#context-skip")?.addEventListener("click", this.#skipAll);
     document.addEventListener("pointerdown", this.#touch, true);

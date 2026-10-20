@@ -1,3 +1,4 @@
+import { initializeHudArt } from "./ui/HudArt";
 import { getGameSounds } from "./feedback/GameSounds";
 import { initializeFeedbackControls } from "./feedback/FeedbackControls";
 import "./styles.css";
@@ -53,6 +54,7 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
   throw new TypeError("#restart-button must be a button element.");
 }
 const restartButton = restartButtonElement;
+initializeHudArt();
 initializeFeedbackControls();
 getGameSounds();
 let requestedGuidedRun = false;

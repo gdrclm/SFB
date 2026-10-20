@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-BTT82D7e.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CSrjNN-u.css">
+    <script type="module" crossorigin src="./assets/index-D_fq62S7.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-77Ep3vlY.css">
   </head>
   <body>
     <main id="app">
@@ -36,7 +36,7 @@
           </div>
 
           <progress id="phase-progress" max="1" value="0" aria-label="Прогресс забега"></progress>
-          <section id="speed-panel" aria-label="Скорость и пробитие">
+          <section id="speed-panel" aria-label="Скорость">
             <div class="speed-value-row">
               <strong id="speed-value">10.0</strong>
               <span>ЕД/С</span>
@@ -66,14 +66,15 @@
 
         <section id="combo-panel" data-tier="1" data-risk="none" aria-label="Серия успешных ударов">
           <div class="combo-heading"><span>КОМБО</span><strong id="combo-count">0</strong><strong id="combo-multiplier">×1</strong></div>
+          <span class="combo-meter" aria-hidden="true"><i id="combo-fill"></i></span><span class="combo-star" aria-hidden="true">★</span>
 
         </section>
         <aside id="challenge-notice" role="status" hidden><strong></strong><span></span></aside>
         <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Нажми BOOST или обойди.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
-        <aside id="first-success" role="status" data-complete="false" hidden><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Задание 1 · награда ★ 10 · потеря ♥ сбрасывает прогресс</small></aside>
+        <aside id="first-success" role="status" data-complete="false" hidden><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Задание 1 · награда ★ 10 · потеря ♥ сбрасывает прогресс</small><span class="mission-nodes" aria-hidden="true"><i></i><i></i><i></i></span></aside>
         <aside id="run-panel">
           <span class="hud-caption">ГЛУБИНА</span>
-          <strong id="depth-value">0 М</strong>
+          <strong id="depth-value"><span id="depth-number">0</span><span class="depth-unit">М</span></strong>
         </aside>
 
         <p id="status" role="status">Загрузка…</p>

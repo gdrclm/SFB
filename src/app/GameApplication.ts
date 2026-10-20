@@ -1,3 +1,4 @@
+import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
 import { getGameSounds } from "../feedback/GameSounds";
@@ -127,6 +128,7 @@ export class GameApplication {
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
   #hitStopRemaining = 0;
+  #lastDepthCheckpoint = 0;
   #energyHighWater = this.#config.economy.initialEnergy;
   #missionIntroRemaining = 0;
   #lastLifeCount = this.#config.run.initialLives;
@@ -273,6 +275,7 @@ export class GameApplication {
     this.#challengeDirector = null;
     this.#hitStopRemaining = 0;
     this.#energyHighWater = this.#config.economy.initialEnergy;
+    this.#lastDepthCheckpoint = 0;
     this.#missionIntroRemaining = 0;
     this.#lastLifeCount = this.#config.run.initialLives;
     this.#missionRewardRemaining = 0;
@@ -786,7 +789,8 @@ export class GameApplication {
       const heart = document.createElement("span");
       heart.className =
         index < remainingLives ? "life-heart" : "life-heart life-lost";
-      heart.textContent = "♥";
+      heart.innerHTML = hudArt(index < remainingLives ? "heart-full" : "heart-lost");
+      if (index >= this.#lastLifeCount && index < remainingLives) heart.classList.add("life-heal");
       heart.setAttribute("aria-hidden", "true");
       hearts.push(heart);
     }
@@ -807,10 +811,13 @@ export class GameApplication {
   #renderCurrency(): void {
     const energy = formatEnergy(this.#wallet.energy);
     this.#coinCountElement.textContent = String(this.#wallet.coins);
+    this.#coinCountElement.style.fontSize = this.#wallet.coins >= 1000 ? "14px" : this.#wallet.coins >= 100 ? "18px" : "24px";
+    this.#coinCountElement.closest<HTMLElement>(".coin-pill")?.setAttribute("data-empty", String(this.#wallet.coins === 0));
     this.#energyHighWater = Math.max(this.#energyHighWater, this.#wallet.energy);
     const reserve = requireMenuElement(this.#interfaceLayerElement, "#energy-reserve");
     reserve.setAttribute("aria-valuenow", String(this.#wallet.energy));
     reserve.setAttribute("aria-valuemax", String(this.#energyHighWater));
+    reserve.dataset.empty = String(this.#wallet.energy <= 0);
     reserve.dataset.low = String(this.#wallet.energy < (this.#boostController?.energyCost ?? 1) * 3);
     reserve.dataset.draining = String(this.#slowModeController?.isActive === true);
     requireMenuElement(reserve, "#energy-fill").style.transform = `scaleX(${String(this.#wallet.energy / Math.max(1, this.#energyHighWater))})`;
@@ -850,19 +857,24 @@ export class GameApplication {
       this.#speedValueElement.textContent = "0";
       this.#breakthroughValueElement.textContent = "0";
       this.#breakthroughHintElement.textContent = "0";
-      this.#depthValueElement.textContent = "0 М";
+      requireMenuElement(this.#depthValueElement, "#depth-number").textContent = "0";
       return;
     }
 
     const speed = Math.max(0, ball.fallSpeed);
     const breakthrough = Math.floor(speed);
     const depth = this.#runProgress.depth;
+    const checkpoint = Math.floor(depth / 100);
+    if (checkpoint > this.#lastDepthCheckpoint) this.#feel?.depth();
+    this.#lastDepthCheckpoint = checkpoint;
     requireMenuElement(this.#interfaceLayerElement, "#run-score").textContent =
       String(calculateScore(depth, this.#wallet.coins, this.#destroyedPlatformCount, this.#combo.bonus));
-    this.#speedValueElement.textContent = (Math.floor(speed * 10) / 10).toFixed(1);
+    const speedText = (Math.floor(speed * 10) / 10).toFixed(1);
+    this.#speedValueElement.textContent = speedText;
+    this.#speedValueElement.dataset.digits = String(Math.min(7, speedText.length));
     this.#breakthroughValueElement.textContent = String(breakthrough);
     this.#breakthroughHintElement.textContent = String(breakthrough);
-    this.#depthValueElement.textContent = `${depth.toFixed(0)} М`;
+    requireMenuElement(this.#depthValueElement, "#depth-number").textContent = depth.toFixed(0);
   }
 
   readonly #pauseGame = (): void => {
@@ -1044,6 +1056,7 @@ export class GameApplication {
     const secondsToImpact = nearest === null ? Infinity : Math.max(0, ball.position.y - this.#config.ball.radius - nearest.mesh.position.y - nearest.size.height / 2) / Math.max(.001, closingSpeed);
     const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;
     for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
+    requireMenuElement(this.#interfaceLayerElement, "#speed-panel").dataset.warning = String(nearest?.approachState === "danger");
     const opportunity = nearest?.approachState === "boost";
     this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
     this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
@@ -1120,6 +1133,7 @@ export class GameApplication {
     panel.hidden = this.#missionRewardRemaining <= 0 && (this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
     panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
+    panel.dataset.progress = this.#missionRewardRemaining > 0 ? "3" : state.progress <= 0 ? "0" : state.progress / mission.target >= .5 ? "2" : "1";
     requireMenuElement(panel, "strong").textContent = this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★` : `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
     requireMenuElement(panel, "small").textContent = this.#missionSaveFailed
       ? "Не удалось сохранить прогресс. Проверьте хранилище браузера."

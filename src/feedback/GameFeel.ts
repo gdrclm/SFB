@@ -46,8 +46,14 @@ export class GameFeel {
       { transform: `translate(${String(((bounds?.x ?? 24) + 16 - point.x) * .4)}px, ${String(-50)}px) scale(1.1)`, opacity: 1, offset: .4 },
       { transform: `translate(${String((bounds?.x ?? 24) + 16 - point.x)}px, ${String((bounds?.y ?? 24) + 16 - point.y)}px) scale(.4)`, opacity: .7 },
     ], 320);
-    if (hud !== null) this.#animate(hud, this.#reduced ? [{ filter: "brightness(1.5)" }, { filter: "brightness(1)" }]
-      : [{ transform: "scale(1.2)" }, { transform: "scale(1)" }], 180, false);
+    if (hud !== null) this.#animate(hud, this.#reduced ? [{ borderColor: "#ffe66a" }, { borderColor: "#1ee4ff" }]
+      : [{ transform: "scale(1.12)", borderColor: "#ffe66a", boxShadow: "0 0 15px #ffd12b, inset 0 0 8px #ffde7366" },
+        { transform: "scale(1)", borderColor: "#1ee4ff", boxShadow: "0 0 8px #00baff88, inset 0 0 8px #008cff44" }], 320, false);
+  }
+  public depth(): void {
+    const panel = document.querySelector<HTMLElement>("#run-panel");
+    if (panel !== null) this.#animate(panel, [{ borderColor: "#e9ffff", boxShadow: "0 0 18px #19dfff, inset 0 0 10px #27dcff99" },
+      { borderColor: "#1ee4ff", boxShadow: "0 0 9px #00c8ff88, inset 0 2px 2px #b8f9ffbb" }], 300, false);
   }
   public heal(): void {
     getGameSounds().play("heal");
@@ -62,6 +68,9 @@ export class GameFeel {
 
   public boost(position: { x: number; y: number; z: number }): void {
     getGameSounds().play("boost");
+    const speed = document.querySelector<HTMLElement>("#speed-panel");
+    if (speed !== null) this.#animate(speed, [{ borderColor: "#e5ffff", boxShadow: "0 0 20px #12e5ff, inset 0 0 12px #30e9ff88" },
+      { borderColor: "#1ee4ff", boxShadow: "0 0 8px #00baff88, inset 0 0 8px #008cff44" }], 350, false);
     const point = this.screenPoint(position);
     this.#particle(point, "boost", this.#reduced ? [{ opacity: .6 }, { opacity: 0 }] : [
       { transform: "translate(-50%, -50%) scale(.4)", opacity: .9 },
