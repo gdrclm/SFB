@@ -43,6 +43,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #baseOutlineColor: Color3;
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;
+  #trailIntensity = 0;
   #phaseTransitionTarget = 0;
   #phaseTransitionBlend = 0;
   #boostElapsedSeconds: number | null = null;
@@ -112,6 +113,9 @@ export class BallVisualController implements FixedSimulationSystem {
           this.#config.speedEffectRange,
       );
     const colorAmount = smoothFactor(this.#config.colorSharpness, fixedDeltaSeconds);
+    // Each doubling keeps adding visible weight instead of saturating after a few boosts.
+    const trailTarget = clamp01(Math.log2(Math.max(1, this.#motion.fallSpeed / this.#ballConfig.startFallSpeed)) / 5);
+    this.#trailIntensity = lerp(this.#trailIntensity, trailTarget, colorAmount);
     this.#speedIntensity = lerp(
       this.#speedIntensity,
       targetSpeedIntensity,
@@ -155,6 +159,7 @@ export class BallVisualController implements FixedSimulationSystem {
   public dispose(): void {
     this.#ball.scaling.copyFrom(this.#baseScale);
     this.#speedIntensity = 0;
+    this.#trailIntensity = 0;
     this.#phaseTransitionBlend = 0;
     this.#phaseTransitionTarget = 0;
     this.#boostElapsedSeconds = null;
@@ -207,10 +212,12 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#material.diffuseColor.copyFrom(displayColor);
     this.#material.emissiveColor.copyFrom(displayColor).scaleInPlace(emissiveStrength);
     this.#trailMaterial.emissiveColor.copyFrom(displayColor);
+    this.#trailMaterial.alpha = .6 + this.#trailIntensity * .35;
+    this.#trail.diameter = this.#ballConfig.radius * this.#config.trailDiameterScale * (1 + this.#trailIntensity * 2.4 + this.#boostStrength * .4);
     this.#trail.visibility = Math.max(this.#boostStrength * .65, lerp(
       this.#config.baseTrailVisibility,
       this.#config.maximumTrailVisibility,
-      speedIntensity,
+      this.#trailIntensity,
     ));
     this.#ball.renderOutline = true;
     this.#ball.outlineColor.copyFrom(

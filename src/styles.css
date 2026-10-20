@@ -2109,3 +2109,13 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 #game-settings #platform-numbers-toggle { font-size: .75rem; justify-content: center; }
 #game-settings [data-vibration-support] { margin: 12px 0 0; }
 @media (max-height: 470px) { #pause-menu .pause-card { padding: 14px 20px; width: min(460px, 100%); } #pause-menu-title { font-size: 1.3rem; } .pause-compact-summary { margin: 7px 0 12px; } #pause-menu .pause-actions { grid-template-columns: 1fr 1fr; gap: 8px; } #pause-menu #resume-button { grid-column: 1 / -1; } .pause-secondary { margin-top: 14px; } .pause-exit-note { margin-top: 8px; } }
+
+/* A compact neon hit, with no permanent panel behind the playfield. */
+#combo-panel { --combo-glow: #6bfff0; }
+#combo-panel[data-tier="2"] { --combo-glow: #64ffb4; }
+#combo-panel[data-tier="3"] { --combo-glow: #72dfff; }
+#combo-panel[data-tier="4"] { --combo-glow: #d49bff; }
+#combo-panel[data-tier="5"] { --combo-glow: #ffe279; }
+#combo-panel .combo-heading { position: relative; z-index: 1; transform-origin: center; }
+#combo-panel :is(#combo-count, #combo-multiplier) { color: #efffff; opacity: 1; text-shadow: 0 0 3px #fff, 0 0 9px var(--combo-glow), 0 0 20px var(--combo-glow), 0 2px 3px #063753; }
+.combo-flare { position: absolute; top: 50%; left: 50%; width: 72px; height: 32px; border: 1px solid var(--combo-glow); border-radius: 50%; box-shadow: 0 0 16px var(--combo-glow), inset 0 0 12px var(--combo-glow); transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }

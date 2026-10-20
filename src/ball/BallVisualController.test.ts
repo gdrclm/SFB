@@ -1,5 +1,6 @@
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { TrailMesh } from "@babylonjs/core/Meshes/trailMesh";
 import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it } from "vitest";
 import type { SuccessfulBoostResult } from "../boost/BoostController";
@@ -72,6 +73,31 @@ describe("BallVisualController", () => {
 
     scene.dispose();
     engine.dispose();
+  });
+
+  it("keeps strengthening the trail through successive speed doublings and softens it again on slowdown", () => {
+    const { engine, scene, motion, controller } = createFixture();
+    const trail = scene.getMeshByName("BallSpeedTrail");
+    if (!(trail instanceof TrailMesh) || !(trail.material instanceof StandardMaterial)) throw new Error("Expected speed trail");
+    let visibility = trail.visibility, diameter = trail.diameter, alpha = trail.material.alpha;
+    for (const speed of [20, 40, 80, 160, 320]) {
+      motion.fallSpeed = speed;
+      updateFor(controller, 2);
+      expect(trail.visibility).toBeGreaterThan(visibility);
+      expect(trail.diameter).toBeGreaterThan(diameter);
+      expect(trail.material.alpha).toBeGreaterThan(alpha);
+      visibility = trail.visibility; diameter = trail.diameter; alpha = trail.material.alpha;
+      expect(motion.fallSpeed).toBe(speed);
+    }
+    motion.fallSpeed = 10000;
+    updateFor(controller, 2);
+    expect(trail.visibility).toBeLessThanOrEqual(gameConfig.ballVisual.maximumTrailVisibility);
+    expect(trail.diameter).toBeLessThanOrEqual(gameConfig.ball.radius * gameConfig.ballVisual.trailDiameterScale * 3.4);
+    motion.fallSpeed = gameConfig.ball.startFallSpeed;
+    updateFor(controller, 3);
+    expect(trail.visibility).toBeCloseTo(gameConfig.ballVisual.baseTrailVisibility, 5);
+    expect(trail.diameter).toBeCloseTo(gameConfig.ball.radius * gameConfig.ballVisual.trailDiameterScale, 5);
+    scene.dispose(); engine.dispose();
   });
 
   it("keeps later equal Boost reactions just as visible as the first", () => {

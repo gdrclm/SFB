@@ -5,6 +5,8 @@ export class ComboView {
   readonly #panel: HTMLElement;
   readonly #number: HTMLElement;
   readonly #multiplier: HTMLElement;
+  readonly #heading: HTMLElement;
+  readonly #flare: HTMLElement;
   #animations: Animation[] = [];
   readonly #visibility = new ComboVisibility();
 
@@ -17,6 +19,11 @@ export class ComboView {
       return node;
     };
     this.#number = element("#combo-count"); this.#multiplier = element("#combo-multiplier");
+    this.#heading = element(".combo-heading");
+    this.#flare = document.createElement("span");
+    this.#flare.className = "combo-flare";
+    this.#flare.setAttribute("aria-hidden", "true");
+    panel.prepend(this.#flare);
   }
 
   public render(combo: ComboController): void {
@@ -28,27 +35,30 @@ export class ComboView {
   public hit(hit: ComboHit): void {
     this.#visibility.show(hit.tierIncreased ? 1.1 : .75);
     this.#updateVisibility();
-    this.#animate(false, hit.tierIncreased);
+    this.#animate(hit.tierIncreased);
   }
 
   public miss(): void {
     this.#visibility.reset();
     this.#updateVisibility();
-    this.#animate(true, false);
+    for (const animation of this.#animations) animation.cancel();
+    this.#animations = [];
   }
 
-  #animate(failed: boolean, milestone: boolean): void {
+  #animate(milestone: boolean): void {
     for (const animation of this.#animations) animation.cancel();
     this.#animations = [];
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    this.#animations.push(this.#number.animate(
-      [{ transform: "scale(1)" }, { transform: `scale(${milestone ? "1.6" : "1.25"})` }, { transform: "scale(1)" }],
-      { duration: milestone ? 500 : 240, easing: "ease-out" },
+    this.#animations.push(this.#heading.animate(
+      [{ transform: "translateY(4px) scale(.8)", filter: "brightness(1.8)" },
+        { transform: `translateY(-2px) scale(${milestone ? "1.4" : "1.2"})`, filter: "brightness(1.4)", offset: .25 },
+        { transform: "translateY(0) scale(1)", filter: "brightness(1)" }],
+      { duration: milestone ? 450 : 300, easing: "ease-out" },
     ));
-    this.#animations.push(this.#panel.animate(
-      failed ? [{ boxShadow: "0 0 32px #ff527e", borderColor: "#ff527e" }, { boxShadow: "0 0 0 transparent" }]
-        : [{ filter: `brightness(${milestone ? "1.8" : "1.35"})` }, { filter: "brightness(1)" }],
-      { duration: failed ? 600 : milestone ? 650 : 280, easing: "ease-out" },
+    this.#animations.push(this.#flare.animate(
+      [{ transform: "translate(-50%, -50%) scale(.35)", opacity: .5 },
+        { transform: `translate(-50%, -50%) scale(${milestone ? "1.8" : "1.3"})`, opacity: 0 }],
+      { duration: milestone ? 450 : 300, easing: "ease-out" },
     ));
   }
 
@@ -70,6 +80,7 @@ export class ComboView {
   }
   public dispose(): void {
     for (const animation of this.#animations) animation.cancel();
+    this.#flare.remove();
     this.#visibility.reset();
     this.#updateVisibility();
   }

@@ -208,10 +208,10 @@ export const gameConfig: GameConfig = Object.freeze({
     baseOutlineWidth: 0.035,
     maximumOutlineWidth: 0.075,
     trailDiameterScale: 0.46,
-    trailLength: 12,
-    trailSegments: 12,
+    trailLength: 18,
+    trailSegments: 18,
     baseTrailVisibility: 0.015,
-    maximumTrailVisibility: 0.72,
+    maximumTrailVisibility: 0.95,
   }),
   boost: Object.freeze({
     speedMultiplier: 1.5,
