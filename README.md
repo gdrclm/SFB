@@ -266,13 +266,13 @@ Combo is a brief count/multiplier badge near the top, without progress bars,
 risk arithmetic or bonus text. It appears only on a hit for 0.75 active real seconds (1.1 on a new multiplier),
 freezes in pause and hides on error/reset. The stage challenge has no text banner. The technical hit journal is not visible.
 
-## Sequential missions and repeatable rewards
+## Selected missions and repeatable rewards
 
 Mission progress briefly appears for 1.2
 active seconds, then collapses; in the opening lesson only the reward is shown. Completion
-credits 10 shop coins and saves the next mission in a single transaction.
-A gold flash and +10 ★ last two active real seconds. The next objective stays
-hidden until the next progress update. Missions cycle through clean breaks, coins,
+credits 10 shop coins, marks the goal complete and clears its selection in a single transaction.
+A gold flash and +10 ★ last two active real seconds. Choose another objective
+from the main-menu list; only the selected goal appears in pause and advances. Each set offers clean breaks, coins,
 successful BOOST uses, platform breaks and combo, with bounded target increases
 on subsequent cycles. Only actions after activation count toward a new mission.
 
@@ -351,7 +351,7 @@ BOOST сначала читается движением и следом, зат
 Окружение меняется через каждые 500 м максимальной глубины: небо → кристальные
 пещеры → лавовые глубины → неоновая бездна, затем цикл повторяется. Шаг задан
 в `src/scene/DepthLocations.ts`. Смена зависит от расстояния, а не от времени
-или этапа; отскок не возвращает прежнюю локацию. Переход занимает 1,2 секунды
+или этапа; отскок не возвращает прежнюю локацию. Переход занимает 2 секунды
 активного реального времени, с остановкой в паузе. При уменьшении движения
 в настройках ОС фон сменяется сразу. Поля платформ и физика сохраняются.
 
@@ -416,3 +416,16 @@ SVG-монету со звездой и графические сердца. П�
 и фонарики, а при ошибке загрузки оставляет голубой запасной фон.
 Переход в кристальную локацию по-прежнему происходит на глубине 500 м;
 повторный забег начинается с небесной локации без пересоздания движка.
+
+### Выбор задания в главном меню
+
+Список из пяти заданий показывает прогресс и награду (+10 монет). Выделено
+только одно выбранное задание; в паузе закрепляется оно же. Прогресс остальных
+заданий не растёт. После выполнения награда и отметка сохраняются атомарно,
+выделение снимается, а блок задания исчезает из паузы. Следующее задание игрок
+выбирает в главном меню; частичный прогресс сохраняется при смене выбора.
+Выполненные задания остаются в списке без выделения и недоступны для повторной
+награды. После пяти выполнений доступен следующий набор. Старый последовательный
+прогресс переносится при загрузке профиля. Во время падения остаются только
+короткие уведомления о прогрессе и награде. Плавная смена фонов длится 2 секунды
+активного игрового времени (при уменьшении движения — мгновенно).

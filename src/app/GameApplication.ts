@@ -7,6 +7,7 @@ import { BoostCoach } from "../boost/BoostCoach";
 import { describeFailedImpact } from "../run/FailedImpact";
 import { tutorialVisuals as tutorialArt } from "./TutorialController";
 import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missions";
+import { renderPinnedMission } from "../run/renderMissionBoard";
 import { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -966,6 +967,7 @@ export class GameApplication {
   #renderPauseSummary(): void {
     this.#pauseDepthElement.textContent = `${String(this.#runProgress.depth)} м`;
     this.#pauseCoinElement.textContent = String(this.#wallet.coins);
+    renderPinnedMission(this.#pauseMenuElement, this.#profile);
   }
 
   #keepFocusInsidePauseMenu(event: KeyboardEvent): void {
@@ -1130,7 +1132,8 @@ export class GameApplication {
     const state = this.#profile.mission;
     const mission = currentMission(state);
     panel.dataset.complete = String(this.#missionRewardRemaining > 0);
-    panel.hidden = this.#missionRewardRemaining <= 0 && (this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
+    panel.hidden = this.#missionRewardRemaining <= 0 && (this.#profile.activeMission === null || this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
+    renderPinnedMission(this.#pauseMenuElement, this.#profile);
     panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
     panel.dataset.progress = this.#missionRewardRemaining > 0 ? "3" : state.progress <= 0 ? "0" : state.progress / mission.target >= .5 ? "2" : "1";

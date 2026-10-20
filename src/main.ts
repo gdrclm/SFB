@@ -9,6 +9,8 @@ import { ShopController } from "./shop/ShopController";
 import { TutorialController } from "./app/TutorialController";
 import { ApplicationLifecycle } from "./app/ApplicationLifecycle";
 import { GameApplication } from "./app/GameApplication";
+import { getPlayerProfile } from "./shop/PlayerProfile";
+import { renderMissionBoard } from "./run/renderMissionBoard";
 
 function requireElement(selector: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(selector);
@@ -114,6 +116,7 @@ function exitApplication(): void {
   interfaceLayer.inert = true;
   requireElement("#start-error").textContent = "";
   shop.refreshBalance();
+  renderMissionBoard(startScreen, getPlayerProfile());
   startButton.focus();
 }
 
@@ -122,6 +125,14 @@ restartButton.addEventListener("click", () => {
 });
 
 const startScreen = requireElement("#start-screen");
+renderMissionBoard(startScreen, getPlayerProfile());
+requireElement("#next-missions-button").addEventListener("click", () => {
+  const saved = getPlayerProfile().nextMissionBoard();
+  renderMissionBoard(startScreen, getPlayerProfile());
+  const error = requireElement("#mission-error");
+  error.hidden = saved;
+  error.textContent = saved ? "" : "Не удалось сохранить задания.";
+});
 const startButton = requireElement("#start-run-button");
 if (!(startButton instanceof HTMLButtonElement)) {
   throw new TypeError("#start-run-button must be a button element.");

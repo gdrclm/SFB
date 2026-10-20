@@ -2247,3 +2247,33 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
   #game-settings .feedback-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #game-settings #platform-numbers-toggle { grid-column: 1 / -1; }
 }
+
+/* One pinned goal; the board stays in the menu rather than covering the fall. */
+.menu-missions { margin: 0 0 14px; min-width: 0; text-align: left; }
+.menu-missions h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 7px; font-size: .8rem; color: #edffff; }
+.menu-missions h2 span { font-size: .62rem; color: #8dc8df; font-weight: 500; }
+#mission-list { display: grid; gap: 5px; max-height: 158px; padding: 3px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #0dadd9 #021b36; }
+#mission-list .mission-choice { display: grid; grid-template-columns: 23px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 40px; padding: 6px 7px; border: 1px solid #176f9d; border-radius: 11px; background: linear-gradient(#063b68, #021d3b); box-shadow: inset 0 1px 1px #6cd7ff33; color: #d4eefa; font: inherit; cursor: pointer; text-align: left; }
+.mission-choice-icon { font-size: 19px; color: #70d9ed; text-align: center; }
+.mission-choice-title { font-size: .67rem; font-weight: 700; line-height: 1.25; }
+#mission-list .mission-choice small { font-size: .59rem; white-space: nowrap; color: #ffdf76; }
+#mission-list .mission-choice[aria-pressed="true"] { border-color: #5affdf; background: linear-gradient(#075c6e, #02374c); box-shadow: 0 0 5px #00f2bf77, inset 0 1px 2px #bcfff488; color: #fff; }
+.mission-choice[aria-pressed="true"] .mission-choice-icon { color: #8bffe1; text-shadow: 0 0 7px #00efb3; }
+#mission-list .mission-choice[data-complete="true"] { opacity: .62; border-color: #24556c; background: #041e35; box-shadow: none; cursor: default; }
+#mission-list .mission-choice[data-complete="true"] small { color: #97b9c8; }
+#mission-list .mission-choice[data-complete="true"] .mission-choice-icon { color: #7ac6b3; }
+#next-missions-button { width: 100%; margin-top: 7px; padding: 7px; border: 1px solid #37d8e9; border-radius: 10px; background: #063b61; color: #c7ffff; font: inherit; font-size: .7rem; cursor: pointer; }
+#mission-error { color: #ffce91; font-size: .65rem; margin: 6px 0 0; }
+.pinned-mission { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 10px; margin: -9px 0 17px; border: 1px solid #1cbfac; border-radius: 12px; background: linear-gradient(#06475a, #03283f); box-shadow: inset 0 1px 1px #70ffe855; text-align: left; }
+.pinned-mission strong { font-size: .72rem; line-height: 1.3; color: #caffef; }
+.pinned-mission span { flex: 0 0 auto; color: #ffdf7c; font-size: .67rem; white-space: nowrap; }
+@media (max-height: 620px) { #mission-list { max-height: 102px; } .menu-missions { margin-bottom: 10px; } }
+@media (max-height: 470px) and (orientation: landscape) { .menu-missions { grid-column: 1; grid-row: 5; margin-bottom: 0; } #mission-list { max-height: 93px; } #start-screen .menu-training { grid-row: 6; } .pinned-mission { margin: 0 0 10px; padding: 7px 10px; } }
+
+#pause-mission[hidden] { display: none; }
+@media (max-height: 620px) and (orientation: portrait) {
+  #start-screen .menu-eyebrow, #start-screen .menu-tagline { display: none; }
+  #start-screen #start-title { margin-bottom: 12px; }
+  #start-screen .game-over-card { padding-top: 12px; padding-bottom: 8px; }
+  #start-screen .main-menu-actions { gap: 8px; }
+}

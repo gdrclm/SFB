@@ -118,6 +118,7 @@
           <div class="pause-card">
             <h1 id="pause-menu-title">Пауза</h1>
             <p class="pause-compact-summary"><strong id="pause-depth-value">0 м</strong><span aria-hidden="true">·</span><span class="stat-gold" aria-hidden="true">★</span><strong id="pause-coin-value">0</strong></p>
+            <div id="pause-mission" class="pinned-mission" aria-label="Выбранное задание" hidden></div>
             <div class="pause-actions">
               <button id="resume-button" class="pause-primary-action" type="button">Продолжить</button>
               <button id="pause-restart-button" type="button">↻ Заново</button>
@@ -163,6 +164,12 @@
           <h1 id="start-title">Speed Fall Ball</h1>
           <p class="menu-tagline">Падай. Разбивай. Ускоряйся.</p>
           <p class="bank-balance"><span class="coin-emblem" aria-hidden="true">★</span><strong data-bank-coins>0</strong><span class="bank-caption">монет</span></p>
+          <section class="menu-missions" aria-labelledby="missions-title">
+            <h2 id="missions-title">Задания <span>Выбери одно</span></h2>
+            <div id="mission-list" role="group" aria-label="Выбрать задание для забега"></div>
+            <button id="next-missions-button" type="button" hidden>Следующие задания ›</button>
+            <p id="mission-error" role="alert" hidden></p>
+          </section>
           <div class="main-menu-actions">
             <button id="start-run-button" type="button"><span aria-hidden="true">▶︎</span> Начать забег</button>
             <button id="shop-button" class="menu-tile" type="button"><span aria-hidden="true">▰</span> Магазин<span aria-hidden="true">›</span></button>

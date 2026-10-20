@@ -34,7 +34,7 @@ export class DepthBackdrop {
       this.#location = location;
     }
     if (this.#next !== null && (this.#next.material as StandardMaterial).diffuseTexture?.isReady() !== false) {
-      this.#blend = this.#reduced ? 1 : Math.min(1, this.#blend + realSeconds / 1.2);
+      this.#blend = this.#reduced ? 1 : Math.min(1, this.#blend + realSeconds / 2);
       (this.#next.material as StandardMaterial).alpha = this.#blend;
       if (this.#blend >= 1) {
         this.#current.dispose(false, true);

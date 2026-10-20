@@ -1,6 +1,7 @@
 import { advanceMission, currentMission, MISSION_REWARD, type MissionEvent, type MissionState } from "../run/Missions";
 import type { GameConfig } from "../config/gameConfig";
 import type { RunResult } from "../run/RunHistory";
+import { migrateMissionBoard, parseMissionBoard, type MissionBoard } from "../run/MissionBoard";
 
 export type ShopCategory = "upgrade" | "ball" | "world" | "props" | "vfx";
 export interface ShopItem {
@@ -36,6 +37,7 @@ interface ProfileState {
   creditedRuns: string[];
   firstSuccessAt: string | null;
   mission: MissionState;
+  missionBoard: MissionBoard;
 }
 export const PROFILE_KEY = "speed-fall-ball.profile.v1";
 const defaults = (): ProfileState => ({
@@ -46,6 +48,7 @@ const defaults = (): ProfileState => ({
   creditedRuns: [],
   firstSuccessAt: null,
   mission: { index: 0, progress: 0 },
+  missionBoard: migrateMissionBoard({ index: 0, progress: 0 }),
 });
 
 function parseProfile(raw: string | null): ProfileState {
@@ -67,6 +70,7 @@ function parseProfile(raw: string | null): ProfileState {
       if (candidate.progress < currentMission(candidate).target) state.mission = candidate;
     }
   }
+  state.missionBoard = parseMissionBoard(data.missionBoard, state.mission);
   state.coins = data.coins;
   state.owned = [...new Set([...state.owned, ...data.owned.filter((id): id is string =>
     typeof id === "string" && SHOP_ITEMS.some((item) => item.id === id && item.category !== "upgrade"))])];
@@ -129,14 +133,47 @@ export class PlayerProfile {
     return this.#commit({ ...this.#state, coins, creditedRuns: [...credited] });
   }
 
-  public get mission(): MissionState { return { ...this.#state.mission }; }
+  public get missionBoard(): MissionBoard {
+    const board = this.#state.missionBoard;
+    return { ...board, progress: [...board.progress], completed: [...board.completed] };
+  }
+
+  public get activeMission(): MissionState | null {
+    const board = this.#state.missionBoard;
+    return board.selected === null ? null : { index: board.start + board.selected, progress: board.progress[board.selected] ?? 0 };
+  }
+
+  public get mission(): MissionState { return this.activeMission ?? { ...this.#state.mission }; }
+
+  public selectMission(index: number): boolean {
+    const board = this.#state.missionBoard;
+    const offset = index - board.start;
+    if (!Number.isInteger(offset) || offset < 0 || offset >= 5 || board.completed[offset]) return false;
+    const mission = { index, progress: board.progress[offset] ?? 0 };
+    return this.#commit({ ...this.#state, mission, missionBoard: { ...board, selected: offset } });
+  }
+
+  public nextMissionBoard(): boolean {
+    const board = this.#state.missionBoard;
+    if (!board.completed.every(Boolean) || board.start > Number.MAX_SAFE_INTEGER - 15) return false;
+    const mission = { index: board.start + 5, progress: 0 };
+    return this.#commit({ ...this.#state, mission,
+      missionBoard: { ...migrateMissionBoard(mission), selected: null } });
+  }
 
   public applyMissionEvent(event: MissionEvent): { saved: boolean; rewarded: boolean } {
-    const next = advanceMission(this.#state.mission, event);
-    if (next.state.index === this.#state.mission.index && next.state.progress === this.#state.mission.progress) return { saved: true, rewarded: false };
+    const mission = this.activeMission;
+    if (mission === null) return { saved: true, rewarded: false };
+    const next = advanceMission(mission, event);
+    if (next.state.index === mission.index && next.state.progress === mission.progress) return { saved: true, rewarded: false };
     const coins = this.coins + (next.completed ? MISSION_REWARD : 0);
     if (!Number.isSafeInteger(coins) || !Number.isSafeInteger(next.state.index)) return { saved: false, rewarded: false };
-    const saved = this.#commit({ ...this.#state, coins, mission: next.state,
+    const board = this.#state.missionBoard;
+    const offset = mission.index - board.start;
+    const missionBoard: MissionBoard = { ...board, selected: next.completed ? null : offset,
+      progress: board.progress.map((value, i) => i === offset ? next.state.progress : value),
+      completed: board.completed.map((value, i) => value || i === offset && next.completed) };
+    const saved = this.#commit({ ...this.#state, coins, mission: next.state, missionBoard,
       firstSuccessAt: this.#state.firstSuccessAt ?? (next.completed ? new Date().toISOString() : null) });
     return { saved, rewarded: saved && next.completed };
   }
