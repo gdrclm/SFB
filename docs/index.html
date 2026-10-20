@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-BohSgqmJ.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DLL2xzSe.css">
+    <script type="module" crossorigin src="./assets/index-B7FyRE1M.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BnizUmKu.css">
   </head>
   <body>
     <main id="app">
@@ -186,15 +186,7 @@
             </div>
 
             <p class="vibration-support" data-vibration-support></p>
-            <p class="personal-bests" data-personal-bests></p>
-            <details class="run-records">
-              <summary>Рекорды · топ-10</summary>
-              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
-              <div class="records-scroll">
-                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
-              </div>
-              <p data-storage-status role="status"></p>
-            </details>
+            <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
             <div class="pause-actions">
               <button type="button" data-open-tutorial>Как играть</button>
               <button id="resume-button" class="pause-primary-action" type="button">Продолжить забег</button>
@@ -206,29 +198,26 @@
         </section>
         <section id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title" hidden>
           <div class="game-over-card">
-            <h1 id="game-over-title">Забег завершён</h1>
-            <p>Все жизни потеряны</p>
-            <div class="death-explanation"><span id="death-platform" aria-hidden="true"></span><p id="death-reason"></p></div>
-            <p id="run-result" aria-live="polite"></p>
-            <button id="restart-button" type="button">Ещё раз</button>
+            <div class="result-medal" aria-hidden="true">★</div>
+            <h1 id="game-over-title">Забег окончен</h1>
+            <p id="result-highlight" class="result-highlight">Твой результат</p>
+            <p id="run-result" aria-live="polite">0</p>
+            <span class="result-score-label">ОЧКОВ</span>
+            <p class="result-best">Личный рекорд <strong data-result="best">0</strong></p>
             <dl class="result-stats">
-              <div><dt>Глубина</dt><dd data-result="depth">0 м</dd></div>
-              <div><dt>Разрушено платформ</dt><dd data-result="platforms">0</dd></div>
-              <div><dt>Монеты за забег</dt><dd data-result="coins">0</dd></div>
-              <div><dt>Максимальная скорость</dt><dd data-result="speed">0 ед/с</dd></div>
-              <div><dt>Лучший результат</dt><dd data-result="best">0 очков</dd></div>
-              <div><dt>Лучшая серия</dt><dd data-result="combo">0</dd></div>
+              <div><dt><span aria-hidden="true">↓</span> Глубина</dt><dd data-result="depth">0 м</dd></div>
+              <div><dt><span class="stat-gold" aria-hidden="true">★</span> Монеты</dt><dd data-result="coins">0</dd></div>
+              <div><dt><span aria-hidden="true">ϟ</span> Макс. скорость</dt><dd data-result="speed">0</dd></div>
+              <div><dt><span aria-hidden="true">▰</span> Разбито</dt><dd data-result="platforms">0</dd></div>
             </dl>
-            <p id="result-save-status" role="status"></p>
-            <p class="personal-bests" data-personal-bests></p>
-            <details class="run-records">
-              <summary>Рекорды · топ-10</summary>
-              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
-              <div class="records-scroll">
-                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
-              </div>
-              <p data-storage-status role="status"></p>
+            <p class="result-combo">Лучшая серия <strong data-result="combo">0</strong></p>
+            <details class="result-impact">
+              <summary><span id="death-platform" aria-hidden="true"></span><span id="death-hint">Не хватило скорости</span><span aria-hidden="true">⌄</span></summary>
+              <p id="death-reason"></p>
             </details>
+            <button id="restart-button" type="button"><span aria-hidden="true">↻</span> Ещё раз</button>
+            <p id="result-save-status" role="status"></p>
+            <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
             <button id="results-menu-button" class="help-button" type="button">Главное меню</button>
           </div>
         </section>
@@ -250,17 +239,17 @@
             <p class="vibration-support" data-vibration-support></p>
           </details>
           <p id="start-error" role="alert"></p>
-          <p class="personal-bests" data-personal-bests></p>
-            <details class="run-records">
-              <summary>Рекорды · топ-10</summary>
-              <p class="score-formula">1 очко за метр + 10 за монету + 25 за платформу + бонусы комбо, скорости и риска.<br>Результаты хранятся в этом браузере, включая прерванные забеги.</p>
-              <div class="records-scroll">
-                <table><thead><tr><th scope="col">Дата</th><th scope="col">Очки</th><th scope="col">Длина</th><th scope="col">Комбо</th><th scope="col">Забег</th></tr></thead><tbody data-run-records></tbody></table>
-              </div>
-              <p data-storage-status role="status"></p>
-            </details>
+          <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
         </div>
       </section>
+      <dialog id="records" class="arcade-records" aria-labelledby="records-title">
+        <header class="records-header"><div><span class="menu-eyebrow">ЛИЧНЫЙ ТОП</span><h1 id="records-title">Рекорды</h1></div><button id="records-close" type="button" aria-label="Закрыть рекорды">×</button></header>
+        <div class="records-bests" data-personal-bests></div>
+        <h2 class="records-list-title">Лучшие забеги <span>ТОП 10</span></h2>
+        <ol class="records-list" data-run-records aria-label="Забеги по очкам"></ol>
+        <p class="records-local-note">Твои результаты на этом устройстве</p>
+        <p data-storage-status role="status"></p>
+      </dialog>
       <dialog id="shop" aria-labelledby="shop-title">
         <header class="shop-header"><div><h1 id="shop-title">Магазин</h1><p>Монеты: ★ <strong data-bank-coins>0</strong></p></div><button id="shop-close" type="button">Назад</button></header>
         <p>Покупки применяются в следующем забеге.</p>

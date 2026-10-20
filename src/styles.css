@@ -1968,3 +1968,105 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 #context-guide #context-skip { min-height: 30px; width: 26px; border: 0; background: none; padding: 0; opacity: .65; }
 #context-guide #context-text { margin: 0; padding-right: 16px; font-weight: 700; }
 .feel-danger { width: 42px; height: 42px; border: 4px solid #ff5b79; border-radius: 50%; box-shadow: 0 0 18px #f5466688; }
+
+/* Results and records share the arcade's cyan rims, deep blue and gold medals. */
+.records-button {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px;
+  margin: 12px 0 0; padding: 8px 14px; border: 2px solid #a8edff; border-radius: 16px;
+  background: linear-gradient(#185c90, #082d55); box-shadow: inset 0 1px 5px #8de8ff33, 0 3px 0 #041b37;
+  color: #fff; font: inherit; font-weight: 850; cursor: pointer;
+}
+.records-button > :last-child { margin-left: auto; font-size: 24px; color: #9de9ff; }
+.records-medal, .result-medal {
+  display: grid; place-items: center; color: #fff6c3; background: radial-gradient(circle at 35% 25%, #fff2a0, #ffc331 45%, #b56a09);
+  border: 2px solid #ffefab; border-radius: 50%; text-shadow: 0 2px 0 #ad6a09;
+  box-shadow: 0 0 0 3px #63431b, 0 0 16px #ffc64733;
+}
+.records-medal { width: 27px; height: 27px; font-size: 20px; }
+#game-over { padding: 12px; }
+#game-over .game-over-card { width: min(380px, 100%); padding: 20px; border-color: #9beaff; border-radius: 28px; max-height: calc(100dvh - 24px); }
+.result-medal { width: 54px; height: 54px; margin: 0 auto 12px; font-size: 36px; }
+#game-over-title { font-size: 1.35rem; }
+#game-over .result-highlight { margin: 10px 0 0; font-size: .75rem; color: #b5e9ff; font-weight: 800; }
+#game-over[data-new-record="true"] .result-highlight { color: #ffe58f; }
+#game-over #run-result { margin: 0; font-size: clamp(2.5rem, 11vw, 3.5rem); line-height: 1.1; color: #fff; letter-spacing: -.03em; text-shadow: 0 3px 0 #062044; }
+.result-score-label { font-size: .65rem; color: #8fd8f8; letter-spacing: .18em; font-weight: 800; }
+#game-over .result-best { margin: 8px 0 14px; color: #b7dbf0; font-size: .72rem; }
+.result-best strong { color: #ffe58f; margin-left: 4px; }
+#game-over .result-stats { margin: 0; gap: 8px; }
+#game-over .result-stats > div { padding: 10px 12px; border: 1px solid #6ccefa40; background: #041c3d77; }
+#game-over .result-stats dt { font-size: .68rem; color: #b2d9eb; }
+.result-stats dt span { margin-right: 4px; color: #78e9ff; }
+.result-stats dt .stat-gold { color: #ffdb69; }
+#game-over .result-stats dd { margin: 3px 0 0; font-size: 1.35rem; }
+#game-over .result-combo { margin: 10px 0; font-size: .72rem; color: #b3dcee; }
+.result-combo strong { color: #80f1d2; margin-left: 5px; }
+.result-impact { margin-bottom: 14px; text-align: left; }
+.result-impact summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: .68rem; color: #c9dfee; }
+.result-impact summary::-webkit-details-marker { display: none; }
+.result-impact summary > :last-child { margin-left: auto; }
+.result-impact #death-platform { width: 42px; flex: 0 0 42px; height: 28px; }
+.result-impact #death-platform svg { width: 42px; height: 28px; }
+#game-over #death-reason { margin: 8px 0; padding: 10px; background: #041c3d99; border-radius: 10px; font-size: .72rem; }
+#game-over #restart-button { width: 100%; min-height: 48px; font: inherit; font-size: 1.1rem; font-weight: 900; border-width: 2px; box-shadow: 0 4px 0 #155800, inset 0 2px 4px #f4ffbf66; }
+#restart-button > span { margin-right: 6px; }
+#game-over .records-button { min-height: 42px; }
+#game-over #results-menu-button { margin: 12px 0 0; padding: 4px; border: 0; background: none; box-shadow: none; font-size: .78rem; color: #b5dff5; }
+#result-save-status:empty { display: none; }
+#game-over #result-save-status { margin: 8px 0; color: #ffdc99; }
+.arcade-records {
+  width: min(400px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); box-sizing: border-box;
+  padding: 20px; border: 2px solid #a0eaff; border-radius: 28px; overflow-y: auto;
+  color: #fff; background: linear-gradient(160deg, #125487, #051c3d 70%);
+  box-shadow: 0 20px 60px #00122d99, inset 0 1px 20px #32beff22;
+}
+.arcade-records::backdrop { background: #00112bc9; backdrop-filter: blur(5px); }
+.records-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.records-header .menu-eyebrow { font-size: .6rem; letter-spacing: .15em; color: #8bdcff; }
+.records-header h1 { margin: 3px 0 0; font-family: Impact, "Arial Black", sans-serif; letter-spacing: .04em; font-size: 1.65rem; }
+#records-close { width: 40px; height: 40px; border: 2px solid #91d8f4; border-radius: 13px; background: linear-gradient(#164d78, #08294a); color: #fff; font-size: 26px; cursor: pointer; }
+.records-bests { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.record-best { display: grid; justify-items: center; gap: 4px; padding: 10px 3px; background: #04234b88; border: 1px solid #6fd5fa44; border-radius: 14px; }
+.record-best-icon { color: #ffda69; font-size: 22px; line-height: 1; }
+.record-best strong { font-size: clamp(.85rem, 4vw, 1.15rem); }
+.record-best > :last-child { font-size: .62rem; color: #acd2e7; }
+.records-list-title { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px; font-size: .85rem; }
+.records-list-title span { color: #8ac7e8; font-size: .6rem; letter-spacing: .1em; }
+.records-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-variant-numeric: tabular-nums; }
+.record-row { display: flex; align-items: center; gap: 12px; padding: 9px 10px; min-width: 0; border: 1px solid #83c9ed22; border-radius: 13px; background: #061f4180; }
+.record-rank { flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; color: #a7ccdf; font-weight: 900; border-radius: 50%; background: #183d5d; }
+.record-row[data-rank="1"] { border-color: #ffdb6888; background: linear-gradient(110deg, #69532166, #152f4a); }
+.record-row[data-rank="1"] .record-rank { color: #644211; background: linear-gradient(#fff2a3, #efb329); box-shadow: 0 0 0 2px #d29132; }
+.record-row[data-rank="2"] .record-rank { color: #24415a; background: linear-gradient(#e2f8ff, #92b3c9); }
+.record-row[data-rank="3"] .record-rank { color: #562c18; background: linear-gradient(#f8cca2, #bd8058); }
+.record-copy { display: grid; gap: 3px; min-width: 0; }
+.record-score { font-size: 1rem; overflow-wrap: anywhere; }
+.record-score small { color: #a6cde4; font-size: .6rem; font-weight: 500; }
+.record-detail { font-size: .65rem; color: #a9ccdf; }
+.record-date { margin-left: auto; font-size: .6rem; color: #89aec5; white-space: nowrap; }
+.records-empty { display: grid; justify-items: center; padding: 28px 0; gap: 10px; text-align: center; }
+.records-empty > span { font-size: 50px; line-height: 1; color: #ffdb6d; }
+.records-empty strong { font-size: .95rem; }
+.records-empty p, .records-local-note { font-size: .68rem; color: #a6cbdf; }
+.records-local-note { text-align: center; margin: 16px 0 0; }
+.arcade-records [data-storage-status] { margin: 12px 0 0; font-size: .75rem; color: #ffd787; }
+.arcade-records [data-storage-status]:empty { display: none; }
+.records-button:active, #records-close:active { transform: translateY(2px); }
+.records-button:focus-visible, #records-close:focus-visible, .result-impact summary:focus-visible { outline: 3px solid #ffe37b; outline-offset: 3px; }
+@media (max-height: 700px) {
+  #game-over .game-over-card { padding: 14px 18px; }
+  .result-medal { width: 34px; height: 34px; font-size: 24px; margin-bottom: 8px; }
+  #game-over #run-result { font-size: 2.5rem; }
+  #game-over .result-stats > div { padding: 6px 10px; }
+  #game-over .result-stats dd { font-size: 1.15rem; }
+  #game-over .result-highlight { margin-top: 5px; }
+  #game-over .result-best { margin-bottom: 8px; }
+  #game-over .result-combo { margin: 7px 0; }
+  .result-impact { margin-bottom: 9px; }
+}
+@media (max-height: 700px) {
+  #game-over .game-over-card { padding: 12px 16px; }
+  #game-over #restart-button { padding: 8px 12px; }
+  #game-over .records-button { padding: 6px 12px; margin-top: 10px; }
+  #game-over #results-menu-button { margin-top: 8px; }
+}

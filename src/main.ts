@@ -111,7 +111,6 @@ function exitApplication(): void {
   startScreen.hidden = false;
   interfaceLayer.inert = true;
   requireElement("#start-error").textContent = "";
-  renderRunHistory(startScreen, getBrowserRunHistory());
   shop.refreshBalance();
   startButton.focus();
 }
@@ -126,7 +125,15 @@ if (!(startButton instanceof HTMLButtonElement)) {
   throw new TypeError("#start-run-button must be a button element.");
 }
 interfaceLayer.inert = true;
-renderRunHistory(startScreen, getBrowserRunHistory());
+const recordsDialog = requireElement("#records");
+if (!(recordsDialog instanceof HTMLDialogElement)) throw new TypeError("#records must be a dialog.");
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-records]")) {
+  button.addEventListener("click", () => {
+    renderRunHistory(recordsDialog, getBrowserRunHistory());
+    recordsDialog.showModal();
+  });
+}
+requireElement("#records-close").addEventListener("click", () => { recordsDialog.close(); });
 const shopDialog = requireElement("#shop");
 if (!(shopDialog instanceof HTMLDialogElement)) throw new TypeError("#shop must be a dialog.");
 const shop = new ShopController(shopDialog);

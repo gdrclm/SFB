@@ -46,7 +46,6 @@ import { createEngine, type RendererKind } from "../rendering/createEngine";
 import "../rendering/registerStandardMaterialShaders";
 import { PhaseOneController } from "../progression/PhaseOneController";
 import { calculateScore, getBrowserRunHistory, RunProgress } from "../run/RunHistory";
-import { renderRunHistory } from "../run/renderRunHistory";
 import { LifeCounter } from "../run/LifeCounter";
 import { createMainScene } from "../scene/createMainScene";
 import { SlowModeButtonController } from "../slow-mode/SlowModeButtonController";
@@ -694,18 +693,23 @@ export class GameApplication {
         this.#pauseButtonElement.disabled = true;
         requireMenuElement(this.#gameOverElement, "#death-reason").textContent = describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
+        const previousBest = this.#history.top(1)[0]?.score ?? 0;
         const result = this.#finishRun("completed");
-        requireMenuElement(this.#gameOverElement, "#run-result").textContent = `${String(result.score)} очков`;
+        const newRecord = result.score > previousBest;
+        this.#gameOverElement.dataset.newRecord = String(newRecord);
+        requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = newRecord ? "Новый рекорд!" : "Твой результат";
+        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · поможет BOOST" : "Слишком прочная · смени дорожку";
+        this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("open");
+        requireMenuElement(this.#gameOverElement, "#run-result").textContent = result.score.toLocaleString("ru-RU");
         const stats: Record<string, string> = {
           depth: `${String(result.depth)} м`, platforms: String(result.platforms),
           coins: String(result.coins), speed: `${(result.maxSpeed ?? 0).toFixed(1)} ед/с`,
-          best: `${String(this.#history.top(1)[0]?.score ?? result.score)} очков`,
-          combo: `${String(result.bestCombo ?? 0)} · бонус +${String(result.comboBonus ?? 0)}`,
+          best: (this.#history.top(1)[0]?.score ?? result.score).toLocaleString("ru-RU"),
+          combo: String(result.bestCombo ?? 0),
         };
         for (const [name, value] of Object.entries(stats)) requireMenuElement(this.#gameOverElement, `[data-result="${name}"]`).textContent = value;
         requireMenuElement(this.#gameOverElement, "#result-save-status").textContent =
-          this.#history.storageAvailable && this.#profile.storageAvailable ? "Результат и монеты сохранены" : "Хранилище недоступно: результат может не сохраниться после закрытия";
-        this.#renderRecords();
+          this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
         this.#gameOverElement.hidden = false;
         document.querySelector<HTMLButtonElement>("#restart-button")?.focus();
         return;
@@ -872,7 +876,6 @@ export class GameApplication {
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");
     this.#pauseButtonElement.setAttribute("aria-expanded", "true");
     this.#renderPauseSummary();
-    this.#renderRecords();
     this.#resumeButtonElement.focus();
   };
 
@@ -1150,10 +1153,6 @@ export class GameApplication {
         : `Задание ${String(state.index + 1)} · награда ★ ${String(MISSION_REWARD)}${mission.kind === "clean" || mission.kind === "combo" ? " · потеря ♥ сбрасывает прогресс" : ""}`;
   }
 
-  #renderRecords(): void {
-    renderRunHistory(this.#pauseMenuElement, this.#history);
-    renderRunHistory(this.#gameOverElement, this.#history);
-  }
 
   #getDepth(): number {
     const ball = this.#ballController;
