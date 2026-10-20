@@ -29,14 +29,14 @@ const steps = [
   },
   {
     title: "Пробитие и BOOST",
-    content: `<p>${platform("standard", 7)} Скорость ≥ числа на платформе — она разобьётся.</p>
+    content: `<p>${platform("standard", 7)} ✓ — пробьёте. ϟ — нужен BOOST. ✕ — обходите.</p>
       <p>${boost} <strong>+50% скорости.</strong> Цена ${energy} — на кнопке. Перезарядка — 1 секунда.</p>
       <p>${heart} Не хватило скорости: −1 жизнь, скорость снова 10.</p>`,
   },
   {
     title: "Монеты и замедление",
     content: `<p>${coin} Монета: <strong>+1 скорости, +2 энергии</strong> без улучшений.</p>
-      <p>${slow} Замедляет время, тратит энергию. BOOST временно недоступен.</p>
+      <p>${slow} Замедляет время, тратит энергию. BOOST возвращает обычную скорость.</p>
       <p>Монеты сохраняются после забега. Покупки — в магазине.</p>`,
   },
   {
@@ -45,7 +45,7 @@ const steps = [
       <article>${platform("standard", 7)}<div><h2>Обычная</h2><p>Хватает скорости — разбивайте.</p></div></article>
       <article>${platform("super-heavy", 25)}<div><h2>Сверхпрочная</h2><p>Нужен разгон или обход.</p></div></article>
       <article>${platform("vitality", 10)}<div><h2>Восстановление</h2><p>${heart} +1 жизнь, ${energy} +10 энергии.</p></div></article>
-      <article>${platform("time-slow", 12)}<div><h2>Замедление</h2><p>${clock} 3 секунды без BOOST.</p></div></article>
+      <article>${platform("time-slow", 12)}<div><h2>Замедление</h2><p>${clock} Замедляет на 3 секунды.</p></div></article>
       </div>`,
   },
   {

@@ -95,8 +95,8 @@ Every successful boost multiplies current speed by 1.5 (10 → 15 → 22.5 →
 Camera view height grows with the square root of the speed ratio on both
 portrait and landscape screens. This expands the view while preserving a
 visible increase in screen traversal speed. Each boost has a consistent ball
-and button reaction, a speed-change message, and speed-dependent movement
-streaks. Reduced-motion preferences disable streaks and button pulses.
+and button reaction, a short air impulse, and speed-dependent movement
+streaks. Zoom starts 180 ms after BOOST so the initial acceleration reads first. Reduced-motion preferences disable streaks and button pulses.
 
 The first run uses the staged contextual opening described below. A reference
 guide remains available through **Как играть** in pause. Tutorial
@@ -120,8 +120,8 @@ storage, shop transactions are blocked and an explanation is shown.
 ## Five-minute combo loop
 
 Phase one now lasts 300 simulation seconds (slow mode stretches real time;
-pause stops progression), with ten increasingly demanding stages. The HUD
-shows an active-time clock and stage goals. A chain of 3/6/10/15 successful
+pause stops progression), with ten increasingly demanding stages. The play HUD shows one speed value, hearts, coins, depth and a small progress
+track; detailed stage goals, score and hit accounting live in pause/results. A chain of 3/6/10/15 successful
 platform breaks raises the hit multiplier to ×2/×3/×4/×5. A damaging bounce
 resets the chain, preserving already earned points. Dodging and pauses do not
 break it. Speed 20/35/55 adds ×1.25/×1.5/×2; breaking a platform whose strength
@@ -131,18 +131,17 @@ over the existing 25 base points is added to the run total. Best chain and
 combo bonus persist with results; older records retain their original scores.
 Combo points do not multiply spendable coins.
 
-Only the nearest active platform intersecting the ball's current horizontal
-lane reacts to speed. Breakable: faint glow; deficit ≤15%: amber tension;
-moderate deficit: subdued orange; deficit over one third: strong rose outline.
-This does not highlight safe routes in neighboring lanes. Platform strength
-is an integer threshold shared by physics assessment, texture labels and HUD;
-generated safe and boost routes account for this rounding. Pulses use game
-time and become static with reduced-motion preferences.
+Only the nearest obstacle in the current horizontal lane gets a readiness cue:
+light outline and ✓ for a break now; amber ϟ only when a currently available
+BOOST suffices; a gray clock when that boost is unavailable; red ✕ when one
+BOOST cannot suffice. Energy, cooldown and gameplay state use the actual boost
+controller. The platform and BOOST glow share the same pulse when boost is useful.
+Other lanes are not ranked. Straddling two platforms in one row conservatively
+warns about the stronger obstacle. Base materials and silhouettes remain intact.
 
-Platform numbers also have neutral screen-space badges with a minimum readable
-font size, so zooming out does not make strength values vanish. Only the one
-platform intersecting the current lane receives a readiness-colored badge;
-other lanes retain neutral numeric labels.
+Numeric strength is optional via **Числа прочности** in pause and persists between
+sessions. The integer threshold remains shared by the actual physics and the
+optional numeric badges. Players do not need numbers for the default cues.
 
 ## Contextual first-run opening
 
@@ -154,12 +153,16 @@ real two-lane fork at second 18. Familiar platforms and coins at seconds
 cards. Positions are placed ahead of the current ball,
 so boosting does not reveal the whole lesson at once. The fork offers a safe
 ordinary platform and a strong dark platform, without a free central corridor.
-Each first appearance opens one short card with its matching illustration.
-Physics, energy drain, cooldowns and game time freeze until Continue; Escape
-also continues. A real first life loss explains lives; no damage is forced.
-A first three-hit combo explains its multiplier. New special platforms after
-staging are explained only once they are actually visible. UI controls appear
-progressively as they are introduced.
+Only three short arrows appear: «Веди пальцем», «Собирай», «Ускорься!».
+They point at the ball, first world coin and BOOST. Gameplay keeps running;
+there is no modal, Continue action or reading stop. Dragging, collecting the
+coin and successfully boosting dismiss the matching hint. Ignored hints time
+out. The fork uses the actual platform cues; lives animate on loss and combo
+shows its multiplier, without extra teaching text. Full rules remain in pause.
+
+Slow platforms are suppressed until the first successful BOOST. Once introduced,
+a ready BOOST can exit manual or forced slow mode and immediately accelerate;
+rejected attempts do not cancel slow mode or consume energy.
 
 At second 30, random generation restarts from the current ball position. This
 avoids replaying rows from the original starting altitude. Completion is saved
@@ -173,7 +176,8 @@ Music, effects and vibration have independent persistent switches in the main
 menu and pause menu. Existing sound-off preferences migrate only to the two
 audio channels, leaving vibration independent. Media tagged
 `data-audio-channel="music"` follows Music; other audio/video follows Effects,
-including media added later. This adds channel controls, not new music assets.
+including media added later. Synthesized event audio follows Effects independently
+of Music and Vibration; no music files are added.
 
 Physical feedback uses the standard Vibration API, after a real user gesture
 and only while the page is visible. Browsers without the API or which reject
@@ -251,26 +255,24 @@ npm run build
 
 ## Compact tutorial, shop and combo feedback
 
-Contextual teaching cards now give one short action and result, keeping their
-matching illustrations. The pause reference uses short pages; navigation stays
+Contextual first-run hints are short arrows dismissed by actual actions. The pause reference uses short pages; navigation stays
 in one row. The store uses compact rows with a small preview, ownership/level,
 price and action. Upgrade effects stay visible; cosmetic descriptions are
 available as tooltips. All categories and reference pages were checked without
 vertical scrolling at 320×568, 390×844 and 844×390.
 
-Combo feedback keeps its text and number sizes, sits higher and uses a translucent
-background. Each hit refreshes a two-second active real-time lifetime; misses
-briefly show the lost-series message. Pausing freezes the lifetime, slow mode
-does not stretch it, and resetting a run hides it. Timed challenge notices use
-a separate overlay so they do not keep the combo panel visible.
-
+Combo is a brief count/multiplier badge near the top, without progress bars,
+risk arithmetic or bonus text. It appears from ×2 and refreshes for two active
+real seconds on hits, freezes in pause and hides on error/reset. Challenge
+notices show just their short names. The technical hit journal is not visible.
 
 ## Sequential missions and repeatable rewards
 
-The bottom goal panel always shows the current mission and progress. Completion
-credits 10 shop coins and saves the next mission in a single profile transaction.
-The next objective appears immediately; a gold flash and earned-reward message
-last two active real-time seconds. Missions cycle through clean breaks, coins,
+Active mission details live in pause. A newly received objective briefly appears
+then collapses; in the opening lesson only the reward is shown. Completion
+credits 10 shop coins and saves the next mission in a single transaction.
+A gold flash and +10 ★ last two active real seconds, followed by a short next-goal
+notification. Missions cycle through clean breaks, coins,
 successful BOOST uses, platform breaks and combo, with bounded target increases
 on subsequent cycles. Only actions after activation count toward a new mission.
 
@@ -280,3 +282,27 @@ Rejected BOOST attempts do not count. Mission rewards are separate from collecte
 run coins, so finishing or replaying a run cannot credit them twice. Legacy users
 who already earned the original first-success reward continue at mission two,
 keeping their old balance and purchases without another first-goal payout.
+
+
+## Arcade feedback and a repeat playtest
+
+BOOST has a short squash/stretch, widening trail, air sweep sound, speed lines,
+ring impulse and delayed camera zoom. Breaks have a 30–50 ms contact stop, four
+large fragments, short camera kick, ring/sparks and a synthesized low/crunch hit.
+Coins flash, arc to the counter and play ascending bounded notes in a chain.
+Errors have red feedback and a dull hit; healing has a green heart pulse and
+its own chime. Audio starts only after a trusted gesture, follows Effects,
+stops on pause/blur/hidden pages, and degrades silently without Web Audio.
+Transient effects are bounded and cleaned between runs. Reduced-motion mode
+avoids decorative travel/streaks and hit stop.
+
+Для живого плейтеста без пояснений:
+
+1. Открыть игру в приватном окне на телефоне и нажать «Начать забег».
+2. Не объяснять управление и не подсказывать первые 30 секунд.
+3. Записать время первого движения, монеты и успешного BOOST; отметить ошибки
+   чтения сигналов ✓ / ϟ / ◷ / ✕ и касания неготовой кнопки.
+4. Спросить, что было приятно и что мешало, без перечисления механик заранее.
+
+Автоматические проверки подтверждают ввод, состояния, эффекты и сохранения.
+Понимание новым человеком и удовольствие от игры нужно оценивать живым плейтестом.

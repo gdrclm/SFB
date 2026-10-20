@@ -32,8 +32,8 @@ describe("SuccessfulHitEffects", () => {
     const platformFragments = scene.meshes.filter((mesh) =>
       mesh.name.startsWith("platform-fragment-"),
     );
-    expect(platformFragments).toHaveLength(6);
-    expect(scene.meshes.length).toBe(meshCountBeforeBreak + 6);
+    expect(platformFragments).toHaveLength(4);
+    expect(scene.meshes.length).toBe(meshCountBeforeBreak + 4);
     expect(completePlatformBreak).not.toHaveBeenCalled();
     expect(platformFragments[0]?.position.x).toBeLessThan(platformMesh.position.x);
     expect(platformFragments.at(-1)?.position.x).toBeGreaterThan(platformMesh.position.x);

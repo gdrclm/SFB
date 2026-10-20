@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-Dd8MiBvz.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-dD-CAT3I.css">
+    <script type="module" crossorigin src="./assets/index-BohSgqmJ.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DLL2xzSe.css">
   </head>
   <body>
     <main id="app">
@@ -19,7 +19,8 @@
         <div class="speed-streaks" aria-hidden="true"><i style="--lane:0"></i><i style="--lane:1"></i><i style="--lane:2"></i><i style="--lane:3"></i><i style="--lane:4"></i><i style="--lane:5"></i><i style="--lane:6"></i><i style="--lane:7"></i><i style="--lane:8"></i><i style="--lane:9"></i><i style="--lane:10"></i><i style="--lane:11"></i></div>
         <p id="boost-feedback" role="status"></p>
       </div>
-      <div id="interface-layer" aria-live="polite">
+      <div id="impact-effects" aria-hidden="true"></div>
+      <div id="interface-layer">
         <div id="platform-labels" aria-hidden="true"></div>
         <header id="top-hud">
           <div class="hud-stack hud-stack-left">
@@ -34,6 +35,7 @@
             </div>
           </div>
 
+          <progress id="phase-progress" max="1" value="0" aria-label="Прогресс забега"></progress>
           <section id="speed-panel" aria-label="Скорость и пробитие">
             <div class="speed-value-row">
               <strong id="speed-value">10.0</strong>
@@ -71,8 +73,8 @@
           <small id="loop-goal">0:00 / 5:00 · Соберите 3 удара подряд</small>
         </section>
         <aside id="challenge-notice" role="status" hidden><strong></strong><span></span></aside>
-        <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Не хватает скорости? BOOST даёт +50%. Нажмите после отскока, когда кнопка готова. Для тёмной платформы этого может быть мало.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
-        <aside id="first-success" role="status" data-complete="false"><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Задание 1 · награда ★ 10 · потеря ♥ сбрасывает прогресс</small></aside>
+        <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Нажми BOOST или обойди.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
+        <aside id="first-success" role="status" data-complete="false" hidden><strong>Разбейте 5 без потери жизни · 0/5</strong><small>Задание 1 · награда ★ 10 · потеря ♥ сбрасывает прогресс</small></aside>
         <aside id="run-panel">
           <span class="hud-caption">ГЛУБИНА</span>
           <strong id="depth-value">0 М</strong>
@@ -100,18 +102,19 @@
             </svg>
             <span class="boost-title">BOOST</span>
             <span class="control-state boost-state">ГОТОВО</span>
+            <span id="boost-energy-inline" aria-label="Энергия">30 ϟ</span>
             <span id="boost-cost" class="boost-cost">−1⚡</span>
           </button>
         </div>
         <button
           id="slow-mode-button"
           type="button"
-          aria-label="Нажмите, чтобы включить замедление времени до 10 процентов."
+          aria-label="Замедлить время."
           aria-pressed="false"
         >
           <span class="control-ring" aria-hidden="true"></span>
           <span class="control-core" aria-hidden="true"></span>
-          <span class="slow-mode-value" aria-hidden="true">ϟ</span>
+          <span class="slow-mode-value" aria-hidden="true">◷</span>
           <span class="slow-mode-title">ЗАМЕДЛЕНИЕ</span>
           <span class="control-state slow-mode-state">ГОТОВО</span>
         </button>
@@ -140,6 +143,9 @@
               </div>
             </div>
 
+            <p id="pause-telemetry" class="pause-combo-summary"></p>
+            <p id="pause-mission" class="pause-combo-summary"></p>
+            <button id="platform-numbers-toggle" type="button" aria-pressed="false">Числа прочности: выкл.</button>
             <p id="pause-combo-summary" class="pause-combo-summary">Комбо 0 · лучшее 0 · бонус +0</p>
             <section class="pause-missions" aria-labelledby="pause-missions-title">
               <h2 id="pause-missions-title">ТЕКУЩИЕ МИССИИ</h2>
@@ -264,11 +270,11 @@
         <div id="shop-items"></div>
       </dialog>
       <dialog id="context-guide" aria-labelledby="context-title">
-        <small>ОБУЧЕНИЕ · ИГРА НА ПАУЗЕ</small>
+        <small>ПОДСКАЗКА</small>
         <div id="context-picture" aria-hidden="true"></div>
         <h1 id="context-title" tabindex="-1" autofocus></h1>
         <p id="context-text"></p>
-        <div class="context-actions"><button id="context-continue" type="button">Продолжить</button><button id="context-skip" type="button">Пропустить обучение</button></div>
+        <div class="context-actions"><button id="context-continue" type="button">ОК</button><button id="context-skip" type="button" aria-label="Пропустить обучение">×</button></div>
       </dialog>
       <dialog id="tutorial" aria-labelledby="tutorial-title">
         <div class="tutorial-header"><span id="tutorial-step"></span><button id="tutorial-close" type="button" aria-label="Закрыть обучение">✕</button></div>

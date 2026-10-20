@@ -170,3 +170,19 @@ describe("BoostController", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 });
+
+it("lets a ready, paid boost leave slow mode before accelerating, without cancelling it on a rejected attempt", () => {
+  const state = { current: GameState.SlowMode as GameState };
+  const ball = createBall(); const wallet = createWallet(0);
+  const leave = vi.fn(() => { state.current = GameState.Playing; });
+  const boost = new BoostController(ball, state, wallet, gameConfig, leave);
+  expect(boost.tryBoost()).toMatchObject({ success: false, reason: "insufficient-energy" });
+  expect(leave).not.toHaveBeenCalled();
+  expect(state.current).toBe(GameState.SlowMode);
+  wallet.addEnergy(10);
+  expect(boost.canBoost).toBe(true);
+  expect(boost.tryBoost().success).toBe(true);
+  expect(leave).toHaveBeenCalledOnce();
+  expect(state.current).toBe(GameState.Playing);
+  expect(ball.fallSpeed).toBe(15);
+});

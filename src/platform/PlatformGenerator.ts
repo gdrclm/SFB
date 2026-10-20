@@ -27,6 +27,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
   #planner: PlatformRoutePlanner;
   readonly #random: () => number;
   public enabled = true;
+  public allowSlowPlatforms = true;
   readonly #generatedListeners = new Set<PlatformGeneratedListener>();
 
   public constructor(
@@ -107,7 +108,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
           routeKind: plan.routeKind,
           widthScale: plan.widthScale,
           isTrap: plan.routeKind === "boost",
-          kind: plan.kind,
+          kind: !this.allowSlowPlatforms && plan.kind === "time-slow" ? "standard" : plan.kind,
         },
       );
       if (platform === null) {
@@ -127,7 +128,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
             routeKind: choice.routeKind,
             widthScale: choice.widthScale,
             isTrap: choice.isTrap,
-            kind: choice.kind,
+            kind: !this.allowSlowPlatforms && choice.kind === "time-slow" ? "standard" : choice.kind,
           },
         );
       }

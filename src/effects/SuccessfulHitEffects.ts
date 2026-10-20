@@ -9,7 +9,7 @@ import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { PlatformController } from "../platform/PlatformController";
 
-const platformFragmentCount = 6;
+const platformFragmentCount = 4;
 
 interface PlatformFragmentState {
   readonly mesh: Mesh;

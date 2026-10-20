@@ -1,3 +1,4 @@
+import { approachSymbol } from "./PlatformReadability";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlatformController } from "./PlatformController";
@@ -37,10 +38,13 @@ export class PlatformLabels {
       if (!platform.isActive) { label.hidden = true; continue; }
       const point = Vector3.Project(platform.mesh.getAbsolutePosition(), Matrix.IdentityReadOnly, transform, viewport);
       const visible = point.z >= 0 && point.z <= 1 && point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height;
-      label.hidden = !visible;
+      const numbers = document.body.dataset.platformNumbers === "true";
+      label.hidden = !visible || !numbers && platform.approachState === null;
       if (!visible) continue;
       this.#visible.push(platform);
-      label.textContent = String(platform.strength);
+      const state = platform.approachState;
+      label.textContent = numbers ? String(platform.strength) : approachSymbol(state);
+      label.dataset.kind = platform.kind;
       label.style.left = `${String(point.x / width * bounds.width)}px`;
       label.style.top = `${String(point.y / height * bounds.height)}px`;
       label.dataset.approach = platform.approachState ?? "none";

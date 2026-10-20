@@ -42,14 +42,15 @@ export class ComboView {
   }
 
   public hit(hit: ComboHit): void {
-    this.#visibility.show();
+    if (hit.multiplier >= 2) this.#visibility.show();
+    else this.#visibility.reset();
     this.#updateVisibility();
     this.#message.textContent = `+${String(hit.points)} ${hit.risky ? "· НА ГРАНИ!" : "· УСПЕШНЫЙ УДАР"}${hit.tierIncreased ? ` · КОМБО ×${String(hit.multiplier)}!` : ""}`;
     this.#animate(false, hit.tierIncreased);
   }
 
   public miss(lost: number): void {
-    this.#visibility.show();
+    this.#visibility.reset();
     this.#updateVisibility();
     this.#message.textContent = lost > 0 ? `Серия ${String(lost)} потеряна · начните новую` : "Ошибка · соберите новую серию";
     this.#animate(true, false);

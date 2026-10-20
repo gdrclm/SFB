@@ -260,7 +260,7 @@ export class PlatformController {
 
   public get approachState(): ApproachState | null { return this.#approachState; }
 
-  public setApproachFeedback(speed: number | null, elapsedSeconds = 0): void {
+  public setApproachFeedback(speed: number | null, elapsedSeconds = 0, boostAvailable = true, boostMultiplier = 1.5): void {
     const reinforced = this.#kind === "super-heavy";
     const baseWidth = reinforced || this.#kind === "time-slow" ? 0.05 : 0.04;
     if (speed === null || !this.#isActive) {
@@ -272,18 +272,18 @@ export class PlatformController {
       }
       return;
     }
-    this.#approachState = approachState(speed, this.#strength);
+    this.#approachState = approachState(speed, this.#strength, boostAvailable, boostMultiplier);
     const pulse = (Math.sin(elapsedSeconds * Math.PI * 1.6) + 1) / 2;
     const state = this.#approachState;
-    const color = state === "breakable" ? new Color3(0.5, 0.95, 0.87)
+    const color = state === "unavailable" ? new Color3(.6, .7, .76) : state === "breakable" ? new Color3(0.35, 1, 0.65)
       : state === "close" ? new Color3(1, 0.73, 0.18)
         : state === "hard" ? new Color3(1, 0.43, 0.13) : new Color3(1, 0.15, 0.26);
     this.mesh.outlineColor = color;
-    this.mesh.outlineWidth = state === "breakable" ? baseWidth + 0.012
+    this.mesh.outlineWidth = state === "breakable" ? 0.085
       : state === "close" ? 0.065 + pulse * 0.015
         : state === "hard" ? 0.07 : 0.09 + pulse * 0.025;
     this.#material.emissiveColor = Color3.Lerp(this.#getEmissiveColor(reinforced), color,
-      state === "breakable" ? 0.12 : state === "danger" ? 0.28 + pulse * 0.08 : 0.18);
+      state === "breakable" ? 0.35 : state === "danger" ? 0.28 + pulse * 0.08 : 0.18);
   }
 
   public beginBreak(): boolean {
@@ -711,17 +711,6 @@ export class PlatformController {
       this.#drawClockIcon(context, 70, height / 2);
     }
 
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.font = "900 92px Impact, Arial Black, sans-serif";
-    context.lineWidth = 14;
-    context.strokeStyle = reinforced ? "#1b0803" : "#3b2b20";
-    const textX = kind === "standard" || kind === "super-heavy"
-      ? width / 2
-      : width / 2 + 34;
-    context.strokeText(String(requiredSpeed(strength)), textX, height / 2 + 4);
-    context.fillStyle = "#ffffff";
-    context.fillText(String(requiredSpeed(strength)), textX, height / 2 + 4);
     texture.update(false);
   }
 

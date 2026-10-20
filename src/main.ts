@@ -1,3 +1,4 @@
+import { getGameSounds } from "./feedback/GameSounds";
 import { initializeFeedbackControls } from "./feedback/FeedbackControls";
 import "./styles.css";
 import { getBrowserRunHistory } from "./run/RunHistory";
@@ -53,6 +54,7 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
 }
 const restartButton = restartButtonElement;
 initializeFeedbackControls();
+getGameSounds();
 let requestedGuidedRun = false;
 const lifecycle = new ApplicationLifecycle(
   () => new GameApplication(
@@ -86,6 +88,9 @@ const lifecycle = new ApplicationLifecycle(
 function showStartupError(error: unknown): void {
   const message = error instanceof Error ? error.message : "Unknown startup error";
   status.textContent = `Ошибка запуска: ${message}`;
+  requireElement("#start-error").textContent = status.textContent;
+  requireElement("#start-screen").hidden = false;
+  interfaceLayer.inert = true;
   console.error(error);
 }
 
@@ -164,3 +169,18 @@ window.addEventListener("pageshow", (event) => {
     void restartApplication();
   }
 });
+
+const numbersToggle = document.querySelector<HTMLButtonElement>("#platform-numbers-toggle");
+let showPlatformNumbers = false;
+try { showPlatformNumbers = localStorage.getItem("speed-fall-ball.platform-numbers") === "true"; } catch { /* Use visual cues. */ }
+function applyPlatformNumbers(): void {
+  document.body.dataset.platformNumbers = String(showPlatformNumbers);
+  numbersToggle?.setAttribute("aria-pressed", String(showPlatformNumbers));
+  if (numbersToggle !== null) numbersToggle.textContent = `Числа прочности: ${showPlatformNumbers ? "вкл." : "выкл."}`;
+}
+numbersToggle?.addEventListener("click", () => {
+  showPlatformNumbers = !showPlatformNumbers;
+  try { localStorage.setItem("speed-fall-ball.platform-numbers", String(showPlatformNumbers)); } catch { /* Session choice. */ }
+  applyPlatformNumbers();
+});
+applyPlatformNumbers();

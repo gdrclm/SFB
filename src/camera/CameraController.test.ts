@@ -131,38 +131,34 @@ describe("CameraController", () => {
     }
   });
 
-  it("zooms out immediately on Boost and returns in three real seconds", () => {
-    const { camera, controller } = createFixture(0.5);
-    const portraitBaseline = Number(camera.orthoTop);
-
+  it("preserves the current view when another boost interrupts its camera reaction", () => {
+    const { camera, controller, target } = createFixture(.5);
+    target.fallSpeed *= 1.5;
     controller.playBoostReaction();
+    for (let frame = 0; frame < 30; frame++) controller.fixedUpdate(1 / 60);
+    const currentView = Number(camera.orthoTop);
 
-    expect(controller.orthographicSize).toBe(
-      gameConfig.camera.orthographicSize +
-        gameConfig.camera.boostZoomExtraSize,
-    );
-    expect(camera.orthoTop).toBe(
-      portraitBaseline + gameConfig.camera.boostZoomExtraSize,
-    );
+    target.fallSpeed *= 1.5;
+    controller.playBoostReaction();
+    expect(Number(camera.orthoTop)).toBe(currentView);
+    controller.fixedUpdate(.1, .1);
+    expect(Number(camera.orthoTop)).toBe(currentView);
+    for (let frame = 0; frame < 240; frame++) controller.fixedUpdate(1 / 60);
+    expect(controller.orthographicSize).toBeCloseTo(calculateCameraSize(target.fallSpeed, gameConfig.camera), 5);
+  });
 
-    for (let step = 0; step < 90; step += 1) {
-      controller.fixedUpdate(1 / 600, 1 / 60);
-    }
-    expect(controller.orthographicSize).toBeGreaterThan(
-      gameConfig.camera.orthographicSize,
-    );
-    expect(controller.orthographicSize).toBeLessThan(
-      gameConfig.camera.orthographicSize +
-        gameConfig.camera.boostZoomExtraSize,
-    );
-
-    for (let step = 0; step < 90; step += 1) {
-      controller.fixedUpdate(1 / 600, 1 / 60);
-    }
-    expect(controller.orthographicSize).toBeCloseTo(
-      gameConfig.camera.orthographicSize,
-      10,
-    );
-    expect(camera.orthoTop).toBeCloseTo(portraitBaseline, 10);
+  it("lets the initial boost travel read before zooming, then returns over real time", () => {
+    const { camera, controller, target } = createFixture(.5);
+    const baseline = Number(camera.orthoTop);
+    target.fallSpeed *= 1.5;
+    controller.playBoostReaction();
+    expect(Number(camera.orthoTop)).toBe(baseline);
+    controller.fixedUpdate(.1, .1);
+    expect(Number(camera.orthoTop)).toBe(baseline);
+    controller.fixedUpdate(.1, .1);
+    controller.fixedUpdate(.1, .1);
+    expect(Number(camera.orthoTop)).toBeGreaterThan(baseline);
+    for (let i = 0; i < 600; i++) controller.fixedUpdate(1 / 60, 1 / 60);
+    expect(controller.orthographicSize).toBeCloseTo(calculateCameraSize(target.fallSpeed, gameConfig.camera), 8);
   });
 });

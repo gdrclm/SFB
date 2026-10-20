@@ -1,3 +1,5 @@
+import { GameFeel } from "../feedback/GameFeel";
+import { getGameSounds } from "../feedback/GameSounds";
 import { ChallengeDirector } from "../challenges/ChallengeDirector";
 import { BoostCoach } from "../boost/BoostCoach";
 import { describeFailedImpact } from "../run/FailedImpact";
@@ -116,16 +118,19 @@ export class GameApplication {
   #runProgress = new RunProgress();
   #combo = new ComboController();
   #comboView: ComboView | null = null;
+  #feel: GameFeel | null = null;
   #elapsedGameplaySeconds = 0;
   #opening: StagedOpening | null = null;
   #guideStrengths: number[] = [];
   #contextGuide: ContextGuide | null = null;
-  #beforeContextTip: GameState = GameState.Playing;
   readonly #reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   #runStarted = false;
   #challengeDirector: ChallengeDirector | null = null;
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
+  #hitStopRemaining = 0;
+  #missionIntroRemaining = 2.5;
+  #lastLifeCount = this.#config.run.initialLives;
   #missionRewardRemaining = 0;
   #missionSaveFailed = false;
   #mainScene: Awaited<ReturnType<typeof createMainScene>> | null = null;
@@ -279,6 +284,9 @@ export class GameApplication {
     this.#boostCoach = new BoostCoach();
     this.#challengeRemaining = 0;
     this.#challengeDirector = null;
+    this.#hitStopRemaining = 0;
+    this.#missionIntroRemaining = 2.5;
+    this.#lastLifeCount = this.#config.run.initialLives;
     this.#missionRewardRemaining = 0;
     this.#missionSaveFailed = false;
     this.#gameState = new GameStateController();
@@ -322,6 +330,7 @@ export class GameApplication {
     const engine = this.#engine;
     if (engine === null) throw new Error("Engine is unavailable");
     this.#scene = mainScene.scene;
+    this.#feel = new GameFeel(this.#scene, this.#canvas);
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
@@ -341,7 +350,11 @@ export class GameApplication {
     this.#fixedStep.register({ fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
       if (this.#missionRewardRemaining > 0) {
         this.#missionRewardRemaining = Math.max(0, this.#missionRewardRemaining - realDeltaSeconds);
-        if (this.#missionRewardRemaining === 0) this.#renderMission();
+        if (this.#missionRewardRemaining === 0) { this.#missionIntroRemaining = 2.5; this.#renderMission(); }
+      }
+      if (this.#missionRewardRemaining <= 0 && this.#missionIntroRemaining > 0) {
+        this.#missionIntroRemaining = Math.max(0, this.#missionIntroRemaining - realDeltaSeconds);
+        if (this.#missionIntroRemaining === 0) this.#renderMission();
       }
       this.#elapsedGameplaySeconds += delta;
       this.#runProgress.observeDepth(this.#getDepth());
@@ -349,6 +362,7 @@ export class GameApplication {
       const scripted = this.#opening?.isScripted === true;
       if (!scripted) this.#challengeDirector?.fixedUpdate(delta);
       this.#challengeRemaining = Math.max(0, this.#challengeRemaining - delta);
+      this.#contextGuide?.fixedUpdate(realDeltaSeconds);
       this.#boostCoach.fixedUpdate(delta, !scripted && this.#gameState.current === GameState.Playing);
     } });
     this.#ballVisualController = new BallVisualController(
@@ -405,13 +419,14 @@ export class GameApplication {
         this.#coinGenerator?.handlePlatformGenerated(plan);
       },
     );
+    this.#platformGenerator.allowSlowPlatforms = false;
     this.#platformGenerator.queueEncounter("chaos");
     this.#fixedStep.register(this.#platformGenerator);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
       this.#platformGenerator?.queueEncounter(challenge.theme);
       const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
       notice.dataset.theme = challenge.theme;
-      requireMenuElement(notice, "strong").textContent = `Впереди: ${challenge.title}`;
+      requireMenuElement(notice, "strong").textContent = challenge.title;
       requireMenuElement(notice, "span").textContent = challenge.text;
       this.#challengeRemaining = 7;
     });
@@ -471,14 +486,18 @@ export class GameApplication {
       this.#gameState,
       this.#wallet,
       this.#config,
+      () => { this.#slowModeController?.cancelForBoost(); },
     );
     this.#unsubscribeBoosted = this.#boostController.onBoosted((result) => {
+      this.#contextGuide?.completed("boost");
+      if (this.#platformGenerator !== null) this.#platformGenerator.allowSlowPlatforms = true;
       this.#boostCoach.boosted();
       this.#updateMission({ type: "boost" });
       this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
+      if (this.#ballController !== null) this.#feel?.boost(this.#ballController.position);
       this.#haptics.request("boost");
       this.#ballVisualController?.playBoostReaction(result);
-      this.#speedFeedback?.playBoost(result);
+      this.#speedFeedback?.playBoost();
       this.#cameraController?.playBoostReaction();
     });
     this.#boostButton = new BoostButtonController(
@@ -493,6 +512,7 @@ export class GameApplication {
     if (guided) this.#prepareOpening(coins);
     else { document.body.dataset.guideStage = "off"; document.body.dataset.guideCombo = "true"; document.body.dataset.guideSlow = "true"; }
 
+    this.#renderMission();
     window.addEventListener("resize", this.#resize);
     window.visualViewport?.addEventListener("resize", this.#resize);
     this.#resizeObserver = new ResizeObserver(this.#resize);
@@ -514,6 +534,8 @@ export class GameApplication {
     document.body.dataset.guideStage = "off";
     this.#platformLabels?.dispose();
     this.#comboView?.dispose();
+    this.#feel?.dispose();
+    this.#feel = null;
     this.#speedFeedback?.dispose();
     this.#isDisposed = !keepScene;
     this.#runStarted = false;
@@ -595,8 +617,9 @@ export class GameApplication {
     const timeScale = isPaused
       ? 1
       : (this.#slowModeController?.update(realDeltaSeconds) ?? 1);
-    if (!isPaused && this.#gameState.current !== GameState.GameOver) {
-      this.#fixedStep.advance(realDeltaSeconds, timeScale, () => this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial);
+    if (!isPaused && this.#hitStopRemaining > 0) this.#hitStopRemaining = Math.max(0, this.#hitStopRemaining - realDeltaSeconds);
+    else if (!isPaused && this.#gameState.current !== GameState.GameOver) {
+      this.#fixedStep.advance(realDeltaSeconds, timeScale, () => this.#hitStopRemaining <= 0 && this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial);
     }
     isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     this.#lastFrameTimeMs = nowMs;
@@ -609,6 +632,7 @@ export class GameApplication {
       isPaused || this.#gameState.current === GameState.GameOver,
     );
     this.#renderCombo(isPaused || this.#gameState.current === GameState.GameOver);
+    this.#feel?.setPaused(isPaused || document.hidden || !document.hasFocus());
     const hideNotices = isPaused || this.#gameState.current === GameState.GameOver;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || !this.#boostCoach.visible;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
@@ -616,6 +640,7 @@ export class GameApplication {
       this.#renderPauseSummary();
     }
     this.#scene?.render();
+    this.#contextGuide?.layout();
     this.#platformLabels?.render();
     for (const platform of this.#platformLabels?.visiblePlatforms ?? []) {
       this.#guideStrengths = [platform.strength];
@@ -637,6 +662,8 @@ export class GameApplication {
     const destroyed = this.#successfulHitHandler?.handle(collision) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
+      this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy");
+      if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .05 : .03;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
@@ -651,7 +678,7 @@ export class GameApplication {
       this.#haptics.request(collision.platform.kind === "super-heavy" || collision.platform.strengthLevel === "high"
         ? "heavyBreak" : collision.platform.strengthLevel === "low" ? "weakBreak" : "normalBreak");
       if (collision.ballSpeed >= collision.platform.strength * 1.75) this.#haptics.request("powerfulBreak");
-      if (this.#lives.remainingLives > previousLives) this.#haptics.request("heal");
+      if (this.#lives.remainingLives > previousLives) { this.#haptics.request("heal"); this.#feel?.heal(); }
       return;
     }
 
@@ -694,6 +721,8 @@ export class GameApplication {
   };
 
   readonly #handleCoinCollected = (coin: CoinController): void => {
+    this.#contextGuide?.completed("coin");
+    this.#feel?.coin(coin.mesh.position);
     this.#updateMission({ type: "coin" });
     this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
     this.#haptics.request(coin.chain !== null && coin.chain.remaining === 0 && !coin.chain.cancelled ? "richChain" : "coin");
@@ -757,6 +786,13 @@ export class GameApplication {
       hearts.push(heart);
     }
     this.#livesElement.replaceChildren(...hearts);
+    if (remainingLives < this.#lastLifeCount) {
+      const lost = hearts[remainingLives];
+      lost?.animate(this.#reducedMotion ? [{ opacity: 1 }, { opacity: .35 }] : [
+        { transform: "scale(1.5)", opacity: 1, color: "#ff5473" }, { transform: "scale(.65)", opacity: .35 },
+      ], { duration: 420 });
+    }
+    this.#lastLifeCount = remainingLives;
     this.#livesElement.setAttribute(
       "aria-label",
       `Жизни: ${String(remainingLives)} из ${String(this.#config.run.initialLives)}`,
@@ -766,6 +802,7 @@ export class GameApplication {
   #renderCurrency(): void {
     const energy = formatEnergy(this.#wallet.energy);
     this.#coinCountElement.textContent = String(this.#wallet.coins);
+    requireMenuElement(this.#interfaceLayerElement, "#boost-energy-inline").textContent = `${energy} ϟ`;
     this.#coinCountElement.setAttribute(
       "aria-label",
       `Монеты: ${String(this.#wallet.coins)}`,
@@ -903,6 +940,7 @@ export class GameApplication {
   }
 
   #renderPauseSummary(): void {
+    requireMenuElement(this.#pauseMenuElement, "#pause-telemetry").textContent = `Скорость ${(this.#ballController?.fallSpeed ?? 0).toFixed(1)} · энергия ${formatEnergy(this.#wallet.energy)} · этап ${String(this.#phaseOneController?.currentStageNumber ?? 1)} · очки ${String(calculateScore(this.#runProgress.depth, this.#wallet.coins, this.#destroyedPlatformCount, this.#combo.bonus))}`;
     const summary = createPauseMenuSummary({
       depth: this.#runProgress.depth,
       coins: this.#wallet.coins,
@@ -979,8 +1017,6 @@ export class GameApplication {
     document.body.dataset.guideCombo = "false";
     document.body.dataset.guideSlow = "false";
     this.#contextGuide = new ContextGuide(dialog,
-      () => { this.#haptics.cancel(); this.#beforeContextTip = this.#gameState.current; this.#gameState.transitionTo(GameState.Tutorial); },
-      () => { if (!this.#isDisposed) this.#gameState.transitionTo(this.#beforeContextTip); },
       () => { this.#opening?.skip(); document.body.dataset.guideStage = "off"; document.body.dataset.guideCombo = "true"; document.body.dataset.guideSlow = "true"; },
     );
     const spawn = (x: number, y: number, strength: number, widthScale: number, kind: "standard" | "super-heavy" = "standard"): void => {
@@ -1007,7 +1043,8 @@ export class GameApplication {
       },
       explain: (tip) => {
         if (tip === "time-slow") document.body.dataset.guideSlow = "true";
-        this.#contextGuide?.show(tip, this.#guideStrengths);
+        this.#contextGuide?.show(tip, tip === "platform" ? () => this.#feel?.screenPoint(ball.position) ?? null
+          : tip === "coin" ? () => { const coin = coins.find((candidate) => candidate.isActive); return coin === undefined ? null : this.#feel?.screenPoint(coin.mesh.position) ?? null; } : undefined);
       },
       random: () => {
         for (const platform of pool.platforms) if (platform.isActive) pool.release(platform);
@@ -1026,11 +1063,17 @@ export class GameApplication {
     const platforms = this.#platformPool?.platforms ?? [];
     const nearest = nearestInCurrentLane(platforms, ball.position, this.#config.ball.radius);
     const elapsed = this.#reducedMotion ? 0 : this.#elapsedGameplaySeconds;
-    for (const platform of platforms) platform.setApproachFeedback(platform === nearest ? ball.fallSpeed : null, elapsed);
+    for (const platform of platforms) platform.setApproachFeedback(platform === nearest ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier);
+    const opportunity = nearest?.approachState === "close" || nearest?.approachState === "hard";
+    this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
+    this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
     this.#comboView?.render(this.#combo, ball.fallSpeed, nearest?.strength ?? null);
     this.#comboView?.setPaused(paused);
     const phase = this.#phaseOneController;
     if (phase !== null) {
+      const progress = requireMenuElement(this.#interfaceLayerElement, "#phase-progress");
+      progress.setAttribute("value", String(phase.phaseElapsedSeconds / phase.totalDurationSeconds));
+      progress.setAttribute("aria-valuetext", `Этап ${String(phase.currentStageNumber)}`);
       const seconds = Math.floor(phase.phaseElapsedSeconds);
       const goals = ["Соберите 3 удара подряд", "Доведите серию до ×3", "Скорость 20+ даёт больше очков", "Пробейте платформу на грани", "Серия 10 → множитель ×4", "Скорость 35+ → бонус ×1,5", "Выбирайте риск или безопасный обход", "Серия 15 → множитель ×5", "Сохраните серию на высокой скорости", "Финиш первой фазы · побейте рекорд"];
       requireMenuElement(this.#interfaceLayerElement, "#loop-goal").textContent =
@@ -1050,6 +1093,8 @@ export class GameApplication {
   };
 
   #emitFailedImpact(): void {
+    if (this.#ballController !== null && this.#feel !== null) this.#feel.error(this.#ballController.position);
+    else getGameSounds().play("impact");
     this.#haptics.request("blockedImpact");
     this.#haptics.request("bounce");
     this.#haptics.request("lifeLost");
@@ -1078,6 +1123,7 @@ export class GameApplication {
     this.#missionSaveFailed = !result.saved || !this.#profile.storageAvailable;
     if (result.rewarded) {
       this.#missionRewardRemaining = 2;
+      this.#missionIntroRemaining = 0;
       const panel = requireMenuElement(this.#interfaceLayerElement, "#first-success");
       panel.classList.remove("goal-celebrate");
       // Restart the short reward flash for every completed mission.
@@ -1092,11 +1138,15 @@ export class GameApplication {
     const state = this.#profile.mission;
     const mission = currentMission(state);
     panel.dataset.complete = String(this.#missionRewardRemaining > 0);
+    panel.hidden = this.#missionRewardRemaining <= 0 && (this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
+    panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
-    requireMenuElement(panel, "strong").textContent = `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
+    const missionLabel = `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
+    requireMenuElement(panel, "strong").textContent = this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★` : mission.title;
+    requireMenuElement(this.#pauseMenuElement, "#pause-mission").textContent = `${missionLabel} · награда ${String(MISSION_REWARD)} ★`;
     requireMenuElement(panel, "small").textContent = this.#missionSaveFailed
       ? "Не удалось сохранить прогресс. Проверьте хранилище браузера."
-      : this.#missionRewardRemaining > 0 ? `✓ Задание выполнено · +${String(MISSION_REWARD)} монет в магазин!`
+      : this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★`
         : `Задание ${String(state.index + 1)} · награда ★ ${String(MISSION_REWARD)}${mission.kind === "clean" || mission.kind === "combo" ? " · потеря ♥ сбрасывает прогресс" : ""}`;
   }
 

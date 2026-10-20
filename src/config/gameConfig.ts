@@ -140,6 +140,7 @@ export interface GameConfig {
     readonly safeVerticalRatio: number;
     readonly phaseTransitionExtraSize: number;
     readonly boostZoomExtraSize: number;
+    readonly boostZoomDelaySeconds: number;
     readonly boostZoomReturnSeconds: number;
   };
   readonly physics: {
@@ -197,8 +198,8 @@ export const gameConfig: GameConfig = Object.freeze({
     phaseOutlineColor: Object.freeze({ r: 0.02, g: 0.08, b: 0.28 }),
     speedEffectRange: 30,
     maximumMovementStretch: 1.22,
-    boostStretch: 0.28,
-    boostDurationSeconds: 0.22,
+    boostStretch: 0.48,
+    boostDurationSeconds: 0.38,
     scaleSharpness: 18,
     colorSharpness: 6,
     baseEmissiveStrength: 0.08,
@@ -314,12 +315,12 @@ export const gameConfig: GameConfig = Object.freeze({
   successfulHit: Object.freeze({
     speedLoss: 1,
     platformEffectSeconds: 0.55,
-    fragmentSpread: 1.5,
-    fragmentDrop: 1.6,
+    fragmentSpread: 2.4,
+    fragmentDrop: 2,
     ballEffectSeconds: 0.16,
     ballVerticalStretch: 1.35,
     cameraEffectSeconds: 0.14,
-    cameraImpulse: 0.16,
+    cameraImpulse: 0.24,
   }),
   unsuccessfulHit: Object.freeze({
     bounceSpeed: 8,
@@ -342,6 +343,7 @@ export const gameConfig: GameConfig = Object.freeze({
     safeVerticalRatio: 0.6,
     phaseTransitionExtraSize: 2,
     boostZoomExtraSize: 1.5,
+    boostZoomDelaySeconds: 0.18,
     boostZoomReturnSeconds: 3,
   }),
   physics: Object.freeze({

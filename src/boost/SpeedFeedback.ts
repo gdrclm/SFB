@@ -1,4 +1,3 @@
-import type { SuccessfulBoostResult } from "./BoostController";
 
 export function calculateSpeedFeedback(speed: number): { duration: number; opacity: number } {
   const safeSpeed = Math.max(0, speed);
@@ -12,6 +11,7 @@ export class SpeedFeedback {
   readonly #root: HTMLElement;
   readonly #label: HTMLElement;
   #animation: Animation | null = null;
+  #burst: Animation | null = null;
 
   public constructor(root: HTMLElement, label: HTMLElement) {
     this.#root = root;
@@ -23,11 +23,19 @@ export class SpeedFeedback {
     this.#root.style.setProperty("--streak-duration", `${String(feedback.duration)}s`);
     this.#root.style.setProperty("--streak-opacity", String(feedback.opacity));
     this.#root.classList.toggle("speed-frozen", frozen);
+    for (const animation of [this.#animation, this.#burst]) {
+      if (frozen && animation?.playState === "running") animation.pause();
+      else if (!frozen && animation?.playState === "paused") animation.play();
+    }
   }
 
-  public playBoost(result: SuccessfulBoostResult): void {
-    this.#label.textContent = `BOOST +${((result.currentSpeed / result.previousSpeed - 1) * 100).toFixed(0)}% · ${result.previousSpeed.toFixed(1)} → ${result.currentSpeed.toFixed(1)}`;
+  public playBoost(): void {
+    this.#label.textContent = "ϟ";
     this.#animation?.cancel();
+    this.#burst?.cancel();
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.#burst = this.#root.querySelector(".speed-streaks")?.animate([{ opacity: .85 }, { opacity: .55, offset: .5 }, { opacity: 0 }], { duration: 850 }) ?? null;
+    }
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.#animation = this.#label.animate(
       reducedMotion
@@ -41,6 +49,7 @@ export class SpeedFeedback {
 
   public dispose(): void {
     this.#animation?.cancel();
+    this.#burst?.cancel();
     this.#label.textContent = "";
     this.#root.style.setProperty("--streak-opacity", "0");
     this.#root.classList.add("speed-frozen");

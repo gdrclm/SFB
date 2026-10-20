@@ -49,6 +49,7 @@ export class CameraController implements FixedSimulationSystem {
   #behavior: CameraBehavior = "gameplay";
   #baseOrthographicSize: number;
   #boostZoomOffset = 0;
+  #boostStartZoomOffset = 0;
   #boostZoomElapsedSeconds: number | null = null;
 
   public constructor(
@@ -85,8 +86,8 @@ export class CameraController implements FixedSimulationSystem {
   }
 
   public playBoostReaction(): void {
+    this.#boostStartZoomOffset = this.#boostZoomOffset;
     this.#boostZoomElapsedSeconds = 0;
-    this.#boostZoomOffset = this.#config.boostZoomExtraSize;
     this.resizeViewport();
   }
 
@@ -111,11 +112,8 @@ export class CameraController implements FixedSimulationSystem {
     const targetSize =
       calculateCameraSize(this.#target.fallSpeed, this.#config) + transitionSize;
     const zoomAmount = smoothFactor(this.#config.zoomSharpness, fixedDeltaSeconds);
-    this.#baseOrthographicSize = lerp(
-      this.#baseOrthographicSize,
-      targetSize,
-      zoomAmount,
-    );
+    const boostDelay = this.#boostZoomElapsedSeconds !== null && this.#boostZoomElapsedSeconds < this.#config.boostZoomDelaySeconds;
+    if (!boostDelay) this.#baseOrthographicSize = lerp(this.#baseOrthographicSize, targetSize, zoomAmount);
     this.#updateBoostZoom(realFixedDeltaSeconds);
     this.resizeViewport();
   }
@@ -146,23 +144,13 @@ export class CameraController implements FixedSimulationSystem {
       return;
     }
 
-    const nextElapsedSeconds = Math.min(
-      this.#config.boostZoomReturnSeconds,
-      elapsedSeconds + realFixedDeltaSeconds,
-    );
-    const progress =
-      nextElapsedSeconds / this.#config.boostZoomReturnSeconds;
+    const nextElapsedSeconds = elapsedSeconds + realFixedDeltaSeconds;
+    const activeElapsed = Math.max(0, nextElapsedSeconds - this.#config.boostZoomDelaySeconds);
+    const progress = Math.min(1, activeElapsed / this.#config.boostZoomReturnSeconds);
     const smoothProgress = progress * progress * (3 - 2 * progress);
-    this.#boostZoomOffset =
-      this.#config.boostZoomExtraSize * (1 - smoothProgress);
+    const attack = Math.min(1, activeElapsed / .14);
+    this.#boostZoomOffset = lerp(this.#boostStartZoomOffset, this.#config.boostZoomExtraSize, attack) * (1 - smoothProgress);
     this.#boostZoomElapsedSeconds = nextElapsedSeconds;
-
-    if (
-      nextElapsedSeconds + Number.EPSILON >=
-      this.#config.boostZoomReturnSeconds
-    ) {
-      this.#boostZoomOffset = 0;
-      this.#boostZoomElapsedSeconds = null;
-    }
+    if (progress >= 1) { this.#boostZoomOffset = 0; this.#boostZoomElapsedSeconds = null; }
   }
 }

@@ -34,13 +34,16 @@ export class BoostController implements FixedSimulationSystem {
   readonly #config: GameConfig["boost"];
   readonly #listeners = new Set<BoostListener>();
   #cooldownRemaining = 0;
+  readonly #cancelSlowMode: (() => void) | undefined;
 
   public constructor(
     ball: Pick<BallController, "fallSpeed">,
     gameState: Pick<GameStateController, "current">,
     wallet: Pick<RunWallet, "energy" | "spendEnergy">,
     config: GameConfig,
+    cancelSlowMode?: () => void,
   ) {
+    this.#cancelSlowMode = cancelSlowMode;
     this.#ball = ball;
     this.#gameState = gameState;
     this.#wallet = wallet;
@@ -70,7 +73,7 @@ export class BoostController implements FixedSimulationSystem {
   public get canBoost(): boolean {
     return (
       this.#cooldownRemaining <= 0 &&
-      this.#gameState.current === GameState.Playing &&
+      (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode && this.#cancelSlowMode !== undefined) &&
       this.#wallet.energy >= this.energyCost
     );
   }
@@ -83,13 +86,13 @@ export class BoostController implements FixedSimulationSystem {
   }
 
   public tryBoost(): BoostResult {
-    if (this.#gameState.current === GameState.SlowMode) {
+    if (this.#gameState.current === GameState.SlowMode && this.#cancelSlowMode === undefined) {
       return { success: false, reason: "slow-mode" };
     }
     if (this.#gameState.current === GameState.BounceRecovery) {
       return { success: false, reason: "bounce-recovery" };
     }
-    if (this.#gameState.current !== GameState.Playing) {
+    if (this.#gameState.current !== GameState.Playing && this.#gameState.current !== GameState.SlowMode) {
       return { success: false, reason: "game-not-playing" };
     }
     if (this.#cooldownRemaining > 0) {
@@ -101,6 +104,7 @@ export class BoostController implements FixedSimulationSystem {
       return { success: false, reason: "insufficient-energy" };
     }
 
+    if (this.#gameState.current === GameState.SlowMode) this.#cancelSlowMode?.();
     const previousSpeed = this.#ball.fallSpeed;
     this.#ball.fallSpeed = previousSpeed * this.#config.speedMultiplier;
     this.#cooldownRemaining = this.#config.cooldownSeconds;

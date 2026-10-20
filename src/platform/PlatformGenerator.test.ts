@@ -245,3 +245,19 @@ describe("PlatformGenerator", () => {
     }
   });
 });
+
+it("suppresses forced-slow platforms until BOOST is learned, then permits them", () => {
+  const platforms = Array.from({ length: 36 }, () => createPlatform(0, false));
+  const { pool } = createPool(platforms);
+  const generator = new PlatformGenerator({ fallSpeed: 10, position: { x: 0, y: 4.5, z: 0 } }, pool, difficultySource, gameConfig, () => .99);
+  generator.allowSlowPlatforms = false;
+  generator.queueEncounter("death-tunnel");
+  generator.fixedUpdate();
+  expect(platforms.some((p) => p.isActive)).toBe(true);
+  expect(platforms.filter((p) => p.isActive).every((p) => p.kind !== "time-slow")).toBe(true);
+  for (const platform of platforms) platform.isActive = false;
+  generator.allowSlowPlatforms = true;
+  generator.queueEncounter("death-tunnel");
+  generator.fixedUpdate();
+  expect(platforms.some((p) => p.isActive && p.kind === "time-slow")).toBe(true);
+});

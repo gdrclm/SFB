@@ -99,6 +99,12 @@ export class SlowModeController {
     return true;
   }
 
+  public cancelForBoost(): void {
+    const active = this.isActive;
+    this.reset();
+    if (active) this.#onActiveChanged(false);
+  }
+
   public reset(): void {
     this.#elapsedRealSeconds = 0;
     this.#forcedRemainingRealSeconds = 0;

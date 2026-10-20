@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approachState, nearestInCurrentLane, requiredSpeed } from "./PlatformReadability";
+import { approachSymbol, approachState, nearestInCurrentLane, requiredSpeed } from "./PlatformReadability";
 
 describe("platform readability", () => {
   it("uses the same integer threshold for the displayed number and the actual platform", () => {
@@ -24,4 +24,26 @@ describe("platform readability", () => {
     expect(nearestInCurrentLane([adjacent], { x: 0, y: 4 }, 0.5)).toBeNull();
     expect(nearestInCurrentLane([adjacent, closest], { x: 3, y: 4 }, 0.5)).toBe(adjacent);
   });
+});
+
+it("gives a direct visual decision instead of requiring arithmetic", () => {
+  expect(approachSymbol(approachState(12, 12))).toBe("✓");
+  expect(approachSymbol(approachState(10, 15))).toBe("ϟ");
+  expect(approachSymbol(approachState(10, 16))).toBe("✕");
+  expect(approachSymbol(null)).toBe("");
+});
+
+it("never recommends an unavailable boost, and distinguishes waiting from an impossible break", () => {
+  expect(approachSymbol(approachState(10, 14, true))).toBe("ϟ");
+  expect(approachSymbol(approachState(10, 14, false))).toBe("◷");
+  expect(approachSymbol(approachState(10, 16, false))).toBe("✕");
+  expect(approachSymbol(approachState(16, 16, false))).toBe("✓");
+  expect(approachState(10, 16, true, 2)).not.toBe("danger");
+});
+
+it("warns conservatively when the ball straddles two platforms in the same row", () => {
+  const safe = { isActive: true, width: 1, strength: 5, mesh: { position: { x: -.45, y: -2 } } };
+  const danger = { isActive: true, width: 1, strength: 30, mesh: { position: { x: .45, y: -2 } } };
+  expect(nearestInCurrentLane([safe, danger], { x: 0, y: 1 }, .4)).toBe(danger);
+  expect(nearestInCurrentLane([safe, danger], { x: -.6, y: 1 }, .4)).toBe(safe);
 });

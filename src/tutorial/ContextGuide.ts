@@ -1,73 +1,73 @@
-import { tutorialVisuals as art } from "../app/TutorialController";
 import type { GuideTip } from "./StagedOpening";
+export interface HintPoint { x: number; y: number; }
+const tips = {
+  platform: { text: "Веди пальцем ↔", target: "world", seconds: 6 },
+  coin: { text: "Собирай", target: "world", seconds: 5 },
+  boost: { text: "Ускорься!", target: "#boost-button", seconds: 7 },
+} as const;
+type ActionTip = keyof typeof tips;
 
-const tips: Record<GuideTip, { title: string; art: string; text: string }> = {
-  platform: { title: "Первая платформа", art: art.platform("standard", 7), text: "Ведите шар пальцем влево-вправо. Для пробития скорость должна быть не ниже числа на платформе." },
-  coin: { title: "Первая монета", art: art.coin, text: "Подберите монету: +1 к скорости и энергия. После забега монеты можно тратить в магазине." },
-  boost: { title: "Пора ускориться", art: `${art.platform("standard", 14)} ${art.boost}`, text: "Нажмите BOOST: скорость вырастет на 50%. Цена — на кнопке, перезарядка — 1 секунда." },
-  fork: { title: "Первая развилка", art: `${art.platform("standard", 8)} ${art.platform("super-heavy", 25)}`, text: "Сравните числа со своей скоростью. Выберите: пробить, ускориться или обойти." },
-  free: { title: "Первые 30 секунд пройдены", art: "↘ ✦ ↙", text: "Дальше — случайные испытания. Собирайте монеты и продолжайте серию ударов." },
-  life: { title: "Одна жизнь потеряна", art: `${art.heart} ${art.heart} <span class="guide-lost-heart">${art.heart}</span>`, text: "Не хватило скорости: −1 жизнь, скорость снова 10, комбо сброшено. После отскока используйте BOOST или обход." },
-  combo: { title: "Вы собрали комбо", art: "КОМБО ×2", text: "3 удара подряд дают ×2. Продолжайте серию для большего бонуса; ошибка её сбросит." },
-  vitality: { title: "Платформа восстановления", art: `${art.platform("vitality", 10)} ${art.heart}`, text: "Разбейте зелёную платформу: +1 жизнь (до трёх) и +10 энергии." },
-  "time-slow": { title: "Платформа замедления", art: `${art.platform("time-slow", 12)} ${art.clock}`, text: "Разбейте белую платформу: время замедлится на 3 секунды. В это время BOOST недоступен." },
-  "super-heavy": { title: "Сверхпрочная платформа", art: art.platform("super-heavy", 25), text: "Тёмная платформа требует высокой скорости. Если BOOST не хватит — обходите." },
-};
-
+/** Never stops play or intercepts input. Real actions dismiss the corresponding arrow. */
 export class ContextGuide {
   readonly #dialog: HTMLDialogElement;
-  readonly #pause: () => void;
-  readonly #resume: () => void;
   readonly #skip: () => void;
-  readonly #queue: { tip: GuideTip; strengths: readonly number[] }[] = [];
-  #active = false;
-
-  public constructor(dialog: HTMLDialogElement, pause: () => void, resume: () => void, skip: () => void) {
-    this.#dialog = dialog; this.#pause = pause; this.#resume = resume; this.#skip = skip;
-    dialog.querySelector("#context-continue")?.addEventListener("click", () => { this.#advance(); });
-    dialog.querySelector("#context-skip")?.addEventListener("click", () => {
-      this.#queue.length = 0; this.#skip(); this.#advance();
-    });
-    dialog.addEventListener("keydown", (event) => { event.stopPropagation(); });
-    dialog.addEventListener("cancel", (event) => { event.preventDefault(); this.#advance(); });
+  readonly #arrow: SVGSVGElement;
+  #tip: ActionTip | null = null;
+  #remaining = 0;
+  #anchor: (() => HintPoint | null) | undefined;
+  #startX: number | null = null;
+  public constructor(dialog: HTMLDialogElement, skip: () => void) {
+    this.#dialog = dialog; this.#skip = skip;
+    this.#arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    this.#arrow.id = "guide-arrow"; this.#arrow.setAttribute("aria-hidden", "true");
+    this.#arrow.innerHTML = '<defs><marker id="guide-arrow-head" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#ffe78b" stroke-width="2"/></marker></defs><path class="guide-line" fill="none" stroke="#ffe78b" stroke-width="3" marker-end="url(#guide-arrow-head)"/>';
+    this.#arrow.style.display = "none"; document.body.append(this.#arrow);
+    dialog.querySelector("#context-skip")?.addEventListener("click", this.#skipAll);
+    document.addEventListener("pointerdown", this.#touch, true);
+    document.addEventListener("pointermove", this.#move, true);
+    document.addEventListener("pointerup", this.#release, true);
   }
-
-  public show(tip: GuideTip, strengths: readonly number[] = []): void {
-    this.#queue.push({ tip, strengths: [...strengths] });
-    if (this.#active) return;
-    this.#active = true; this.#pause(); this.#renderNext(); this.#dialog.showModal();
-    this.#dialog.querySelector<HTMLButtonElement>("#context-continue")?.focus({ preventScroll: true });
-  }
-
-  #renderNext(): void {
-    const event = this.#queue.shift();
-    if (event === undefined) return;
-    const { tip, strengths } = event;
+  public show(tip: GuideTip, anchor?: () => HintPoint | null): void {
+    if (!(tip in tips)) return;
+    const action = tip as ActionTip, data = tips[action];
+    this.#tip = action; this.#remaining = data.seconds; this.#anchor = anchor;
     this.#dialog.dataset.tip = tip;
-    this.#dialog.dataset.anchor = ["life", "combo", "free"].includes(tip) ? "bottom" : "top";
-    const data = tips[tip];
-    const title = this.#dialog.querySelector<HTMLElement>("#context-title");
-    const picture = this.#dialog.querySelector<HTMLElement>("#context-picture");
-    const text = this.#dialog.querySelector<HTMLElement>("#context-text");
-    if (title === null || picture === null || text === null) throw new Error("Missing contextual guide elements");
-    let illustration = data.art;
-    const strength = strengths[0];
-    if (tip === "fork" && strength !== undefined && strengths[1] !== undefined) {
-      illustration = `${art.platform("standard", strength)} ${art.platform("super-heavy", strengths[1])}`;
-    } else if (strength !== undefined && ["platform", "boost", "vitality", "time-slow", "super-heavy"].includes(tip)) {
-      const kind = tip === "vitality" || tip === "time-slow" || tip === "super-heavy" ? tip : "standard";
-      illustration = art.platform(kind, strength) + (tip === "boost" ? art.boost : tip === "vitality" ? art.heart : tip === "time-slow" ? art.clock : "");
-    }
-    title.textContent = data.title; picture.innerHTML = illustration; text.textContent = data.text;
+    const text = this.#dialog.querySelector("#context-text");
+    if (text === null) throw new Error("Missing hint text");
+    text.textContent = data.text;
+    if (!this.#dialog.open) this.#dialog.setAttribute("open", "");
+    this.#arrow.style.display = "block"; this.layout();
   }
-  #advance(): void {
-    if (this.#queue.length > 0) { this.#renderNext(); return; }
-    if (!this.#active) return;
-    this.#active = false; this.#dialog.close(); this.#resume();
+  public completed(tip: ActionTip): void { if (this.#tip === tip) this.#close(); }
+  public fixedUpdate(realDeltaSeconds: number): void {
+    if (this.#tip === null) return;
+    this.#remaining -= realDeltaSeconds;
+    if (this.#remaining <= 0) this.#close();
   }
+  public layout(): void {
+    if (this.#tip === null) return;
+    const width = window.innerWidth, height = window.innerHeight, data = tips[this.#tip];
+    const target = data.target === "world" ? null : document.querySelector(data.target)?.getBoundingClientRect();
+    const point = this.#anchor?.() ?? (target ? { x: target.x + target.width / 2, y: target.y } : { x: width / 2, y: height * .52 });
+    const x = Math.max(20, Math.min(width - 20, point.x)), y = Math.max(70, Math.min(height - 30, point.y));
+    const boxWidth = Math.min(190, width - 24);
+    this.#dialog.style.width = `${String(boxWidth)}px`;
+    this.#dialog.style.left = `${String(Math.max(12, Math.min(width - boxWidth - 12, x - boxWidth / 2)))}px`;
+    this.#dialog.style.top = `${String(Math.max(85, y - this.#dialog.offsetHeight - 48))}px`;
+    const box = this.#dialog.getBoundingClientRect(), startX = Math.max(box.left + 20, Math.min(box.right - 20, x));
+    this.#arrow.setAttribute("viewBox", `0 0 ${String(width)} ${String(height)}`);
+    this.#arrow.querySelector(".guide-line")?.setAttribute("d", `M${String(startX)} ${String(box.bottom + 4)} Q${String(startX + 18)} ${String((box.bottom + y) / 2)} ${String(x)} ${String(y - 7)}`);
+  }
+  readonly #touch = (event: PointerEvent): void => { if (event.target instanceof Element && event.target.closest("#game-canvas")) this.#startX = event.clientX; };
+  readonly #move = (event: PointerEvent): void => { if (this.#startX !== null && Math.abs(event.clientX - this.#startX) >= 12) this.completed("platform"); };
+  readonly #release = (): void => { this.#startX = null; };
+  readonly #skipAll = (): void => { this.#close(); this.#skip(); };
+  #close(): void { this.#tip = null; this.#dialog.removeAttribute("open"); this.#arrow.style.display = "none"; }
   public dispose(): void {
-    this.#active = false; this.#queue.length = 0; this.#dialog.close();
-    // Release listeners when a restarted game creates its next guide instance.
-    this.#dialog.replaceWith(this.#dialog.cloneNode(true));
+    this.#close(); this.#arrow.remove();
+    document.removeEventListener("pointerdown", this.#touch, true);
+    document.removeEventListener("pointermove", this.#move, true);
+    document.removeEventListener("pointerup", this.#release, true);
+    this.#dialog.querySelector("#context-skip")?.removeEventListener("click", this.#skipAll);
   }
 }

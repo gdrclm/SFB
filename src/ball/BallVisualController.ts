@@ -172,8 +172,9 @@ export class BallVisualController implements FixedSimulationSystem {
     }
 
     const progress = clamp01(elapsedSeconds / this.#config.boostDurationSeconds);
-    const boostStretch =
-      this.#config.boostStretch * this.#boostStrength * (1 - progress) ** 2;
+    const boostStretch = progress < .12
+      ? -.18 * this.#boostStrength * Math.sin(progress / .12 * Math.PI / 2)
+      : this.#config.boostStretch * this.#boostStrength * (1 - (progress - .12) / .88) ** 2;
     const nextElapsedSeconds = elapsedSeconds + fixedDeltaSeconds;
     this.#boostElapsedSeconds = nextElapsedSeconds;
     if (
