@@ -222,7 +222,8 @@ npm run dev
 - Жизни: одна активация платформы снимает не больше одной жизни.
 - Последовательные BOOST, отдаление камеры, эффекты скорости и комбо.
 - Подсветка прочности только ближайшей платформы под шаром.
-- Цель из пяти разрушений без потери жизни с разовой наградой 25 монет.
+- Цепочка заданий: разрушения без потери жизни, монеты, BOOST, платформы и
+  комбо. Каждое выполнение даёт 10 монет и сразу открывает следующую цель.
 - Именованные испытания через 20–40 секунд игрового времени после обучения,
   богатые дорожки с BOOST и более простой альтернативой.
 - Подсказка BOOST после повторных ошибок, причина смерти и кнопка «Ещё раз».
@@ -262,3 +263,20 @@ background. Each hit refreshes a two-second active real-time lifetime; misses
 briefly show the lost-series message. Pausing freezes the lifetime, slow mode
 does not stretch it, and resetting a run hides it. Timed challenge notices use
 a separate overlay so they do not keep the combo panel visible.
+
+
+## Sequential missions and repeatable rewards
+
+The bottom goal panel always shows the current mission and progress. Completion
+credits 10 shop coins and saves the next mission in a single profile transaction.
+The next objective appears immediately; a gold flash and earned-reward message
+last two active real-time seconds. Missions cycle through clean breaks, coins,
+successful BOOST uses, platform breaks and combo, with bounded target increases
+on subsequent cycles. Only actions after activation count toward a new mission.
+
+Progress persists between runs and reloads. Life loss and a new run reset clean
+break/combo progress; cumulative coin, BOOST and platform goals retain theirs.
+Rejected BOOST attempts do not count. Mission rewards are separate from collected
+run coins, so finishing or replaying a run cannot credit them twice. Legacy users
+who already earned the original first-success reward continue at mission two,
+keeping their old balance and purchases without another first-goal payout.

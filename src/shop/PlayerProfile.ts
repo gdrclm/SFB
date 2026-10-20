@@ -1,4 +1,4 @@
-import { FirstSuccess } from "../run/FirstSuccess";
+import { advanceMission, currentMission, MISSION_REWARD, type MissionEvent, type MissionState } from "../run/Missions";
 import type { GameConfig } from "../config/gameConfig";
 import type { RunResult } from "../run/RunHistory";
 
@@ -35,6 +35,7 @@ interface ProfileState {
   equipped: Equipment;
   creditedRuns: string[];
   firstSuccessAt: string | null;
+  mission: MissionState;
 }
 export const PROFILE_KEY = "speed-fall-ball.profile.v1";
 const defaults = (): ProfileState => ({
@@ -44,6 +45,7 @@ const defaults = (): ProfileState => ({
   equipped: { ball: "ball-classic", world: "world-sky", props: "props-none", vfx: "vfx-none" },
   creditedRuns: [],
   firstSuccessAt: null,
+  mission: { index: 0, progress: 0 },
 });
 
 function parseProfile(raw: string | null): ProfileState {
@@ -55,6 +57,16 @@ function parseProfile(raw: string | null): ProfileState {
   if (typeof data.coins !== "number" || !Number.isSafeInteger(data.coins) || data.coins < 0 ||
     !Array.isArray(data.owned) || !Array.isArray(data.creditedRuns)) throw new Error("Invalid profile balance");
   state.firstSuccessAt = typeof data.firstSuccessAt === "string" && Number.isFinite(Date.parse(data.firstSuccessAt)) ? data.firstSuccessAt : null;
+  // Existing players already received the legacy first reward; continue at mission two.
+  state.mission = { index: state.firstSuccessAt === null ? 0 : 1, progress: 0 };
+  if (typeof data.mission === "object" && data.mission !== null) {
+    const mission = data.mission as Record<string, unknown>;
+    if (typeof mission.index === "number" && Number.isSafeInteger(mission.index) && mission.index >= 0 && mission.index < Number.MAX_SAFE_INTEGER &&
+      typeof mission.progress === "number" && Number.isSafeInteger(mission.progress) && mission.progress >= 0) {
+      const candidate = { index: mission.index, progress: mission.progress };
+      if (candidate.progress < currentMission(candidate).target) state.mission = candidate;
+    }
+  }
   state.coins = data.coins;
   state.owned = [...new Set([...state.owned, ...data.owned.filter((id): id is string =>
     typeof id === "string" && SHOP_ITEMS.some((item) => item.id === id && item.category !== "upgrade"))])];
@@ -117,13 +129,16 @@ export class PlayerProfile {
     return this.#commit({ ...this.#state, coins, creditedRuns: [...credited] });
   }
 
-  public get firstSuccessAt(): string | null { return this.#state.firstSuccessAt; }
+  public get mission(): MissionState { return { ...this.#state.mission }; }
 
-  public completeFirstSuccess(): boolean {
-    if (this.#state.firstSuccessAt !== null) return true;
-    const coins = this.coins + FirstSuccess.reward;
-    if (!Number.isSafeInteger(coins)) return false;
-    return this.#commit({ ...this.#state, coins, firstSuccessAt: new Date().toISOString() });
+  public applyMissionEvent(event: MissionEvent): { saved: boolean; rewarded: boolean } {
+    const next = advanceMission(this.#state.mission, event);
+    if (next.state.index === this.#state.mission.index && next.state.progress === this.#state.mission.progress) return { saved: true, rewarded: false };
+    const coins = this.coins + (next.completed ? MISSION_REWARD : 0);
+    if (!Number.isSafeInteger(coins) || !Number.isSafeInteger(next.state.index)) return { saved: false, rewarded: false };
+    const saved = this.#commit({ ...this.#state, coins, mission: next.state,
+      firstSuccessAt: this.#state.firstSuccessAt ?? (next.completed ? new Date().toISOString() : null) });
+    return { saved, rewarded: saved && next.completed };
   }
 
   public buy(id: string): boolean {

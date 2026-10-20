@@ -2,7 +2,7 @@ import { ChallengeDirector } from "../challenges/ChallengeDirector";
 import { BoostCoach } from "../boost/BoostCoach";
 import { describeFailedImpact } from "../run/FailedImpact";
 import { tutorialVisuals as tutorialArt } from "./TutorialController";
-import { FirstSuccess } from "../run/FirstSuccess";
+import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missions";
 import { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -126,8 +126,8 @@ export class GameApplication {
   #challengeDirector: ChallengeDirector | null = null;
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
-  #firstSuccess = new FirstSuccess();
-  #showFirstSuccessReward = false;
+  #missionRewardRemaining = 0;
+  #missionSaveFailed = false;
   #mainScene: Awaited<ReturnType<typeof createMainScene>> | null = null;
   #runResources: RunSceneResources | null = null;
   #renderer: RendererKind = "webgl2";
@@ -279,8 +279,8 @@ export class GameApplication {
     this.#boostCoach = new BoostCoach();
     this.#challengeRemaining = 0;
     this.#challengeDirector = null;
-    this.#firstSuccess = new FirstSuccess();
-    this.#showFirstSuccessReward = false;
+    this.#missionRewardRemaining = 0;
+    this.#missionSaveFailed = false;
     this.#gameState = new GameStateController();
     this.#lives = new LifeCounter(this.#config.run.initialLives);
     this.#wallet = new RunWallet(this.#config.economy.initialEnergy, this.#config.economy.energyPerCoin);
@@ -326,7 +326,7 @@ export class GameApplication {
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
     this.#runProgress.observeSpeed(this.#config.ball.startFallSpeed);
-    this.#renderFirstSuccess();
+    this.#updateMission({ type: "run-start" });
 
     this.#horizontalInput = new PointerHorizontalInput(this.#canvas);
     const ballMesh = createBallMesh(this.#scene, this.#config);
@@ -338,7 +338,11 @@ export class GameApplication {
     );
     this.#fixedStep.register({ fixedUpdate: (delta: number) => { this.#opening?.fixedUpdate(delta); } });
     this.#fixedStep.register(this.#ballController);
-    this.#fixedStep.register({ fixedUpdate: (delta: number) => {
+    this.#fixedStep.register({ fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
+      if (this.#missionRewardRemaining > 0) {
+        this.#missionRewardRemaining = Math.max(0, this.#missionRewardRemaining - realDeltaSeconds);
+        if (this.#missionRewardRemaining === 0) this.#renderMission();
+      }
       this.#elapsedGameplaySeconds += delta;
       this.#runProgress.observeDepth(this.#getDepth());
       this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
@@ -470,6 +474,7 @@ export class GameApplication {
     );
     this.#unsubscribeBoosted = this.#boostController.onBoosted((result) => {
       this.#boostCoach.boosted();
+      this.#updateMission({ type: "boost" });
       this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
       this.#haptics.request("boost");
       this.#ballVisualController?.playBoostReaction(result);
@@ -634,14 +639,9 @@ export class GameApplication {
     if (destroyed && this.#ballController !== null) {
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
-      if (this.#firstSuccess.hit() && this.#profile.firstSuccessAt === null) {
-        this.#showFirstSuccessReward = true;
-        this.#profile.completeFirstSuccess();
-        requireMenuElement(this.#interfaceLayerElement, "#first-success").classList.add("goal-celebrate");
-      }
-      this.#renderFirstSuccess();
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
       this.#comboView?.hit(hit);
+      this.#updateMission({ type: "hit", combo: hit.count });
       const previousLives = this.#lives.remainingLives;
       const platformEffect = this.#applyDestroyedPlatformEffect(
         collision.platform,
@@ -658,8 +658,7 @@ export class GameApplication {
     const bounced = this.#unsuccessfulHitHandler?.handle(collision) ?? false;
     if (bounced) {
       this.#boostCoach.failedImpact();
-      this.#firstSuccess.loseLife();
-      this.#renderFirstSuccess();
+      this.#updateMission({ type: "life-lost" });
       this.#comboView?.miss(this.#combo.miss());
       this.#renderLives();
       if (this.#gameState.current === GameState.GameOver) {
@@ -695,6 +694,7 @@ export class GameApplication {
   };
 
   readonly #handleCoinCollected = (coin: CoinController): void => {
+    this.#updateMission({ type: "coin" });
     this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
     this.#haptics.request(coin.chain !== null && coin.chain.remaining === 0 && !coin.chain.cancelled ? "richChain" : "coin");
     this.#renderCurrency();
@@ -1073,14 +1073,31 @@ export class GameApplication {
     return result;
   }
 
-  #renderFirstSuccess(): void {
+  #updateMission(event: MissionEvent): void {
+    const result = this.#profile.applyMissionEvent(event);
+    this.#missionSaveFailed = !result.saved || !this.#profile.storageAvailable;
+    if (result.rewarded) {
+      this.#missionRewardRemaining = 2;
+      const panel = requireMenuElement(this.#interfaceLayerElement, "#first-success");
+      panel.classList.remove("goal-celebrate");
+      // Restart the short reward flash for every completed mission.
+      void panel.offsetWidth;
+      panel.classList.add("goal-celebrate");
+    }
+    this.#renderMission();
+  }
+
+  #renderMission(): void {
     const panel = requireMenuElement(this.#interfaceLayerElement, "#first-success");
-    const done = this.#firstSuccess.completed || this.#profile.firstSuccessAt !== null;
-    panel.dataset.complete = String(done);
-    requireMenuElement(panel, "strong").textContent = this.#showFirstSuccessReward
-      ? (this.#profile.firstSuccessAt !== null ? "Цель выполнена! +25 монет в магазин" : "Цель выполнена · награда не сохранена: нет доступа к хранилищу")
-      : this.#profile.firstSuccessAt !== null ? "Первая цель выполнена ✓" : `Разбейте 5 без потери жизни · ${String(this.#firstSuccess.count)}/5`;
-    requireMenuElement(panel, "small").textContent = done ? "" : "Первая цель · награда ★ 25 · потеря ♥ сбрасывает прогресс";
+    const state = this.#profile.mission;
+    const mission = currentMission(state);
+    panel.dataset.complete = String(this.#missionRewardRemaining > 0);
+    panel.dataset.mission = String(state.index);
+    requireMenuElement(panel, "strong").textContent = `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
+    requireMenuElement(panel, "small").textContent = this.#missionSaveFailed
+      ? "Не удалось сохранить прогресс. Проверьте хранилище браузера."
+      : this.#missionRewardRemaining > 0 ? `✓ Задание выполнено · +${String(MISSION_REWARD)} монет в магазин!`
+        : `Задание ${String(state.index + 1)} · награда ★ ${String(MISSION_REWARD)}${mission.kind === "clean" || mission.kind === "combo" ? " · потеря ♥ сбрасывает прогресс" : ""}`;
   }
 
   #renderRecords(): void {

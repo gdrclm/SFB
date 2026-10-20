@@ -72,22 +72,48 @@ describe("player profile and shop", () => {
   });
 });
 
-it("saves the first-success reward immediately and credits it once across reloads", () => {
+it("atomically saves each mission reward and next goal across reloads without double credit", () => {
   const data = storage(); const profile = new PlayerProfile(() => data);
-  expect(profile.firstSuccessAt).toBeNull();
-  expect(profile.completeFirstSuccess()).toBe(true);
-  expect(profile.coins).toBe(25);
+  for (let i = 1; i <= 5; i++) profile.applyMissionEvent({ type: "hit", combo: i });
+  expect(profile.coins).toBe(10);
+  expect(profile.mission).toEqual({ index: 1, progress: 0 });
   const restored = new PlayerProfile(() => data);
-  expect(restored.firstSuccessAt).toBe(profile.firstSuccessAt);
-  expect(restored.completeFirstSuccess()).toBe(true);
+  expect(restored.mission).toEqual(profile.mission);
+  restored.applyMissionEvent({ type: "hit", combo: 6 });
+  expect(restored.coins).toBe(10);
+  for (let i = 0; i < 5; i++) restored.applyMissionEvent({ type: "coin" });
+  expect(restored.coins).toBe(20);
+  expect(new PlayerProfile(() => data).mission).toEqual({ index: 2, progress: 0 });
+  restored.creditRuns([result("after-goal", 5), result("after-goal", 5)]);
   expect(restored.coins).toBe(25);
-  restored.creditRuns([result("after-goal", 3)]);
-  expect(restored.coins).toBe(28);
 });
 
-it("does not mark a reward saved when storage rejects the transaction", () => {
-  const profile = new PlayerProfile(() => ({ getItem: () => null, setItem: () => { throw Error("full"); } }));
-  expect(profile.completeFirstSuccess()).toBe(false);
-  expect(profile.firstSuccessAt).toBeNull();
+it("migrates a completed legacy first goal without another reward or a stuck completed banner", () => {
+  const data = storage(); const profile = new PlayerProfile(() => data);
+  profile.creditRuns([result("legacy", 25)]);
+  const legacy = JSON.parse(data.getItem(PROFILE_KEY) ?? "{}") as Record<string, unknown>;
+  legacy.firstSuccessAt = "2026-10-20T00:00:00Z";
+  delete legacy.mission;
+  data.setItem(PROFILE_KEY, JSON.stringify(legacy));
+  const restored = new PlayerProfile(() => data);
+  expect(restored.coins).toBe(25);
+  expect(restored.mission).toEqual({ index: 1, progress: 0 });
+  restored.applyMissionEvent({ type: "run-start" });
+  expect(restored.coins).toBe(25);
+});
+
+it("keeps partial progress across reloads and grants nothing on rejected saves", () => {
+  const data = storage(); let reject = false;
+  const profile = new PlayerProfile(() => ({ getItem: data.getItem,
+    setItem: (key, value) => { if (reject) throw Error("full"); data.setItem(key, value); } }));
+  for (let i = 1; i <= 4; i++) profile.applyMissionEvent({ type: "hit", combo: i });
+  expect(new PlayerProfile(() => data).mission.progress).toBe(4);
+  reject = true;
+  expect(profile.applyMissionEvent({ type: "hit", combo: 5 })).toEqual({ saved: false, rewarded: false });
   expect(profile.coins).toBe(0);
+  expect(profile.mission).toEqual({ index: 0, progress: 4 });
+  reject = false;
+  expect(profile.applyMissionEvent({ type: "hit", combo: 6 })).toEqual({ saved: true, rewarded: true });
+  expect(profile.coins).toBe(10);
+  expect(new PlayerProfile(() => data).coins).toBe(10);
 });
