@@ -2,8 +2,6 @@ import type { Camera } from "@babylonjs/core/Cameras/camera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import type { Scene } from "@babylonjs/core/scene";
 import type { SuccessfulHitFeedback } from "../collision/SuccessfulPlatformHitHandler";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
@@ -46,7 +44,6 @@ function copyLerp(target: Vector3, start: Vector3, end: Vector3, amount: number)
 }
 
 export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulationSystem {
-  readonly #scene: Scene;
   readonly #ball: AbstractMesh;
   readonly #camera: Camera;
   readonly #config: GameConfig["successfulHit"];
@@ -57,8 +54,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   #cameraBasePosition: Vector3;
   #cameraForce = 1;
 
-  public constructor(scene: Scene, ball: AbstractMesh, camera: Camera, config: GameConfig) {
-    this.#scene = scene;
+  public constructor(ball: AbstractMesh, camera: Camera, config: GameConfig) {
     this.#ball = ball;
     this.#camera = camera;
     this.#config = config.successfulHit;
@@ -87,12 +83,12 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
       baseScale,
       crushedScale: new Vector3(
         baseScale.x * 1.04,
-        baseScale.y * 0.42,
+        baseScale.y * 0.82,
         baseScale.z * 1.04,
       ),
       flattenedScale: new Vector3(
         baseScale.x * 0.9,
-        baseScale.y * 0.12,
+        baseScale.y * 0.68,
         baseScale.z * 0.9,
       ),
       baseVisibility: platform.mesh.visibility,
@@ -158,9 +154,9 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
       }
 
       state.platform.visibility =
-        progress <= 0.28
+        progress <= 0.08
           ? state.baseVisibility
-          : state.baseVisibility * (1 - clamp01((progress - 0.28) / 0.2));
+          : state.baseVisibility * (1 - clamp01((progress - 0.08) / 0.2));
 
       const easedProgress = 1 - (1 - progress) ** 3;
       for (const fragment of state.fragments) {
@@ -268,18 +264,11 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     force: number,
   ): PlatformFragmentState {
     const direction = offsetX < 0 ? -1 : 1;
-    const mesh = MeshBuilder.CreateBox(
-      `${platform.id}-fragment-${String(index)}`,
-      {
-        width: fragmentWidth,
-        height: platform.size.height,
-        depth: platform.size.depth,
-      },
-      this.#scene,
-    );
-    mesh.material = platform.mesh.material;
+    const mesh = platform.createBreakFragment(index, fragmentWidth);
     mesh.isPickable = false;
+    const spriteDepth = mesh.position.z;
     mesh.position.copyFrom(origin);
+    mesh.position.z = spriteDepth;
     mesh.position.x += offsetX;
 
     const startPosition = mesh.position.clone();

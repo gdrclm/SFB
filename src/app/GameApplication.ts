@@ -8,6 +8,7 @@ import { describeFailedImpact } from "../run/FailedImpact";
 import { tutorialVisuals as tutorialArt } from "./TutorialController";
 import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missions";
 import { renderPinnedMission } from "../run/renderMissionBoard";
+import { waitForPlatformSprites } from "../platform/PlatformSprites";
 import { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -400,6 +401,8 @@ export class GameApplication {
     this.#renderPhaseStage();
     this.#fixedStep.register(this.#phaseOneController);
     this.#platformPool = createStaticPlatformPool(this.#scene, this.#config);
+    await waitForPlatformSprites(this.#scene);
+    if (this.#hasBeenDisposed()) return;
     this.#platformLabels = new PlatformLabels(this.#scene, this.#canvas,
       requireMenuElement(this.#interfaceLayerElement, "#platform-labels"), this.#platformPool.platforms);
     this.#platformGenerator = new PlatformGenerator(
@@ -434,7 +437,6 @@ export class GameApplication {
       ),
     );
     this.#successfulHitEffects = new SuccessfulHitEffects(
-      this.#scene,
       ballMesh,
       mainScene.camera,
       this.#config,

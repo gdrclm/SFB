@@ -27,20 +27,23 @@ describe("HavokPlatformSweep", () => {
       throw new Error("The test requires at least one configured platform.");
     }
     const platform = new PlatformController(scene, gameConfig, platformConfig);
-    const defaultOutline = platform.mesh.outlineWidth;
+    const sprite = platform.mesh.getChildMeshes()[0];
+    if (sprite === undefined) throw new Error("The platform requires an atlas sprite");
+    expect(platform.mesh.isVisible).toBe(false);
+    expect(sprite.isVisible).toBe(true);
     platform.setApproachFeedback(10, 0);
     expect(platform.approachState).toBe("breakable");
-    expect(platform.mesh.outlineWidth).toBeGreaterThan(defaultOutline);
+    expect(sprite.metadata).toMatchObject({ spriteAtlas: "neon-rocks", row: 0 });
     platform.setApproachFeedback(6.5, 0.5);
     expect(platform.approachState).toBe("boost");
     platform.setApproachFeedback(2, 0.5, true, 1.5, .5);
     expect(platform.approachState).toBe("danger");
-    expect(platform.mesh.outlineWidth).toBeGreaterThan(0.08);
+    expect(sprite.metadata).toMatchObject({ row: 2 });
     platform.setApproachFeedback(null);
     expect(platform.approachState).toBeNull();
-    expect(platform.mesh.outlineWidth).toBe(defaultOutline);
+    expect(sprite.metadata).toMatchObject({ row: 0 });
     const standardVertexCount = platform.mesh.getTotalVertices();
-    expect(platform.mesh.getTotalVertices()).toBeGreaterThan(24);
+    expect(platform.mesh.getTotalVertices()).toBe(24);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.x * 2)
       .toBeCloseTo(platformConfig.size.width, 5);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.y * 2)
@@ -81,7 +84,7 @@ describe("HavokPlatformSweep", () => {
     expect(platform.strengthLevel).toBe("high");
     expect(platform.routeKind).toBe("bypass");
     expect(platform.kind).toBe("super-heavy");
-    expect(platform.mesh.getTotalVertices()).not.toBe(standardVertexCount);
+    expect(platform.mesh.getTotalVertices()).toBe(standardVertexCount);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.x * 2)
       .toBeCloseTo(platformConfig.size.width, 5);
     const metadata = platform.mesh.metadata as { readonly kind?: unknown } | null;
@@ -104,17 +107,33 @@ describe("HavokPlatformSweep", () => {
         isTrap: true,
       },
     );
-    const brightMaterial = platform.mesh.material;
+    const brightMaterial = sprite.material;
     expect(brightMaterial).toBeInstanceOf(StandardMaterial);
     if (!(brightMaterial instanceof StandardMaterial)) {
       throw new Error("The platform requires a StandardMaterial.");
     }
     expect(brightMaterial.disableLighting).toBe(true);
-    expect(brightMaterial.useEmissiveAsIllumination).toBe(true);
+    expect(brightMaterial.useAlphaFromDiffuseTexture).toBe(true);
     expect(brightMaterial.diffuseColor.r).toBeGreaterThan(0.9);
     expect(brightMaterial.diffuseColor.g).toBeGreaterThan(0.6);
     expect(brightMaterial.emissiveColor.r).toBeGreaterThan(0.9);
     expect(platform.mesh.getTotalVertices()).toBe(standardVertexCount);
+
+    // A special skin and animation must keep the same collider and atlas resources.
+    const textureCount = scene.textures.length;
+    const materialCount = scene.materials.length;
+    for (const kind of ["vitality", "time-slow", "standard"] as const) {
+      platform.deactivate();
+      platform.reactivate(new Vector3(0, -8, gameConfig.playSpace.depth), {
+        strength: 7, strengthLevel: "low", kind, widthScale: .4,
+      });
+      for (let frame = 0; frame < 12; frame++) platform.setApproachFeedback(null, frame / 5);
+      expect(platform.width).toBeCloseTo(3);
+      expect(sweep.cast({ x: 0, y: -5, z: 0 }, { x: 0, y: -11, z: 0 })?.id).toBe(platform.id);
+      expect(sweep.cast({ x: 3, y: -5, z: 0 }, { x: 3, y: -11, z: 0 })).toBeNull();
+      expect(scene.textures.length).toBe(textureCount);
+      expect(scene.materials.length).toBe(materialCount);
+    }
 
     sweep.dispose();
     platform.dispose();

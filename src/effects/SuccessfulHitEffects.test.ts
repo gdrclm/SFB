@@ -17,10 +17,11 @@ describe("SuccessfulHitEffects", () => {
     const platformMesh = MeshBuilder.CreateBox("platform", { width: 4 }, scene);
     const platform = {
       id: "platform",
+      createBreakFragment: (index: number, width: number) => MeshBuilder.CreatePlane(`platform-fragment-${String(index)}`, { width, height: .4 }, scene),
       mesh: platformMesh,
       size: { width: 4, height: 0.4, depth: 1 },
     } as PlatformController;
-    const effects = new SuccessfulHitEffects(scene, ball, camera, gameConfig);
+    const effects = new SuccessfulHitEffects(ball, camera, gameConfig);
     const meshCountBeforeBreak = scene.meshes.length;
     const completePlatformBreak = vi.fn();
     const initialCameraPosition = camera.position.clone();

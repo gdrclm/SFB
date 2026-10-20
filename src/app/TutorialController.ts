@@ -1,5 +1,6 @@
 import type { PlatformKind } from "../config/gameConfig";
-import { createPlatformOutline } from "../platform/PlatformOutline";
+import { platformPreviewMarkup } from "../platform/PlatformSprites";
+import { platformSpriteRow } from "../platform/PlatformSpriteLayout";
 
 const SEEN_KEY = "speed-fall-ball.tutorial-seen.v1";
 const heart = '<svg class="tutorial-icon heart-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28 4 16C-5 5 10-2 16 7 22-2 37 5 28 16Z" fill="#ff527e" stroke="#760d37" stroke-width="2"/></svg>';
@@ -10,12 +11,7 @@ const slow = '<span class="tutorial-key" aria-hidden="true">ϟ ЗАМЕДЛЕН�
 const clock = '<svg class="tutorial-icon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#d5f7ff" stroke="#16799f" stroke-width="3"/><path d="M16 6V16L23 19" fill="none" stroke="#16799f" stroke-width="3"/></svg>';
 
 function platform(kind: PlatformKind, strength: number): string {
-  const colors = { standard: "#e9a740", "super-heavy": "#434956", vitality: "#27bf66", "time-slow": "#c2f2ff" };
-  const points = createPlatformOutline(kind, 168, 40)
-    .map(({ x, y }) => `${String(x + 90)},${String(28 - y)}`).join(" ");
-  const effect = kind === "vitality" ? '<path d="M25 37 14 26C7 18 18 12 25 20 32 12 43 18 36 26Z" fill="#e8ffed"/>'
-    : kind === "time-slow" ? '<circle cx="26" cy="28" r="12" fill="#fff" stroke="#197da3" stroke-width="2"/><path d="M26 19V28L32 31" fill="none" stroke="#197da3" stroke-width="2"/>' : '';
-  return `<svg class="tutorial-platform" viewBox="0 0 180 56" role="img" aria-label="Платформа, прочность ${String(strength)}"><polygon points="${points}" fill="${colors[kind]}" stroke="${kind === "super-heavy" ? '#e65d22' : '#183e52'}" stroke-width="3"/><path d="M50 10 46 24 59 34 53 46M123 10 130 26 119 42M8 28H172" fill="none" stroke="#122d40" stroke-opacity=".25" stroke-width="2"/>${effect}<text x="95" y="37" text-anchor="middle" fill="white" stroke="#17394f" stroke-width="3" paint-order="stroke" font-size="26" font-family="Arial, sans-serif" font-weight="900">${String(strength)}</text></svg>`;
+  return platformPreviewMarkup(platformSpriteRow(kind, null), `Платформа, прочность ${String(strength)}`);
 }
 
 export const tutorialVisuals = { heart, coin, energy, boost, slow, clock, platform };
