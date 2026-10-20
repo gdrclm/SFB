@@ -132,9 +132,10 @@ combo bonus persist with results; older records retain their original scores.
 Combo points do not multiply spendable coins.
 
 Only the nearest obstacle in the current horizontal lane gets a readiness cue:
-light outline and ✓ for a break now; amber ϟ only when a currently available
-BOOST suffices; a gray clock when that boost is unavailable; red ✕ when one
-BOOST cannot suffice. Energy, cooldown and gameplay state use the actual boost
+turquoise contour and the surface cracks for a break now; amber ϟ only when a
+currently available BOOST suffices. Distant surfaces that still need speed stay
+neutral. Red ! appears only within 0.7 real seconds of an unsafe impact.
+Assessment is limited to a 1.6-second approach window. Energy, cooldown and gameplay state use the actual boost
 controller. The platform and BOOST glow share the same pulse when boost is useful.
 Other lanes are not ranked. Straddling two platforms in one row conservatively
 warns about the stronger obstacle. Base materials and silhouettes remain intact.
@@ -222,7 +223,7 @@ npm run dev
 Что проверить:
 
 - Первый обучающий забег: простая платформа, монета, BOOST, развилка и
-  контекстные карточки с изображениями. Пауза останавливает симуляцию.
+  короткие стрелки без остановок на чтение. Пауза останавливает симуляцию.
 - Жизни: одна активация платформы снимает не больше одной жизни.
 - Последовательные BOOST, отдаление камеры, эффекты скорости и комбо.
 - Подсветка прочности только ближайшей платформы под шаром.
@@ -262,17 +263,16 @@ available as tooltips. All categories and reference pages were checked without
 vertical scrolling at 320×568, 390×844 and 844×390.
 
 Combo is a brief count/multiplier badge near the top, without progress bars,
-risk arithmetic or bonus text. It appears from ×2 and refreshes for two active
-real seconds on hits, freezes in pause and hides on error/reset. Challenge
-notices show just their short names. The technical hit journal is not visible.
+risk arithmetic or bonus text. It appears only on a hit for 0.75 active real seconds (1.1 on a new multiplier),
+freezes in pause and hides on error/reset. The stage challenge has no text banner. The technical hit journal is not visible.
 
 ## Sequential missions and repeatable rewards
 
-Active mission details live in pause. A newly received objective briefly appears
-then collapses; in the opening lesson only the reward is shown. Completion
+Active mission details live in pause. Actual progress briefly appears for 1.2
+active seconds, then collapses; in the opening lesson only the reward is shown. Completion
 credits 10 shop coins and saves the next mission in a single transaction.
-A gold flash and +10 ★ last two active real seconds, followed by a short next-goal
-notification. Missions cycle through clean breaks, coins,
+A gold flash and +10 ★ last two active real seconds. The next objective stays
+in pause until the next progress update. Missions cycle through clean breaks, coins,
 successful BOOST uses, platform breaks and combo, with bounded target increases
 on subsequent cycles. Only actions after activation count toward a new mission.
 
@@ -301,7 +301,7 @@ avoids decorative travel/streaks and hit stop.
 1. Открыть игру в приватном окне на телефоне и нажать «Начать забег».
 2. Не объяснять управление и не подсказывать первые 30 секунд.
 3. Записать время первого движения, монеты и успешного BOOST; отметить ошибки
-   чтения сигналов ✓ / ϟ / ◷ / ✕ и касания неготовой кнопки.
+   чтения бирюзового контура / янтарной ϟ / нейтральной поверхности / красного ! и касания неготовой кнопки.
 4. Спросить, что было приятно и что мешало, без перечисления механик заранее.
 
 Автоматические проверки подтверждают ввод, состояния, эффекты и сохранения.
@@ -315,3 +315,26 @@ avoids decorative travel/streaks and hit stop.
 паузе и итогах открывает общий экран: лучшие глубина, скорость и этап,
 призовые места и десять лучших забегов. Данные по-прежнему локальны;
 прерванные забеги сохраняются и участвуют в рейтинге.
+
+### Поле решений и ощущения
+
+Камера ставит шар примерно на 38% свободной области между сердцами и
+нижними кнопками. Эта гипотеза настраивается при изменении размера экрана;
+снизу остаётся больше места для развилок. Энергия BOOST и замедления — общая
+шкала между кнопками с точным остатком. Заполнение относительно максимального
+запаса за текущий забег, без ограничения накопления энергии. Цена BOOST видна
+при росте стоимости или малом остатке; при обычной цене 1 и достаточном запасе
+она скрыта. Число скорости меняет оттенок без дополнительных подписей.
+
+BOOST сначала читается движением и следом, затем через 180 мс камера расширяет
+обзор; дополнительный импульс масштаба возвращается за 850 мс. Разрушение
+занимает 380 мс, дальность крупных фрагментов и короткий толчок камеры зависят
+от соотношения скорости и прочности. Повторные удары не накапливают смещение
+камеры. Монета летит к счётчику за 320 мс. Декоративные конфетти убраны из фона,
+чтобы не конкурировать с монетами и обломками.
+
+Обязательный следующий шаг для оценки ощущений — живой телефонный тест:
+несколько последовательных BOOST, 5–10 ударов, монетная цепочка, ошибка и
+восстановление жизни. Оценить различимость событий со звуком и без, вибрацию,
+обзор ближайшей развилки и понимание сигналов без сравнения чисел. Эмуляция
+размеров экрана не заменяет проверку физического телефона.

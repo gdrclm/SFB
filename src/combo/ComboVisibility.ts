@@ -2,7 +2,7 @@
 export class ComboVisibility {
   #remaining = 0;
   public get visible(): boolean { return this.#remaining > 0; }
-  public show(): void { this.#remaining = 2; }
+  public show(durationSeconds = 2): void { this.#remaining = durationSeconds; }
   public advance(realDeltaSeconds: number): void {
     this.#remaining = Math.max(0, this.#remaining - realDeltaSeconds);
     if (this.#remaining < 1e-9) this.#remaining = 0;

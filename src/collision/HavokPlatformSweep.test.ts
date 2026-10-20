@@ -32,8 +32,8 @@ describe("HavokPlatformSweep", () => {
     expect(platform.approachState).toBe("breakable");
     expect(platform.mesh.outlineWidth).toBeGreaterThan(defaultOutline);
     platform.setApproachFeedback(6.5, 0.5);
-    expect(platform.approachState).toBe("close");
-    platform.setApproachFeedback(2, 0.5);
+    expect(platform.approachState).toBe("boost");
+    platform.setApproachFeedback(2, 0.5, true, 1.5, .5);
     expect(platform.approachState).toBe("danger");
     expect(platform.mesh.outlineWidth).toBeGreaterThan(0.08);
     platform.setApproachFeedback(null);

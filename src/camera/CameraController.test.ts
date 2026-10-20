@@ -52,21 +52,29 @@ describe("CameraController", () => {
     }
   });
 
-  it("smoothly follows the falling ball and keeps it inside the safe view area", () => {
-    const { controller, rig, target } = createFixture();
-
-    target.position.y = 4;
+  it.each([9 / 19.5, 16 / 9])("keeps the falling ball above centre and preserves the decision space at aspect %s", (aspect) => {
+    const { controller, camera, rig, target } = createFixture(aspect);
+    controller.setBallScreenRatio(.37);
+    for (let frame = 0; frame < 180; frame++) {
+      target.position.y -= target.fallSpeed / 60;
+      controller.fixedUpdate(1 / 60);
+      const halfHeight = Number(camera.orthoTop);
+      const screenRatio = .5 - (target.position.y - rig.position.y) / (halfHeight * 2);
+      expect(screenRatio).toBeGreaterThanOrEqual(.345);
+      expect(screenRatio).toBeLessThanOrEqual(.396);
+    }
+    target.position.y -= 100;
     controller.fixedUpdate(1 / 60);
-    expect(rig.position.y).toBeGreaterThan(4);
-    expect(rig.position.y).toBeLessThan(4.5);
+    const ratio = .5 - (target.position.y - rig.position.y) / (Number(camera.orthoTop) * 2);
+    expect(ratio).toBeLessThan(.4);
+  });
 
-    target.position.y = -20;
-    controller.fixedUpdate(1 / 60);
-    const safeOffset =
-      controller.orthographicSize * gameConfig.camera.safeVerticalRatio;
-    expect(Math.abs(target.position.y - rig.position.y) - safeOffset).toBeLessThan(
-      1e-10,
-    );
+  it("adapts framing to the free area after rotation without changing world proportions", () => {
+    const { controller, camera, target, rig } = createFixture(.5);
+    controller.setBallScreenRatio(.43);
+    for (let frame = 0; frame < 120; frame++) controller.fixedUpdate(1 / 60);
+    expect(.5 - (target.position.y - rig.position.y) / (Number(camera.orthoTop) * 2)).toBeCloseTo(.43, 6);
+    expect((Number(camera.orthoRight) - Number(camera.orthoLeft)) / (Number(camera.orthoTop) * 2)).toBe(.5);
   });
 
   it("zooms out smoothly as speed grows without modifying ball speed", () => {

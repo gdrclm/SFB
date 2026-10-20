@@ -48,9 +48,9 @@ describe("SuccessfulPlatformHitHandler", () => {
     expect(ball.fallSpeed).toBe(9);
     expect(beginRelease).toHaveBeenCalledWith(platform);
     expect(completeRelease).toHaveBeenCalledWith(platform);
-    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function));
+    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7);
     expect(feedback.playBallReaction).toHaveBeenCalledOnce();
-    expect(feedback.playCameraReaction).toHaveBeenCalledOnce();
+    expect(feedback.playCameraReaction).toHaveBeenCalledWith(10 / 7);
   });
 
   it("does nothing when the ball speed is insufficient", () => {

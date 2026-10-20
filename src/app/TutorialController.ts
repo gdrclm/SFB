@@ -29,8 +29,8 @@ const steps = [
   },
   {
     title: "Пробитие и BOOST",
-    content: `<p>${platform("standard", 7)} ✓ — пробьёте. ϟ — нужен BOOST. ✕ — обходите.</p>
-      <p>${boost} <strong>+50% скорости.</strong> Цена ${energy} — на кнопке. Перезарядка — 1 секунда.</p>
+    content: `<p>${platform("standard", 7)} <span class="cue-key cue-safe">Бирюзовый — пробьётся.</span> <span class="cue-key cue-boost">ϟ — хватит BOOST.</span> <span class="cue-key">Нейтральный — нужен разгон.</span> <span class="cue-key cue-danger">! — обходите.</span></p>
+      <p>${boost} <strong>+50% скорости.</strong> Общая энергия ${energy} — между кнопками. Перезарядка — 1 секунда.</p>
       <p>${heart} Не хватило скорости: −1 жизнь, скорость снова 10.</p>`,
   },
   {

@@ -64,11 +64,7 @@
 
         <section id="combo-panel" data-tier="1" data-risk="none" aria-label="Серия успешных ударов">
           <div class="combo-heading"><span>КОМБО</span><strong id="combo-count">0</strong><strong id="combo-multiplier">×1</strong></div>
-          <div class="combo-track" aria-hidden="true"><span id="combo-progress"></span></div>
-          <small id="combo-next">Ещё 3 до ×2</small>
-          <p id="combo-risk">Скорость ×1</p>
-          <p id="combo-message" role="status">Разбейте 3 подряд → множитель ×2</p>
-          <small id="loop-goal">0:00 / 5:00 · Соберите 3 удара подряд</small>
+
         </section>
         <aside id="challenge-notice" role="status" hidden><strong></strong><span></span></aside>
         <aside id="boost-coach" hidden role="status"><span id="boost-coach-art" aria-hidden="true"></span><p>Нажми BOOST или обойди.</p><button id="dismiss-boost-coach" type="button" aria-label="Скрыть подсказку BOOST">Понятно</button></aside>
@@ -100,9 +96,11 @@
             </svg>
             <span class="boost-title">BOOST</span>
             <span class="control-state boost-state">ГОТОВО</span>
-            <span id="boost-energy-inline" aria-label="Энергия">30 ϟ</span>
             <span id="boost-cost" class="boost-cost">−1⚡</span>
           </button>
+        </div>
+        <div id="energy-reserve" role="meter" aria-label="Общая энергия BOOST и замедления" aria-valuemin="0" aria-valuemax="30" aria-valuenow="30">
+          <span aria-hidden="true">ϟ</span><span class="energy-track" aria-hidden="true"><i id="energy-fill"></i></span><strong id="energy-amount">30</strong>
         </div>
         <button
           id="slow-mode-button"

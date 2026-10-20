@@ -1,12 +1,11 @@
-export type ApproachState = "breakable" | "close" | "hard" | "danger" | "unavailable";
+export type ApproachState = "breakable" | "boost" | "neutral" | "danger";
 export function requiredSpeed(strength: number): number { return Math.ceil(strength); }
-export function approachState(speed: number, strength: number, boostAvailable = true, boostMultiplier = 1.5): ApproachState {
+/** Red is an imminent collision warning, never a prediction about a distant lane. */
+export function approachState(speed: number, strength: number, boostAvailable = true, boostMultiplier = 1.5, secondsToImpact = Infinity): ApproachState {
   const threshold = requiredSpeed(strength);
   if (speed >= threshold) return "breakable";
-  if (speed * boostMultiplier < threshold) return "danger";
-  if (!boostAvailable) return "unavailable";
-  const ratio = speed / Math.max(threshold, Number.EPSILON);
-  return ratio >= 0.85 ? "close" : "hard";
+  if (boostAvailable && speed * boostMultiplier >= threshold) return "boost";
+  return secondsToImpact <= .7 ? "danger" : "neutral";
 }
 interface LanePlatform {
   readonly isActive: boolean;
@@ -27,7 +26,7 @@ export function nearestInCurrentLane<T extends LanePlatform>(
   return nearest;
 }
 
-/** These symbols express the current lane only; amber means one BOOST can suffice. */
+/** Breakable and neutral surfaces communicate through material and contour alone. */
 export function approachSymbol(state: ApproachState | null): string {
-  return state === "breakable" ? "✓" : state === "danger" ? "✕" : state === null ? "" : state === "unavailable" ? "◷" : "ϟ";
+  return state === "boost" ? "ϟ" : state === "danger" ? "!" : "";
 }

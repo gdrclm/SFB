@@ -34,7 +34,7 @@ export class SpeedFeedback {
     this.#animation?.cancel();
     this.#burst?.cancel();
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      this.#burst = this.#root.querySelector(".speed-streaks")?.animate([{ opacity: .85 }, { opacity: .55, offset: .5 }, { opacity: 0 }], { duration: 850 }) ?? null;
+      this.#burst = this.#root.querySelector(".speed-streaks")?.animate([{ opacity: .45 }, { opacity: .55, offset: .5 }, { opacity: 0 }], { duration: 450 }) ?? null;
     }
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.#animation = this.#label.animate(

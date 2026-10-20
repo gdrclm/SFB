@@ -39,7 +39,7 @@ export class PlatformLabels {
       const point = Vector3.Project(platform.mesh.getAbsolutePosition(), Matrix.IdentityReadOnly, transform, viewport);
       const visible = point.z >= 0 && point.z <= 1 && point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height;
       const numbers = document.body.dataset.platformNumbers === "true";
-      label.hidden = !visible || !numbers && platform.approachState === null;
+      label.hidden = !visible || !numbers && approachSymbol(platform.approachState) === "";
       if (!visible) continue;
       this.#visible.push(platform);
       const state = platform.approachState;

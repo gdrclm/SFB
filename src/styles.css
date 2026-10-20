@@ -2070,3 +2070,30 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
   #game-over .records-button { padding: 6px 12px; margin-top: 10px; }
   #game-over #results-menu-button { margin-top: 8px; }
 }
+
+/* Keep the decision space clear; energy belongs to both lower controls. */
+#energy-reserve { position: absolute; left: 104px; right: 140px; bottom: max(42px, calc(env(safe-area-inset-bottom) + 30px)); display: flex; align-items: center; gap: 5px; color: #baf9ff; font-size: 13px; pointer-events: none; }
+.energy-track { height: 6px; min-width: 12px; flex: 1; background: #052b4ab3; border-radius: 5px; overflow: hidden; box-shadow: 0 0 0 1px #c0f3ff55; }
+#energy-fill { display: block; height: 100%; background: linear-gradient(90deg, #21a6ec, #9cf7ff); transform-origin: left; transition: transform 120ms linear; }
+#energy-amount { font-size: 11px; min-width: 14px; }
+#energy-reserve[data-low="true"] { color: #ffce66; }
+#energy-reserve[data-low="true"] #energy-fill { background: #ffc45e; }
+#energy-reserve[data-draining="true"] .energy-track { box-shadow: 0 0 0 1px #88cfff, 0 0 7px #91dcff66; }
+#boost-cost[hidden] { display: none; }
+#first-success { top: max(78px, calc(env(safe-area-inset-top) + 70px)); bottom: auto; max-width: calc(100% - 64px); font-size: 16px; border-radius: 12px; }
+#first-success[data-mode="intro"] { font-size: 12px; }
+#combo-panel { top: max(110px, calc(env(safe-area-inset-top) + 102px)); }
+#combo-panel[data-tier="1"] #combo-multiplier { display: none; }
+#combo-panel[data-tier="1"] #combo-count { font-size: 20px; }
+.platform-strength-label[data-approach="boost"] { color: #ffdf78; border: 2px solid #ffd26b; border-radius: 8px 2px; }
+.platform-strength-label[data-approach="danger"] { color: #fff; border: 2px solid #ff5b67; background: #8c2438e6; }
+#interface-layer #speed-value[data-power="rising"] { color: #a1fff1; }
+#interface-layer #speed-value[data-power="high"] { color: #ffe899; text-shadow: 0 0 12px #fff1a455, 0 2px 4px #075484; }
+#challenge-notice { display: none; }
+@media (orientation: landscape) { #energy-reserve { left: 110px; right: 145px; width: min(200px, 35vw); margin: auto; } }
+@media (prefers-reduced-motion: reduce) { #energy-fill { transition: none; } }
+
+.cue-key { display: inline-block; margin-right: 5px; color: #cadce9; }
+.cue-safe { color: #75eee3; }
+.cue-boost { color: #ffd477; }
+.cue-danger { color: #ff94a1; }

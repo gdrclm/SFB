@@ -138,6 +138,7 @@ export interface GameConfig {
     readonly followSharpness: number;
     readonly zoomSharpness: number;
     readonly safeVerticalRatio: number;
+    readonly ballScreenRatio: number;
     readonly phaseTransitionExtraSize: number;
     readonly boostZoomExtraSize: number;
     readonly boostZoomDelaySeconds: number;
@@ -209,8 +210,8 @@ export const gameConfig: GameConfig = Object.freeze({
     trailDiameterScale: 0.46,
     trailLength: 12,
     trailSegments: 12,
-    baseTrailVisibility: 0.08,
-    maximumTrailVisibility: 0.58,
+    baseTrailVisibility: 0.015,
+    maximumTrailVisibility: 0.72,
   }),
   boost: Object.freeze({
     speedMultiplier: 1.5,
@@ -314,13 +315,13 @@ export const gameConfig: GameConfig = Object.freeze({
   }),
   successfulHit: Object.freeze({
     speedLoss: 1,
-    platformEffectSeconds: 0.55,
+    platformEffectSeconds: 0.38,
     fragmentSpread: 2.4,
     fragmentDrop: 2,
     ballEffectSeconds: 0.16,
     ballVerticalStretch: 1.35,
     cameraEffectSeconds: 0.14,
-    cameraImpulse: 0.24,
+    cameraImpulse: 0.14,
   }),
   unsuccessfulHit: Object.freeze({
     bounceSpeed: 8,
@@ -338,13 +339,14 @@ export const gameConfig: GameConfig = Object.freeze({
     orthographicSize: 6,
     speedThreshold: 10,
     speedZoomExponent: 0.5,
-    followSharpness: 7,
+    followSharpness: 10,
     zoomSharpness: 4,
-    safeVerticalRatio: 0.6,
+    safeVerticalRatio: 0.015,
+    ballScreenRatio: 0.37,
     phaseTransitionExtraSize: 2,
-    boostZoomExtraSize: 1.5,
+    boostZoomExtraSize: 0.8,
     boostZoomDelaySeconds: 0.18,
-    boostZoomReturnSeconds: 3,
+    boostZoomReturnSeconds: 0.85,
   }),
   physics: Object.freeze({
     gravity: Object.freeze({ x: 0, y: -9.81, z: 0 }),

@@ -207,11 +207,11 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#material.diffuseColor.copyFrom(displayColor);
     this.#material.emissiveColor.copyFrom(displayColor).scaleInPlace(emissiveStrength);
     this.#trailMaterial.emissiveColor.copyFrom(displayColor);
-    this.#trail.visibility = lerp(
+    this.#trail.visibility = Math.max(this.#boostStrength * .65, lerp(
       this.#config.baseTrailVisibility,
       this.#config.maximumTrailVisibility,
       speedIntensity,
-    );
+    ));
     this.#ball.renderOutline = true;
     this.#ball.outlineColor.copyFrom(
       Color3.Lerp(

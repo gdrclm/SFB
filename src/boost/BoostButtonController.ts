@@ -36,6 +36,7 @@ export class BoostButtonController {
       "aria-label",
       `Boost: +50% к скорости. Цена ${String(this.#boost.energyCost)}. Энергия ${String(this.#boost.energy)}.`,
     );
+    this.#costLabel.hidden = this.#boost.energyCost <= 1 && this.#boost.energy >= this.#boost.energyCost * 3;
     this.#costLabel.textContent = `−${String(this.#boost.energyCost)}⚡`;
     this.#energyLabel.textContent = String(this.#boost.energy);
     this.#energyLabel.setAttribute(

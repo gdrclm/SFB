@@ -128,7 +128,8 @@ export class GameApplication {
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
   #hitStopRemaining = 0;
-  #missionIntroRemaining = 2.5;
+  #energyHighWater = this.#config.economy.initialEnergy;
+  #missionIntroRemaining = 0;
   #lastLifeCount = this.#config.run.initialLives;
   #missionRewardRemaining = 0;
   #missionSaveFailed = false;
@@ -284,7 +285,8 @@ export class GameApplication {
     this.#challengeRemaining = 0;
     this.#challengeDirector = null;
     this.#hitStopRemaining = 0;
-    this.#missionIntroRemaining = 2.5;
+    this.#energyHighWater = this.#config.economy.initialEnergy;
+    this.#missionIntroRemaining = 0;
     this.#lastLifeCount = this.#config.run.initialLives;
     this.#missionRewardRemaining = 0;
     this.#missionSaveFailed = false;
@@ -307,8 +309,7 @@ export class GameApplication {
     this.#gameOverElement.hidden = true;
     this.#comboView = new ComboView(requireMenuElement(this.#interfaceLayerElement, "#combo-panel"));
     this.#fixedStep.register(this.#comboView);
-    this.#comboView.render(this.#combo, this.#config.ball.startFallSpeed, null);
-    requireMenuElement(this.#interfaceLayerElement, "#combo-message").textContent = "Разбейте 3 подряд → множитель ×2";
+    this.#comboView.render(this.#combo);
     this.#renderLives();
     this.#renderCurrency();
     if (this.#mainScene === null) {
@@ -349,7 +350,7 @@ export class GameApplication {
     this.#fixedStep.register({ fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
       if (this.#missionRewardRemaining > 0) {
         this.#missionRewardRemaining = Math.max(0, this.#missionRewardRemaining - realDeltaSeconds);
-        if (this.#missionRewardRemaining === 0) { this.#missionIntroRemaining = 2.5; this.#renderMission(); }
+        if (this.#missionRewardRemaining === 0) { this.#missionIntroRemaining = 0; this.#renderMission(); }
       }
       if (this.#missionRewardRemaining <= 0 && this.#missionIntroRemaining > 0) {
         this.#missionIntroRemaining = Math.max(0, this.#missionIntroRemaining - realDeltaSeconds);
@@ -649,6 +650,12 @@ export class GameApplication {
 
   readonly #resize = (): void => {
     this.#engine?.resize(true);
+    const height = this.#canvas.getBoundingClientRect().height;
+    if (height > 0) {
+      const top = this.#livesElement.getBoundingClientRect().bottom + 12;
+      const bottom = Math.min(this.#boostButtonElement.getBoundingClientRect().top, this.#slowModeButtonElement.getBoundingClientRect().top) - 12;
+      this.#cameraController?.setBallScreenRatio((top + Math.max(0, bottom - top) * .38) / height);
+    }
     this.#cameraController?.resizeViewport();
   };
 
@@ -661,7 +668,7 @@ export class GameApplication {
     const destroyed = this.#successfulHitHandler?.handle(collision) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
-      this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy");
+      this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
       if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .05 : .03;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
@@ -685,7 +692,8 @@ export class GameApplication {
     if (bounced) {
       this.#boostCoach.failedImpact();
       this.#updateMission({ type: "life-lost" });
-      this.#comboView?.miss(this.#combo.miss());
+      this.#combo.miss();
+      this.#comboView?.miss();
       this.#renderLives();
       if (this.#gameState.current === GameState.GameOver) {
         this.#emitFailedImpact();
@@ -806,7 +814,14 @@ export class GameApplication {
   #renderCurrency(): void {
     const energy = formatEnergy(this.#wallet.energy);
     this.#coinCountElement.textContent = String(this.#wallet.coins);
-    requireMenuElement(this.#interfaceLayerElement, "#boost-energy-inline").textContent = `${energy} ϟ`;
+    this.#energyHighWater = Math.max(this.#energyHighWater, this.#wallet.energy);
+    const reserve = requireMenuElement(this.#interfaceLayerElement, "#energy-reserve");
+    reserve.setAttribute("aria-valuenow", String(this.#wallet.energy));
+    reserve.setAttribute("aria-valuemax", String(this.#energyHighWater));
+    reserve.dataset.low = String(this.#wallet.energy < (this.#boostController?.energyCost ?? 1) * 3);
+    reserve.dataset.draining = String(this.#slowModeController?.isActive === true);
+    requireMenuElement(reserve, "#energy-fill").style.transform = `scaleX(${String(this.#wallet.energy / Math.max(1, this.#energyHighWater))})`;
+    requireMenuElement(reserve, "#energy-amount").textContent = energy;
     this.#coinCountElement.setAttribute(
       "aria-label",
       `Монеты: ${String(this.#wallet.coins)}`,
@@ -1018,7 +1033,7 @@ export class GameApplication {
     if (this.#platformGenerator !== null) this.#platformGenerator.enabled = false;
     document.body.dataset.guideStage = "platform";
     document.body.dataset.guideCombo = "false";
-    document.body.dataset.guideSlow = "false";
+    document.body.dataset.guideSlow = "true";
     this.#contextGuide = new ContextGuide(dialog,
       () => { this.#opening?.skip(); document.body.dataset.guideStage = "off"; document.body.dataset.guideCombo = "true"; document.body.dataset.guideSlow = "true"; },
     );
@@ -1066,21 +1081,22 @@ export class GameApplication {
     const platforms = this.#platformPool?.platforms ?? [];
     const nearest = nearestInCurrentLane(platforms, ball.position, this.#config.ball.radius);
     const elapsed = this.#reducedMotion ? 0 : this.#elapsedGameplaySeconds;
-    for (const platform of platforms) platform.setApproachFeedback(platform === nearest ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier);
-    const opportunity = nearest?.approachState === "close" || nearest?.approachState === "hard";
+    const closingSpeed = ball.fallSpeed * (this.#slowModeController?.timeScale ?? 1);
+    const secondsToImpact = nearest === null ? Infinity : Math.max(0, ball.position.y - this.#config.ball.radius - nearest.mesh.position.y - nearest.size.height / 2) / Math.max(.001, closingSpeed);
+    const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;
+    for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
+    const opportunity = nearest?.approachState === "boost";
     this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
     this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
-    this.#comboView?.render(this.#combo, ball.fallSpeed, nearest?.strength ?? null);
+    this.#comboView?.render(this.#combo);
+    this.#speedValueElement.dataset.power = ball.fallSpeed >= 30 ? "high" : ball.fallSpeed >= 18 ? "rising" : "base";
     this.#comboView?.setPaused(paused);
     const phase = this.#phaseOneController;
     if (phase !== null) {
       const progress = requireMenuElement(this.#interfaceLayerElement, "#phase-progress");
       progress.setAttribute("value", String(phase.phaseElapsedSeconds / phase.totalDurationSeconds));
       progress.setAttribute("aria-valuetext", `Этап ${String(phase.currentStageNumber)}`);
-      const seconds = Math.floor(phase.phaseElapsedSeconds);
-      const goals = ["Соберите 3 удара подряд", "Доведите серию до ×3", "Скорость 20+ даёт больше очков", "Пробейте платформу на грани", "Серия 10 → множитель ×4", "Скорость 35+ → бонус ×1,5", "Выбирайте риск или безопасный обход", "Серия 15 → множитель ×5", "Сохраните серию на высокой скорости", "Финиш первой фазы · побейте рекорд"];
-      requireMenuElement(this.#interfaceLayerElement, "#loop-goal").textContent =
-        `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")} / 5:00 · ${goals[phase.currentStageNumber - 1] ?? "Держите серию"}`;
+
     }
     requireMenuElement(this.#pauseMenuElement, "#pause-combo-summary").textContent =
       `Комбо ${String(this.#combo.count)} · лучшее ${String(this.#combo.best)} · бонус +${String(this.#combo.bonus)}`;
@@ -1122,7 +1138,9 @@ export class GameApplication {
   }
 
   #updateMission(event: MissionEvent): void {
+    const beforeProgress = this.#profile.mission.progress;
     const result = this.#profile.applyMissionEvent(event);
+    if (!result.rewarded && event.type !== "run-start" && event.type !== "life-lost" && this.#profile.mission.progress !== beforeProgress) this.#missionIntroRemaining = 1.2;
     this.#missionSaveFailed = !result.saved || !this.#profile.storageAvailable;
     if (result.rewarded) {
       this.#missionRewardRemaining = 2;
@@ -1145,7 +1163,7 @@ export class GameApplication {
     panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
     const missionLabel = `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
-    requireMenuElement(panel, "strong").textContent = this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★` : mission.title;
+    requireMenuElement(panel, "strong").textContent = this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★` : `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
     requireMenuElement(this.#pauseMenuElement, "#pause-mission").textContent = `${missionLabel} · награда ${String(MISSION_REWARD)} ★`;
     requireMenuElement(panel, "small").textContent = this.#missionSaveFailed
       ? "Не удалось сохранить прогресс. Проверьте хранилище браузера."

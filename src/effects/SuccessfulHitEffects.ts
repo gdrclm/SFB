@@ -55,6 +55,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   #ballReactionElapsedSeconds: number | null = null;
   #cameraReactionElapsedSeconds: number | null = null;
   #cameraBasePosition: Vector3;
+  #cameraForce = 1;
 
   public constructor(scene: Scene, ball: AbstractMesh, camera: Camera, config: GameConfig) {
     this.#scene = scene;
@@ -65,7 +66,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playPlatformBreak(platform: PlatformController, onComplete: () => void): void {
+  public playPlatformBreak(platform: PlatformController, onComplete: () => void, force = 1): void {
     const baseScale = platform.mesh.scaling.clone();
     const origin = platform.mesh.position.clone();
     const platformWidth = Number.isFinite(platform.width)
@@ -77,7 +78,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     for (let index = 0; index < platformFragmentCount; index += 1) {
       const offsetX = -platformWidth / 2 + fragmentWidth * (index + 0.5);
       fragments.push(
-        this.#createFragment(platform, origin, platformWidth, fragmentWidth, offsetX, index),
+        this.#createFragment(platform, origin, platformWidth, fragmentWidth, offsetX, index, force),
       );
     }
 
@@ -106,8 +107,9 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#ballReactionElapsedSeconds = 0;
   }
 
-  public playCameraReaction(): void {
-    this.#cameraBasePosition = this.#camera.position.clone();
+  public playCameraReaction(force = 1): void {
+    if (this.#cameraReactionElapsedSeconds === null) this.#cameraBasePosition = this.#camera.position.clone();
+    this.#cameraForce = Math.max(.75, Math.min(1.6, force));
     this.#cameraReactionElapsedSeconds = 0;
   }
 
@@ -236,7 +238,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     const progress = clamp01(
       this.#cameraReactionElapsedSeconds / this.#config.cameraEffectSeconds,
     );
-    const impulse = this.#config.cameraImpulse;
+    const impulse = this.#config.cameraImpulse * this.#cameraForce;
     let verticalOffset: number;
 
     if (progress <= 0.25) {
@@ -263,6 +265,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     fragmentWidth: number,
     offsetX: number,
     index: number,
+    force: number,
   ): PlatformFragmentState {
     const direction = offsetX < 0 ? -1 : 1;
     const mesh = MeshBuilder.CreateBox(
@@ -285,7 +288,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     const verticalScatter = index % 2 === 0 ? 0.28 : -0.08;
     const endPosition = startPosition.add(
       new Vector3(
-        direction * this.#config.fragmentSpread * outwardForce,
+        direction * this.#config.fragmentSpread * outwardForce * force,
         -this.#config.fragmentDrop + verticalScatter,
         0,
       ),

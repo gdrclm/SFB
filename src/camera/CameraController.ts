@@ -48,6 +48,7 @@ export class CameraController implements FixedSimulationSystem {
   readonly #playSpaceHalfWidth: number;
   #behavior: CameraBehavior = "gameplay";
   #baseOrthographicSize: number;
+  #ballScreenRatio: number;
   #boostZoomOffset = 0;
   #boostStartZoomOffset = 0;
   #boostZoomElapsedSeconds: number | null = null;
@@ -64,6 +65,7 @@ export class CameraController implements FixedSimulationSystem {
     this.#target = target;
     this.#getAspectRatio = getAspectRatio;
     this.#config = config.camera;
+    this.#ballScreenRatio = config.camera.ballScreenRatio;
     this.#playSpaceHalfWidth = config.playSpace.halfWidth;
     this.#baseOrthographicSize = calculateCameraSize(
       target.fallSpeed,
@@ -71,6 +73,7 @@ export class CameraController implements FixedSimulationSystem {
     );
     this.#rig.position.y = target.position.y;
     this.resizeViewport();
+    this.#rig.position.y = target.position.y - this.#lookAhead();
   }
 
   public get behavior(): CameraBehavior {
@@ -95,15 +98,6 @@ export class CameraController implements FixedSimulationSystem {
     fixedDeltaSeconds: number,
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
-    const followAmount = smoothFactor(this.#config.followSharpness, fixedDeltaSeconds);
-    const targetY = this.#target.position.y;
-    const smoothedY = lerp(this.#rig.position.y, targetY, followAmount);
-    const maximumTargetOffset =
-      this.#getVisibleVerticalHalfSize() * this.#config.safeVerticalRatio;
-    this.#rig.position.y = Math.max(
-      targetY - maximumTargetOffset,
-      Math.min(targetY + maximumTargetOffset, smoothedY),
-    );
 
     const transitionSize =
       this.#behavior === "phase-transition"
@@ -115,7 +109,19 @@ export class CameraController implements FixedSimulationSystem {
     const boostDelay = this.#boostZoomElapsedSeconds !== null && this.#boostZoomElapsedSeconds < this.#config.boostZoomDelaySeconds;
     if (!boostDelay) this.#baseOrthographicSize = lerp(this.#baseOrthographicSize, targetSize, zoomAmount);
     this.#updateBoostZoom(realFixedDeltaSeconds);
+    const desiredY = this.#target.position.y - this.#lookAhead();
+    const smoothedY = lerp(this.#rig.position.y, desiredY, smoothFactor(this.#config.followSharpness, fixedDeltaSeconds));
+    const maximumOffset = this.#getVisibleVerticalHalfSize() * this.#config.safeVerticalRatio;
+    this.#rig.position.y = Math.max(desiredY - maximumOffset, Math.min(desiredY + maximumOffset, smoothedY));
     this.resizeViewport();
+  }
+
+  public setBallScreenRatio(ratio: number): void {
+    this.#ballScreenRatio = Math.max(.25, Math.min(.5, ratio));
+  }
+
+  #lookAhead(): number {
+    return this.#getVisibleVerticalHalfSize() * (1 - 2 * this.#ballScreenRatio);
   }
 
   public resizeViewport(): void {

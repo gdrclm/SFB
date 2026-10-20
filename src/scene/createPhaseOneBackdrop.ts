@@ -150,17 +150,6 @@ export function createPhaseOneBackdrop(
   drawIsland(context, 740, 960, 0.48);
   drawIsland(context, 820, 1380, 0.62);
 
-  const confettiColors = ["#ff5eb5", "#ffe348", "#47efbb", "#ff7b4c"];
-  for (let index = 0; index < 28; index += 1) {
-    const x = (index * 173 + 91) % 1024;
-    const y = (index * 281 + 170) % 1536;
-    context.save();
-    context.translate(x, y);
-    context.rotate((index * Math.PI) / 9);
-    context.fillStyle = confettiColors[index % confettiColors.length] ?? "#fff";
-    context.fillRect(-7, -16, 14, 32);
-    context.restore();
-  }
   texture.update(false);
   texture.wrapU = Texture.CLAMP_ADDRESSMODE;
   texture.wrapV = Texture.CLAMP_ADDRESSMODE;

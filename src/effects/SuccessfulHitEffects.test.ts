@@ -53,6 +53,14 @@ describe("SuccessfulHitEffects", () => {
     expect(platformMesh.visibility).toBe(1);
     expect(scene.meshes.length).toBe(meshCountBeforeBreak);
 
+    // A rapid series must return to the original camera position, not accumulate drift.
+    for (let hit = 0; hit < 5; hit++) {
+      effects.playCameraReaction(1.6);
+      effects.fixedUpdate(.03);
+    }
+    effects.fixedUpdate(gameConfig.successfulHit.cameraEffectSeconds);
+    expect(camera.position).toEqual(initialCameraPosition);
+
     effects.dispose();
     expect(scene.meshes.length).toBe(meshCountBeforeBreak);
     scene.dispose();

@@ -45,7 +45,7 @@ export class GameFeel {
       { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
       { transform: `translate(${String(((bounds?.x ?? 24) + 16 - point.x) * .4)}px, ${String(-50)}px) scale(1.1)`, opacity: 1, offset: .4 },
       { transform: `translate(${String((bounds?.x ?? 24) + 16 - point.x)}px, ${String((bounds?.y ?? 24) + 16 - point.y)}px) scale(.4)`, opacity: .7 },
-    ], 380);
+    ], 320);
     if (hud !== null) this.#animate(hud, this.#reduced ? [{ filter: "brightness(1.5)" }, { filter: "brightness(1)" }]
       : [{ transform: "scale(1.2)" }, { transform: "scale(1)" }], 180, false);
   }
@@ -66,19 +66,19 @@ export class GameFeel {
     this.#particle(point, "boost", this.#reduced ? [{ opacity: .6 }, { opacity: 0 }] : [
       { transform: "translate(-50%, -50%) scale(.4)", opacity: .9 },
       { transform: "translate(-50%, -50%) scale(5)", opacity: 0 },
-    ], 550);
-    this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 500, false);
+    ], 320);
+    this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 300, false);
   }
   public breakAt(position: { x: number; y: number; z: number }, heavy: boolean): void {
-    getGameSounds().play("break");
+    getGameSounds().play("break", heavy ? 1.5 : 1);
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
-      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : heavy ? "3.5" : "2.5"})`, opacity: 0 }], 250);
+      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
     if (this.#reduced) return;
-    for (let i = 0; i < (heavy ? 8 : 5); i++) {
+    for (let i = 0; i < (heavy ? 5 : 3); i++) {
       const angle = i * 2.4;
       this.#particle(point, "spark", [{ opacity: 1, transform: "scale(1)" },
-        { opacity: 0, transform: `translate(${String(Math.cos(angle) * 65)}px, ${String(Math.sin(angle) * 40)}px) rotate(130deg) scale(.2)` }], 320);
+        { opacity: 0, transform: `translate(${String(Math.cos(angle) * 65)}px, ${String(Math.sin(angle) * 40)}px) rotate(130deg) scale(.2)` }], 230);
     }
   }
   public setPaused(paused: boolean): void {

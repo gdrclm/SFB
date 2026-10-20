@@ -8,9 +8,9 @@ export interface SuccessfulHitBall {
 }
 
 export interface SuccessfulHitFeedback {
-  playPlatformBreak(platform: PlatformController, onComplete: () => void): void;
+  playPlatformBreak(platform: PlatformController, onComplete: () => void, force?: number): void;
   playBallReaction(): void;
-  playCameraReaction(): void;
+  playCameraReaction(force?: number): void;
 }
 
 export class SuccessfulPlatformHitHandler {
@@ -40,13 +40,14 @@ export class SuccessfulPlatformHitHandler {
       return false;
     }
 
+    const force = Math.max(.75, Math.min(1.6, collision.ballSpeed / Math.max(1, collision.platform.strength)));
     this.#feedback.playPlatformBreak(collision.platform, () => {
       this.#platformPool.completeRelease(collision.platform);
-    });
+    }, force);
 
     this.#ball.fallSpeed = collision.ballSpeed - this.#speedLoss;
     this.#feedback.playBallReaction();
-    this.#feedback.playCameraReaction();
+    this.#feedback.playCameraReaction(force);
     return true;
   }
 }

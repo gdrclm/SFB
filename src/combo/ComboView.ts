@@ -1,14 +1,10 @@
 import { ComboVisibility } from "./ComboVisibility";
-import { assessRisk, speedMultiplier, type ComboController, type ComboHit } from "./ComboController";
+import { type ComboController, type ComboHit } from "./ComboController";
 
 export class ComboView {
   readonly #panel: HTMLElement;
   readonly #number: HTMLElement;
   readonly #multiplier: HTMLElement;
-  readonly #next: HTMLElement;
-  readonly #bar: HTMLElement;
-  readonly #risk: HTMLElement;
-  readonly #message: HTMLElement;
   #animations: Animation[] = [];
   readonly #visibility = new ComboVisibility();
 
@@ -21,38 +17,23 @@ export class ComboView {
       return node;
     };
     this.#number = element("#combo-count"); this.#multiplier = element("#combo-multiplier");
-    this.#next = element("#combo-next"); this.#bar = element("#combo-progress");
-    this.#risk = element("#combo-risk"); this.#message = element("#combo-message");
   }
 
-  public render(combo: ComboController, speed: number, strength: number | null): void {
+  public render(combo: ComboController): void {
     this.#number.textContent = String(combo.count);
     this.#multiplier.textContent = `×${String(combo.multiplier)}`;
     this.#panel.dataset.tier = String(combo.multiplier);
-    this.#bar.style.transform = `scaleX(${String(combo.progress)})`;
-    this.#next.textContent = combo.nextThreshold === null ? "МАКСИМУМ ×5 · держите серию"
-      : `Ещё ${String(combo.nextThreshold - combo.count)} до ×${String(combo.multiplier + 1)}`;
-    const risk = strength === null ? "safe" : assessRisk(speed, strength);
-    this.#panel.dataset.risk = strength === null ? "none" : risk;
-    const speedText = `Скорость ×${speedMultiplier(speed).toLocaleString("ru-RU")}`;
-    this.#risk.textContent = strength === null ? `${speedText} · выберите платформу`
-      : risk === "blocked" ? `НЕ ПРОБЬЁШЬ ${strength.toFixed(0)} · BOOST или обход`
-        : risk === "edge" ? `${speedText} · НА ГРАНИ: бонус ×1,5`
-          : `${speedText} · есть запас для удара`;
   }
 
   public hit(hit: ComboHit): void {
-    if (hit.multiplier >= 2) this.#visibility.show();
-    else this.#visibility.reset();
+    this.#visibility.show(hit.tierIncreased ? 1.1 : .75);
     this.#updateVisibility();
-    this.#message.textContent = `+${String(hit.points)} ${hit.risky ? "· НА ГРАНИ!" : "· УСПЕШНЫЙ УДАР"}${hit.tierIncreased ? ` · КОМБО ×${String(hit.multiplier)}!` : ""}`;
     this.#animate(false, hit.tierIncreased);
   }
 
-  public miss(lost: number): void {
+  public miss(): void {
     this.#visibility.reset();
     this.#updateVisibility();
-    this.#message.textContent = lost > 0 ? `Серия ${String(lost)} потеряна · начните новую` : "Ошибка · соберите новую серию";
     this.#animate(true, false);
   }
 
