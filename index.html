@@ -116,80 +116,19 @@
         </button>
         <section id="pause-menu" role="dialog" aria-modal="true" aria-labelledby="pause-menu-title" hidden>
           <div class="pause-card">
-            <header class="pause-card-header">
-              <span class="pause-header-line" aria-hidden="true"></span>
-              <div>
-                <small>SPEED FALL BALL</small>
-                <h1 id="pause-menu-title">ПАУЗА</h1>
-              </div>
-              <span class="pause-header-line" aria-hidden="true"></span>
-            </header>
-
-            <div class="pause-summary" aria-label="Текущий результат забега">
-              <div class="pause-stat pause-distance-stat">
-                <span>ПРОЙДЕНО</span>
-                <strong id="pause-depth-value">0 М</strong>
-              </div>
-              <div class="pause-stat pause-currency-stat">
-                <span class="coin-emblem pause-coin" aria-hidden="true">★</span>
-                <div>
-                  <span>СОБРАНО МОНЕТ</span>
-                  <strong id="pause-coin-value">0</strong>
-                </div>
-              </div>
-            </div>
-
-            <p id="pause-telemetry" class="pause-combo-summary"></p>
-            <p id="pause-mission" class="pause-combo-summary"></p>
-            <button id="platform-numbers-toggle" type="button" aria-pressed="false">Числа прочности: выкл.</button>
-            <p id="pause-combo-summary" class="pause-combo-summary">Комбо 0 · лучшее 0 · бонус +0</p>
-            <section class="pause-missions" aria-labelledby="pause-missions-title">
-              <h2 id="pause-missions-title">ТЕКУЩИЕ МИССИИ</h2>
-              <ul>
-                <li>
-                  <div class="mission-copy">
-                    <span>Соберите 50 монет</span>
-                    <strong id="mission-coins-value">0/50</strong>
-                  </div>
-                  <div class="mission-track" aria-hidden="true"><span id="mission-coins-progress"></span></div>
-                </li>
-                <li>
-                  <div class="mission-copy">
-                    <span>Разрушьте 10 платформ</span>
-                    <strong id="mission-platforms-value">0/10</strong>
-                  </div>
-                  <div class="mission-track" aria-hidden="true"><span id="mission-platforms-progress"></span></div>
-                </li>
-                <li>
-                  <div class="mission-copy">
-                    <span>Дойдите до этапа 10</span>
-                    <strong id="mission-stage-value">1/10</strong>
-                  </div>
-                  <div class="mission-track" aria-hidden="true"><span id="mission-stage-progress"></span></div>
-                </li>
-              </ul>
-            </section>
-
-            <div class="pause-settings" aria-label="Настройки">
-              <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
-              <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>
-              <button class="pause-setting" type="button" data-feedback-setting="vibration" aria-pressed="true"><span aria-hidden="true">≋</span><span>Вибрация</span><strong class="setting-state">ВКЛ</strong></button>
-              <button id="interface-toggle" class="pause-setting" type="button" aria-pressed="true">
-                <span class="setting-icon" aria-hidden="true">▣</span>
-                <span>ИНТЕРФЕЙС</span>
-                <strong class="setting-state">ВКЛ</strong>
-              </button>
-            </div>
-
-            <p class="vibration-support" data-vibration-support></p>
-            <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
+            <h1 id="pause-menu-title">Пауза</h1>
+            <p class="pause-compact-summary"><strong id="pause-depth-value">0 м</strong><span aria-hidden="true">·</span><span class="stat-gold" aria-hidden="true">★</span><strong id="pause-coin-value">0</strong></p>
             <div class="pause-actions">
-              <button type="button" data-open-tutorial>Как играть</button>
-              <button id="resume-button" class="pause-primary-action" type="button">Продолжить забег</button>
-              <button id="pause-restart-button" type="button">НАЧАТЬ ЗАНОВО</button>
-              <button id="exit-button" class="pause-danger-action" type="button">Завершить забег → Главное меню</button>
-              <small class="exit-note">Забег завершится. Собранные монеты и результат сохранятся.</small>
+              <button id="resume-button" class="pause-primary-action" type="button">Продолжить</button>
+              <button id="pause-restart-button" type="button">↻ Заново</button>
+              <button id="exit-button" class="pause-menu-exit" type="button">В главное меню</button>
             </div>
+            <nav class="pause-secondary" aria-label="Дополнительно">
+              <button type="button" data-open-settings><span aria-hidden="true">⚙</span> Настройки</button>
+              <button type="button" data-open-tutorial><span aria-hidden="true">?</span> Как играть</button>
+              <button type="button" data-open-records><span aria-hidden="true">★</span> Рекорды</button>
+            </nav>
+            <p class="pause-exit-note">При выходе результат сохранится.</p>
           </div>
         </section>
         <section id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title" hidden>
@@ -238,6 +177,17 @@
           <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
         </div>
       </section>
+      <dialog id="game-settings" class="arcade-records" aria-labelledby="settings-title">
+        <header class="records-header"><h1 id="settings-title">Настройки</h1><button id="settings-close" class="settings-close" type="button" aria-label="Закрыть настройки">×</button></header>
+        <div class="feedback-controls">
+          <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
+          <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>
+          <button class="pause-setting" type="button" data-feedback-setting="vibration" aria-pressed="true"><span aria-hidden="true">≋</span><span>Вибрация</span><strong class="setting-state">ВКЛ</strong></button>
+          <button id="interface-toggle" class="pause-setting" type="button" aria-pressed="true"><span aria-hidden="true">▣</span><span>Интерфейс</span><strong class="setting-state">ВКЛ</strong></button>
+          <button id="platform-numbers-toggle" type="button" aria-pressed="false">Числа прочности: выкл.</button>
+        </div>
+        <p class="vibration-support" data-vibration-support></p>
+      </dialog>
       <dialog id="records" class="arcade-records" aria-labelledby="records-title">
         <header class="records-header"><div><span class="menu-eyebrow">ЛИЧНЫЙ ТОП</span><h1 id="records-title">Рекорды</h1></div><button id="records-close" type="button" aria-label="Закрыть рекорды">×</button></header>
         <div class="records-bests" data-personal-bests></div>

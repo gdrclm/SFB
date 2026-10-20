@@ -121,7 +121,7 @@ storage, shop transactions are blocked and an explanation is shown.
 
 Phase one now lasts 300 simulation seconds (slow mode stretches real time;
 pause stops progression), with ten increasingly demanding stages. The play HUD shows one speed value, hearts, coins, depth and a small progress
-track; detailed stage goals, score and hit accounting live in pause/results. A chain of 3/6/10/15 successful
+track; score and hit accounting live in results. A chain of 3/6/10/15 successful
 platform breaks raises the hit multiplier to ×2/×3/×4/×5. A damaging bounce
 resets the chain, preserving already earned points. Dodging and pauses do not
 break it. Speed 20/35/55 adds ×1.25/×1.5/×2; breaking a platform whose strength
@@ -140,7 +140,7 @@ controller. The platform and BOOST glow share the same pulse when boost is usefu
 Other lanes are not ranked. Straddling two platforms in one row conservatively
 warns about the stronger obstacle. Base materials and silhouettes remain intact.
 
-Numeric strength is optional via **Числа прочности** in pause and persists between
+Numeric strength is optional via **Настройки → Числа прочности** in pause and persists between
 sessions. The integer threshold remains shared by the actual physics and the
 optional numeric badges. Players do not need numbers for the default cues.
 
@@ -268,11 +268,11 @@ freezes in pause and hides on error/reset. The stage challenge has no text banne
 
 ## Sequential missions and repeatable rewards
 
-Active mission details live in pause. Actual progress briefly appears for 1.2
+Mission progress briefly appears for 1.2
 active seconds, then collapses; in the opening lesson only the reward is shown. Completion
 credits 10 shop coins and saves the next mission in a single transaction.
 A gold flash and +10 ★ last two active real seconds. The next objective stays
-in pause until the next progress update. Missions cycle through clean breaks, coins,
+hidden until the next progress update. Missions cycle through clean breaks, coins,
 successful BOOST uses, platform breaks and combo, with bounded target increases
 on subsequent cycles. Only actions after activation count toward a new mission.
 
@@ -338,3 +338,25 @@ BOOST сначала читается движением и следом, зат
 восстановление жизни. Оценить различимость событий со звуком и без, вибрацию,
 обзор ближайшей развилки и понимание сигналов без сравнения чисел. Эмуляция
 размеров экрана не заменяет проверку физического телефона.
+
+### Компактная пауза и локации по расстоянию
+
+Пауза показывает только глубину и монеты одной строкой, затем «Продолжить»,
+«Заново» и «В главное меню». Настройки, справка и рекорды доступны отдельными
+кнопками. Музыка, эффекты, вибрация, интерфейс и числа прочности находятся
+в отдельном окне настроек. Закрытие этого окна, рекордов или справки
+не возобновляет забег. Старые три фиксированные миссии и статистический
+журнал из паузы убраны; награждаемая цепочка целей продолжает работать.
+
+Окружение меняется через каждые 500 м максимальной глубины: небо → кристальные
+пещеры → лавовые глубины → неоновая бездна, затем цикл повторяется. Шаг задан
+в `src/scene/DepthLocations.ts`. Смена зависит от расстояния, а не от времени
+или этапа; отскок не возвращает прежнюю локацию. Переход занимает 1,2 секунды
+активного реального времени, с остановкой в паузе. При уменьшении движения
+в настройках ОС фон сменяется сразу. Поля платформ и физика сохраняются.
+
+Фоны различаются палитрой и силуэтами; окружение вписывается в обе оси
+экрана, в том числе при высокой скорости. Скин мира задаёт начальное небо и оттенок следующих локаций;
+купленные фонарики сохраняются в новых локациях. Во время перехода существуют
+не более двух фоновых плоскостей; старые материалы и текстуры освобождаются.
+Перезапуск начинает новый цикл, сохраняя Babylon/Havok.

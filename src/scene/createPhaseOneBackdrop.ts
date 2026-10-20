@@ -5,6 +5,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { DepthLocation } from "./DepthLocations";
 import type { Scene } from "@babylonjs/core/scene";
 
 type DrawingContext = CanvasRenderingContext2D;
@@ -106,6 +107,7 @@ export function createPhaseOneBackdrop(
   scene: Scene,
   cameraRig: TransformNode,
   appearance: WorldAppearance = {},
+  location: DepthLocation = "sky",
 ): Mesh {
   const texture = new DynamicTexture(
     "PhaseOneBackdropTexture",
@@ -115,7 +117,10 @@ export function createPhaseOneBackdrop(
   );
   const context = texture.getContext() as unknown as CanvasRenderingContext2D;
   const sky = context.createLinearGradient(0, 0, 0, 1536);
-  const palette = appearance.theme === "world-sunset"
+  const palette = location === "crystal" ? ["#061d37", "#104259", "#166b7c", "#10334e"]
+    : location === "lava" ? ["#230c24", "#55223a", "#963d35", "#ed8749"]
+      : location === "abyss" ? ["#050b22", "#131b45", "#2b2258", "#12345d"]
+        : appearance.theme === "world-sunset"
     ? ["#32205d", "#81458b", "#eb8c93", "#ffd69f"]
     : appearance.theme === "world-night" ? ["#050b28", "#0d2050", "#214d75", "#566e9c"]
       : ["#0758c8", "#079eed", "#55c8f6", "#b9ecff"];
@@ -123,6 +128,10 @@ export function createPhaseOneBackdrop(
   context.fillStyle = sky;
   context.fillRect(0, 0, 1024, 1536);
 
+  if (location !== "sky" && (appearance.theme === "world-night" || appearance.theme === "world-sunset")) {
+    context.fillStyle = appearance.theme === "world-night" ? "#070c3244" : "#8b326333";
+    context.fillRect(0, 0, 1024, 1536);
+  }
   if (appearance.theme === "world-night") {
     context.fillStyle = "#e4f7ff";
     for (let i = 0; i < 65; i++) {
@@ -140,6 +149,7 @@ export function createPhaseOneBackdrop(
       context.restore();
     }
   }
+  if (location === "sky") {
   drawCloud(context, 120, 330, 1.15);
   drawCloud(context, 870, 530, 0.95);
   drawCloud(context, 400, 940, 0.7);
@@ -149,6 +159,38 @@ export function createPhaseOneBackdrop(
   drawIsland(context, 260, 1140, 0.7);
   drawIsland(context, 740, 960, 0.48);
   drawIsland(context, 820, 1380, 0.62);
+  } else {
+    // Large silhouettes at the edges keep the playable corridor quiet.
+    for (let i = 0; i < 12; i++) {
+      const y = i * 145 - 30;
+      for (const side of [-1, 1]) {
+        const x = side < 0 ? 0 : 1024;
+        const reach = 85 + (i * 47 % 100);
+        context.fillStyle = location === "lava" ? "#341a30" : location === "crystal" ? "#092b43" : "#0a183a";
+        context.beginPath(); context.moveTo(x, y - 50); context.lineTo(x - side * reach, y + 30);
+        context.lineTo(x - side * reach * .65, y + 120); context.lineTo(x, y + 180); context.fill();
+        if (location === "crystal") {
+          const cx = x - side * reach * .6;
+          context.fillStyle = i % 2 ? "#4aa3b7" : "#6884bb";
+          context.beginPath(); context.moveTo(cx, y + 95); context.lineTo(cx - side * 25, y + 20);
+          context.lineTo(cx - side * 50, y + 85); context.lineTo(cx - side * 28, y + 120); context.fill();
+        } else if (location === "lava") {
+          context.strokeStyle = "#ffb464"; context.lineWidth = 5; context.beginPath();
+          context.moveTo(x - side * 30, y); context.lineTo(x - side * 65, y + 55);
+          context.lineTo(x - side * 38, y + 110); context.stroke();
+        }
+      }
+    }
+    if (location === "abyss") {
+      for (let i = 0; i < 55; i++) {
+        context.fillStyle = i % 3 ? "#77d5d488" : "#b8a5dfaa";
+        context.beginPath(); context.arc((i * 173 + 41) % 1024, (i * 257 + 93) % 1536, i % 3 + 1, 0, Math.PI * 2); context.fill();
+      }
+      context.strokeStyle = "#887bd344"; context.lineWidth = 22;
+      context.beginPath(); context.moveTo(30, 100); context.bezierCurveTo(180, 500, 70, 900, 150, 1536); context.stroke();
+      context.beginPath(); context.moveTo(1000, 0); context.bezierCurveTo(800, 600, 970, 900, 880, 1536); context.stroke();
+    }
+  }
 
   texture.update(false);
   texture.wrapU = Texture.CLAMP_ADDRESSMODE;
@@ -170,5 +212,6 @@ export function createPhaseOneBackdrop(
   backdrop.position.z = 6;
   backdrop.isPickable = false;
   backdrop.material = material;
+  backdrop.metadata = { location };
   return backdrop;
 }

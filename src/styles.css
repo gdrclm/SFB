@@ -1636,16 +1636,6 @@ body[data-atmosphere="vfx-sparkles"] .atmosphere-particles { display: block; }
   border-bottom: 1px solid #387098;
 }
 
-#pause-menu .pause-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas: "resume resume" "help restart" "exit exit" "note note";
-}
-#pause-menu #resume-button { grid-area: resume; font-size: 0.95rem; }
-#pause-menu [data-open-tutorial] { grid-area: help; font-size: 0.8rem; }
-#pause-menu #pause-restart-button { grid-area: restart; font-size: 0.8rem; }
-#pause-menu #exit-button { grid-area: exit; font-size: 0.85rem; }
-#pause-menu .exit-note { grid-area: note; }
 
 #combo-panel {
   --combo-color: #a9e5ff;
@@ -2097,3 +2087,25 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 .cue-safe { color: #75eee3; }
 .cue-boost { color: #ffd477; }
 .cue-danger { color: #ff94a1; }
+
+/* Pause is a short interruption, not a second dashboard. */
+#pause-menu { padding: 12px; }
+#pause-menu .pause-card { display: block; width: min(340px, 100%); max-height: calc(100dvh - 24px); padding: 24px 20px 18px; border: 2px solid #9beaff; border-radius: 26px; background: linear-gradient(160deg, #125487, #051c3d 75%); box-shadow: 0 18px 50px #00142c77, inset 0 0 18px #48c4ff22; text-align: center; overflow: auto; }
+#pause-menu-title { margin: 0; font-family: Impact, "Arial Black", sans-serif; font-size: 1.7rem; letter-spacing: .04em; }
+.pause-compact-summary { display: flex; justify-content: center; align-items: center; gap: 9px; color: #aed8ee; font-size: .85rem; margin: 14px 0 22px; }
+.pause-compact-summary strong { color: #fff; font-size: 1rem; }
+.pause-compact-summary .stat-gold { color: #ffda73; }
+#pause-menu .pause-actions { display: grid; grid-template-columns: 1fr; gap: 11px; margin: 0; }
+#pause-menu .pause-actions button { grid-column: auto; min-height: 46px; padding: 10px 12px; border-width: 2px; border-radius: 18px; font-size: .95rem; }
+#pause-menu .pause-actions .pause-primary-action { font-size: 1.1rem; }
+#pause-menu .pause-actions .pause-menu-exit { background: #082a4d; border-color: #69afcf; box-shadow: none; color: #cfebfa; }
+.pause-secondary { display: flex; justify-content: space-between; gap: 8px; margin-top: 22px; }
+.pause-secondary button { display: grid; justify-items: center; gap: 5px; flex: 1; padding: 5px 0; border: 0; background: none; color: #c2e3f3; font: inherit; font-size: .63rem; cursor: pointer; }
+.pause-secondary button span { color: #9deaff; font-size: 21px; line-height: 1; }
+.pause-secondary button:last-child span { color: #ffda73; }
+.pause-exit-note { margin: 16px 0 0; font-size: .62rem; color: #8db8cf; }
+.settings-close { width: 40px; height: 40px; border: 2px solid #91d8f4; border-radius: 13px; background: #08294a; color: #fff; font-size: 26px; cursor: pointer; }
+#game-settings .feedback-controls button { min-height: 46px; align-items: center; font: inherit; font-size: .85rem; }
+#game-settings #platform-numbers-toggle { font-size: .75rem; justify-content: center; }
+#game-settings [data-vibration-support] { margin: 12px 0 0; }
+@media (max-height: 470px) { #pause-menu .pause-card { padding: 14px 20px; width: min(460px, 100%); } #pause-menu-title { font-size: 1.3rem; } .pause-compact-summary { margin: 7px 0 12px; } #pause-menu .pause-actions { grid-template-columns: 1fr 1fr; gap: 8px; } #pause-menu #resume-button { grid-column: 1 / -1; } .pause-secondary { margin-top: 14px; } .pause-exit-note { margin-top: 8px; } }

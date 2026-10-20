@@ -1,3 +1,4 @@
+import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
 import { getGameSounds } from "../feedback/GameSounds";
 import { ChallengeDirector } from "../challenges/ChallengeDirector";
@@ -12,7 +13,6 @@ import { ContextGuide } from "../tutorial/ContextGuide";
 import { saveFinishedOpening, StagedOpening } from "../tutorial/StagedOpening";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { Scene } from "@babylonjs/core/scene";
-import { createPauseMenuSummary, type MissionProgress } from "./PauseMenuModel";
 import { ComboController } from "../combo/ComboController";
 import { ComboView } from "../combo/ComboView";
 import { BallController } from "../ball/BallController";
@@ -55,8 +55,6 @@ function formatEnergy(energy: number): string {
   return String(Math.round(energy * 10) / 10);
 }
 
-const COIN_MISSION_TARGET = 50;
-const PLATFORM_MISSION_TARGET = 10;
 const INTERFACE_PREFERENCE_KEY = "speed-fall-ball.interface-visible";
 
 export interface PauseMenuElements {
@@ -118,6 +116,7 @@ export class GameApplication {
   #combo = new ComboController();
   #comboView: ComboView | null = null;
   #feel: GameFeel | null = null;
+  #backdrop: DepthBackdrop | null = null;
   #elapsedGameplaySeconds = 0;
   #opening: StagedOpening | null = null;
   #guideStrengths: number[] = [];
@@ -155,12 +154,6 @@ export class GameApplication {
   readonly #pauseMenuElement: HTMLElement;
   readonly #pauseDepthElement: HTMLElement;
   readonly #pauseCoinElement: HTMLElement;
-  readonly #missionCoinsValueElement: HTMLElement;
-  readonly #missionCoinsProgressElement: HTMLElement;
-  readonly #missionPlatformsValueElement: HTMLElement;
-  readonly #missionPlatformsProgressElement: HTMLElement;
-  readonly #missionStageValueElement: HTMLElement;
-  readonly #missionStageProgressElement: HTMLElement;
   readonly #interfaceToggleElement: HTMLButtonElement;
   readonly #resumeButtonElement: HTMLButtonElement;
   readonly #pauseRestartButtonElement: HTMLButtonElement;
@@ -249,13 +242,7 @@ export class GameApplication {
     this.#pauseMenuElement = pauseMenu.menu;
     this.#pauseDepthElement = requireMenuElement(pauseMenu.menu, "#pause-depth-value");
     this.#pauseCoinElement = requireMenuElement(pauseMenu.menu, "#pause-coin-value");
-    this.#missionCoinsValueElement = requireMenuElement(pauseMenu.menu, "#mission-coins-value");
-    this.#missionCoinsProgressElement = requireMenuElement(pauseMenu.menu, "#mission-coins-progress");
-    this.#missionPlatformsValueElement = requireMenuElement(pauseMenu.menu, "#mission-platforms-value");
-    this.#missionPlatformsProgressElement = requireMenuElement(pauseMenu.menu, "#mission-platforms-progress");
-    this.#missionStageValueElement = requireMenuElement(pauseMenu.menu, "#mission-stage-value");
-    this.#missionStageProgressElement = requireMenuElement(pauseMenu.menu, "#mission-stage-progress");
-    this.#interfaceToggleElement = requireMenuButton(pauseMenu.menu, "#interface-toggle");
+    this.#interfaceToggleElement = requireMenuButton(document.body, "#interface-toggle");
     this.#resumeButtonElement = requireMenuButton(pauseMenu.menu, "#resume-button");
     this.#pauseRestartButtonElement = requireMenuButton(pauseMenu.menu, "#pause-restart-button");
     this.#exitButtonElement = requireMenuButton(pauseMenu.menu, "#exit-button");
@@ -331,6 +318,9 @@ export class GameApplication {
     if (engine === null) throw new Error("Engine is unavailable");
     this.#scene = mainScene.scene;
     this.#feel = new GameFeel(this.#scene, this.#canvas);
+    this.#backdrop = new DepthBackdrop(this.#scene, mainScene.cameraRig, {
+      theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
+    });
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
@@ -534,6 +524,8 @@ export class GameApplication {
     document.body.dataset.guideStage = "off";
     this.#platformLabels?.dispose();
     this.#comboView?.dispose();
+    this.#backdrop?.dispose();
+    this.#backdrop = null;
     this.#feel?.dispose();
     this.#feel = null;
     this.#speedFeedback?.dispose();
@@ -639,6 +631,7 @@ export class GameApplication {
     if (isPaused) {
       this.#renderPauseSummary();
     }
+    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds);
     this.#scene?.render();
     this.#contextGuide?.layout();
     this.#platformLabels?.render();
@@ -924,6 +917,7 @@ export class GameApplication {
   };
 
   readonly #handleKeyDown = (event: KeyboardEvent): void => {
+    if (document.querySelector("dialog:modal") !== null) return;
     if (event.key === "Tab" && this.#gameState.current === GameState.Paused) {
       this.#keepFocusInsidePauseMenu(event);
       return;
@@ -958,43 +952,8 @@ export class GameApplication {
   }
 
   #renderPauseSummary(): void {
-    requireMenuElement(this.#pauseMenuElement, "#pause-telemetry").textContent = `Скорость ${(this.#ballController?.fallSpeed ?? 0).toFixed(1)} · энергия ${formatEnergy(this.#wallet.energy)} · этап ${String(this.#phaseOneController?.currentStageNumber ?? 1)} · очки ${String(calculateScore(this.#runProgress.depth, this.#wallet.coins, this.#destroyedPlatformCount, this.#combo.bonus))}`;
-    const summary = createPauseMenuSummary({
-      depth: this.#runProgress.depth,
-      coins: this.#wallet.coins,
-      destroyedPlatforms: this.#destroyedPlatformCount,
-      stage: this.#phaseOneController?.currentStageNumber ?? 1,
-      stageTarget: this.#config.phaseOne.stages.length,
-      coinTarget: COIN_MISSION_TARGET,
-      platformTarget: PLATFORM_MISSION_TARGET,
-    });
-
-    this.#pauseDepthElement.textContent = summary.depthLabel;
-    this.#pauseCoinElement.textContent = summary.coinLabel;
-    this.#renderMissionProgress(
-      this.#missionCoinsValueElement,
-      this.#missionCoinsProgressElement,
-      summary.coinsMission,
-    );
-    this.#renderMissionProgress(
-      this.#missionPlatformsValueElement,
-      this.#missionPlatformsProgressElement,
-      summary.platformsMission,
-    );
-    this.#renderMissionProgress(
-      this.#missionStageValueElement,
-      this.#missionStageProgressElement,
-      summary.stageMission,
-    );
-  }
-
-  #renderMissionProgress(
-    valueElement: HTMLElement,
-    progressElement: HTMLElement,
-    progress: MissionProgress,
-  ): void {
-    valueElement.textContent = progress.label;
-    progressElement.style.transform = `scaleX(${String(progress.ratio)})`;
+    this.#pauseDepthElement.textContent = `${String(this.#runProgress.depth)} м`;
+    this.#pauseCoinElement.textContent = String(this.#wallet.coins);
   }
 
   #keepFocusInsidePauseMenu(event: KeyboardEvent): void {
@@ -1098,8 +1057,7 @@ export class GameApplication {
       progress.setAttribute("aria-valuetext", `Этап ${String(phase.currentStageNumber)}`);
 
     }
-    requireMenuElement(this.#pauseMenuElement, "#pause-combo-summary").textContent =
-      `Комбо ${String(this.#combo.count)} · лучшее ${String(this.#combo.best)} · бонус +${String(this.#combo.bonus)}`;
+
   }
 
   readonly #dismissBoostCoach = (): void => { this.#boostCoach.dismiss(); };
@@ -1162,9 +1120,7 @@ export class GameApplication {
     panel.hidden = this.#missionRewardRemaining <= 0 && (this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
     panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
-    const missionLabel = `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
     requireMenuElement(panel, "strong").textContent = this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★` : `${mission.title} · ${String(state.progress)}/${String(mission.target)}`;
-    requireMenuElement(this.#pauseMenuElement, "#pause-mission").textContent = `${missionLabel} · награда ${String(MISSION_REWARD)} ★`;
     requireMenuElement(panel, "small").textContent = this.#missionSaveFailed
       ? "Не удалось сохранить прогресс. Проверьте хранилище браузера."
       : this.#missionRewardRemaining > 0 ? `+${String(MISSION_REWARD)} ★`

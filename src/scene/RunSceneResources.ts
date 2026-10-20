@@ -1,6 +1,6 @@
 import type { Scene } from "@babylonjs/core/scene";
 
-/** Retain the backdrop, camera and physics world; release resources owned by a run. */
+/** Retain the camera and physics world; release run-owned resources, including environments. */
 export class RunSceneResources {
   readonly #scene: Scene;
   readonly #meshes;
