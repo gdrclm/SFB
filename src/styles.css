@@ -2001,7 +2001,12 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 #game-over #restart-button { width: 100%; min-height: 48px; font: inherit; font-size: 1.1rem; font-weight: 900; border-width: 2px; box-shadow: 0 4px 0 #155800, inset 0 2px 4px #f4ffbf66; }
 #restart-button > span { margin-right: 6px; }
 #game-over .records-button { min-height: 42px; }
-#game-over #results-menu-button { margin: 12px 0 0; padding: 4px; border: 0; background: none; box-shadow: none; font-size: .78rem; color: #b5dff5; }
+#game-over #results-menu-button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 46px; margin: 12px 0 0; padding: 9px 14px; border: 2px solid #24dbff; border-radius: 16px; background: linear-gradient(160deg, #0965a5, #04366a 48%, #021c3d); box-shadow: 0 3px 0 #01132d, 0 0 9px #00c8ff66, inset 0 2px 2px #b8f9ff99; color: #f1ffff; font: inherit; font-size: .95rem; font-weight: 850; cursor: pointer; text-shadow: 0 1px 2px #00152e; }
+#results-menu-button .result-home-icon { flex: 0 0 24px; width: 24px; height: 24px; color: #95f4ff; filter: drop-shadow(0 0 4px #00c8ff88); }
+#results-menu-button .result-menu-arrow { margin-left: auto; color: #95f4ff; font-size: 26px; line-height: 1; }
+#game-over #results-menu-button:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }
+#game-over #results-menu-button:hover { border-color: #b0ffff; background: linear-gradient(160deg, #117dc0, #064c84 48%, #03264e); }
+#game-over #results-menu-button:active { transform: translateY(2px); box-shadow: 0 1px 0 #01132d, 0 0 12px #00c8ff88, inset 0 1px 3px #a7f9ff66; }
 #result-save-status:empty { display: none; }
 #game-over #result-save-status { margin: 8px 0; color: #ffdc99; }
 .arcade-records {
@@ -2295,3 +2300,12 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 @media (max-height: 470px) and (orientation: landscape) { #missions-dialog { width: min(600px, calc(100vw - 24px)); padding: 14px 18px; } #missions-dialog .records-header { margin-bottom: 9px; } #missions-dialog #mission-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: calc(100dvh - 140px); } }
 @media (max-height: 470px) and (orientation: landscape) { #start-screen .menu-training { grid-row: 5; margin-top: 4px; } }
 #boost-button[data-charged="true"].boost-ready .boost-cooldown { background: conic-gradient(#adffe7, #00ecba, #adffe7); box-shadow: 0 0 12px #00edb988; }
+@media (max-height: 620px) and (orientation: portrait) {
+  #game-over .game-over-card { padding-top: 10px; padding-bottom: 10px; }
+  #game-over .result-medal { width: 28px; height: 28px; margin-bottom: 6px; }
+  #game-over-title { margin-bottom: 4px; }
+  #game-over .result-best { margin-top: 4px; margin-bottom: 6px; }
+  #game-over .result-combo { margin-top: 5px; margin-bottom: 5px; }
+  #game-over .result-impact { margin-bottom: 6px; }
+  #game-over .records-button { margin-top: 8px; }
+}
