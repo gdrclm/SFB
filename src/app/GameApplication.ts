@@ -299,6 +299,7 @@ export class GameApplication {
   public async start(guided = this.#actions.guided === true): Promise<void> {
     this.#gameOverElement.hidden = true;
     this.#comboView = new ComboView(requireMenuElement(this.#interfaceLayerElement, "#combo-panel"));
+    this.#fixedStep.register(this.#comboView);
     this.#comboView.render(this.#combo, this.#config.ball.startFallSpeed, null);
     requireMenuElement(this.#interfaceLayerElement, "#combo-message").textContent = "Разбейте 3 подряд → множитель ×2";
     this.#renderLives();

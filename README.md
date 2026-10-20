@@ -247,3 +247,18 @@ npm run build
 
 `npm run build` обновляет `docs/`; при публикации её следует отправлять вместе
 с исходниками. Сгенерированные файлы сборки исключены из проверки ESLint.
+
+## Compact tutorial, shop and combo feedback
+
+Contextual teaching cards now give one short action and result, keeping their
+matching illustrations. The pause reference uses short pages; navigation stays
+in one row. The store uses compact rows with a small preview, ownership/level,
+price and action. Upgrade effects stay visible; cosmetic descriptions are
+available as tooltips. All categories and reference pages were checked without
+vertical scrolling at 320×568, 390×844 and 844×390.
+
+Combo feedback keeps its text and number sizes, sits higher and uses a translucent
+background. Each hit refreshes a two-second active real-time lifetime; misses
+briefly show the lost-series message. Pausing freezes the lifetime, slow mode
+does not stretch it, and resetting a run hides it. Timed challenge notices use
+a separate overlay so they do not keep the combo panel visible.

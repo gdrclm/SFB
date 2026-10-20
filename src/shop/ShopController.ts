@@ -60,19 +60,21 @@ export class ShopController {
       preview.setAttribute("aria-hidden", "true");
       preview.textContent = item.preview;
       const title = document.createElement("h2"); title.textContent = item.name;
-      const description = document.createElement("p"); description.textContent = item.description;
+      const description = document.createElement("p"); description.className = "shop-item-description"; description.textContent = item.description;
+      description.hidden = item.category !== "upgrade";
+      card.title = item.description;
       const info = document.createElement("p"); info.className = "shop-item-state";
       const action = document.createElement("button"); action.type = "button";
       const level = this.#profile.level(item.id);
       const owned = this.#profile.owns(item.id);
       const maxed = item.maxLevel !== undefined && level >= item.maxLevel;
       const equipped = item.category !== "upgrade" && this.#profile.equipment[item.category] === item.id;
-      info.textContent = item.maxLevel === undefined ? owned ? "Куплено" : "Косметический предмет" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
+      info.textContent = item.maxLevel === undefined ? owned ? "Куплено" : "Не куплено" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
       const price = this.#profile.price(item);
-      action.textContent = maxed ? "Максимальный уровень" : equipped ? "Выбрано" : owned ? "Выбрать"
+      action.textContent = maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
         : `${item.category === "upgrade" ? "Улучшить" : "Купить"} · ${String(price)} ★`;
       action.disabled = maxed || equipped || !this.#profile.storageAvailable || !owned && this.#profile.coins < price;
-      if (!owned && !maxed && this.#profile.coins < price) info.textContent += ` · Не хватает ${String(price - this.#profile.coins)} монет`;
+      if (!owned && !maxed && this.#profile.coins < price) action.title = `Не хватает ${String(price - this.#profile.coins)} монет`;
       action.addEventListener("click", () => {
         const success = owned ? this.#profile.equip(item.id) : this.#profile.buy(item.id);
         this.#render();

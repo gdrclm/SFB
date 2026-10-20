@@ -1,3 +1,4 @@
+import { ComboVisibility } from "./ComboVisibility";
 import { assessRisk, speedMultiplier, type ComboController, type ComboHit } from "./ComboController";
 
 export class ComboView {
@@ -9,9 +10,11 @@ export class ComboView {
   readonly #risk: HTMLElement;
   readonly #message: HTMLElement;
   #animations: Animation[] = [];
+  readonly #visibility = new ComboVisibility();
 
   public constructor(panel: HTMLElement) {
     this.#panel = panel;
+    this.#updateVisibility();
     const element = (selector: string): HTMLElement => {
       const node = panel.querySelector<HTMLElement>(selector);
       if (node === null) throw new Error(`Missing combo element: ${selector}`);
@@ -39,11 +42,15 @@ export class ComboView {
   }
 
   public hit(hit: ComboHit): void {
+    this.#visibility.show();
+    this.#updateVisibility();
     this.#message.textContent = `+${String(hit.points)} ${hit.risky ? "· НА ГРАНИ!" : "· УСПЕШНЫЙ УДАР"}${hit.tierIncreased ? ` · КОМБО ×${String(hit.multiplier)}!` : ""}`;
     this.#animate(false, hit.tierIncreased);
   }
 
   public miss(lost: number): void {
+    this.#visibility.show();
+    this.#updateVisibility();
     this.#message.textContent = lost > 0 ? `Серия ${String(lost)} потеряна · начните новую` : "Ошибка · соберите новую серию";
     this.#animate(true, false);
   }
@@ -63,11 +70,25 @@ export class ComboView {
     ));
   }
 
+  public fixedUpdate(delta: number, realDeltaSeconds = delta): void {
+    this.#visibility.advance(realDeltaSeconds);
+    this.#updateVisibility();
+  }
+
+  #updateVisibility(): void {
+    this.#panel.dataset.visible = String(this.#visibility.visible);
+    this.#panel.setAttribute("aria-hidden", String(!this.#visibility.visible));
+  }
+
   public setPaused(paused: boolean): void {
     for (const animation of this.#animations) {
       if (paused && animation.playState === "running") animation.pause();
       else if (!paused && animation.playState === "paused") animation.play();
     }
   }
-  public dispose(): void { for (const animation of this.#animations) animation.cancel(); }
+  public dispose(): void {
+    for (const animation of this.#animations) animation.cancel();
+    this.#visibility.reset();
+    this.#updateVisibility();
+  }
 }

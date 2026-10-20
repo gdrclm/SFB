@@ -13,8 +13,8 @@ export interface ShopItem {
   readonly preview: string;
 }
 export const SHOP_ITEMS: readonly ShopItem[] = [
-  { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень. До 5 уровней.", price: 25, maxLevel: 5, preview: "ϟ" },
-  { id: "coin-energy", category: "upgrade", name: "Энергия монет", description: "+1 энергии за собранную монету за уровень. До 3 уровней.", price: 40, maxLevel: 3, preview: "★ϟ" },
+  { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень.", price: 25, maxLevel: 5, preview: "ϟ" },
+  { id: "coin-energy", category: "upgrade", name: "Энергия монет", description: "+1 энергии за монету за уровень.", price: 40, maxLevel: 3, preview: "★ϟ" },
   { id: "ball-classic", category: "ball", name: "Классический", description: "Белый шар с голубыми деталями.", price: 0, preview: "●" },
   { id: "ball-gold", category: "ball", name: "Золотой", description: "Тёплое золотое свечение шара.", price: 50, preview: "●" },
   { id: "ball-mint", category: "ball", name: "Мятный", description: "Бирюзовый шар с прохладным свечением.", price: 50, preview: "●" },
@@ -22,9 +22,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: "world-sunset", category: "world", name: "Закат", description: "Персиковый горизонт и фиолетовое небо.", price: 80, preview: "☀" },
   { id: "world-night", category: "world", name: "Лунная ночь", description: "Тёмное звёздное небо.", price: 80, preview: "☾" },
   { id: "props-none", category: "props", name: "Без дополнений", description: "Базовые декорации мира.", price: 0, preview: "—" },
-  { id: "props-lanterns", category: "props", name: "Небесные фонарики", description: "Светящиеся фонарики на фоне. Не влияют на столкновения.", price: 60, preview: "◈" },
+  { id: "props-lanterns", category: "props", name: "Небесные фонарики", description: "Светящиеся фонарики на фоне.", price: 60, preview: "◈" },
   { id: "vfx-none", category: "vfx", name: "Без искр", description: "Обычные эффекты скорости.", price: 0, preview: "—" },
-  { id: "vfx-sparkles", category: "vfx", name: "Золотые искры", description: "Мягкие светящиеся частицы. Учитывают настройку уменьшения движения.", price: 60, preview: "✦" },
+  { id: "vfx-sparkles", category: "vfx", name: "Золотые искры", description: "Мягкие золотые частицы.", price: 60, preview: "✦" },
 ];
 
 type Equipment = Record<Exclude<ShopCategory, "upgrade">, string>;
