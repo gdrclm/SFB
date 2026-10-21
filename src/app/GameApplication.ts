@@ -472,7 +472,7 @@ export class GameApplication {
       this.#gameState,
       this.#wallet,
       this.#config,
-      (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); },
+      (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); if (active) this.#ballVisualController?.react("slow"); },
     );
     this.#slowModeButton = new SlowModeButtonController(
       this.#slowModeButtonElement,
@@ -672,6 +672,7 @@ export class GameApplication {
     const destroyed = this.#successfulHitHandler?.handle(collision) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
+      this.#ballVisualController?.react("break");
       this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
       if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .05 : .03;
       this.#destroyedPlatformCount += 1;
@@ -689,12 +690,13 @@ export class GameApplication {
       this.#haptics.request(collision.platform.kind === "super-heavy" || collision.platform.strengthLevel === "high"
         ? "heavyBreak" : collision.platform.strengthLevel === "low" ? "weakBreak" : "normalBreak");
       if (collision.ballSpeed >= collision.platform.strength * 1.75) this.#haptics.request("powerfulBreak");
-      if (this.#lives.remainingLives > previousLives) { this.#haptics.request("heal"); this.#feel?.heal(); }
+      if (this.#lives.remainingLives > previousLives) { this.#haptics.request("heal"); this.#feel?.heal(); this.#ballVisualController?.react("heal"); }
       return;
     }
 
     const bounced = this.#unsuccessfulHitHandler?.handle(collision) ?? false;
     if (bounced) {
+      this.#ballVisualController?.react("hurt");
       this.#boostCoach.failedImpact();
       this.#updateMission({ type: "life-lost" });
       this.#combo.miss();
@@ -702,6 +704,7 @@ export class GameApplication {
       this.#comboView?.miss();
       this.#renderLives();
       if (this.#gameState.current === GameState.GameOver) {
+        this.#ballVisualController?.react("defeat");
         this.#emitFailedImpact();
         this.#status.textContent = "Забег завершён · все жизни потеряны";
         this.#pauseButtonElement.disabled = true;
@@ -739,6 +742,7 @@ export class GameApplication {
   };
 
   readonly #handleCoinCollected = (coin: CoinController): void => {
+    this.#ballVisualController?.react("coin");
     this.#contextGuide?.completed("coin");
     this.#feel?.coin(coin.mesh.position);
     this.#updateMission({ type: "coin" });
@@ -751,6 +755,7 @@ export class GameApplication {
 
   #applyDestroyedPlatformEffect(platform: PlatformController): string {
     if (platform.kind === "vitality") {
+      this.#ballVisualController?.react("heal");
       const restoredLives = this.#lives.restoreLives(
         this.#config.platformEffects.vitalityLives,
       );
@@ -1068,6 +1073,7 @@ export class GameApplication {
     const secondsToImpact = nearest === null ? Infinity : Math.max(0, ball.position.y - this.#config.ball.radius - nearest.mesh.position.y - nearest.size.height / 2) / Math.max(.001, closingSpeed);
     const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;
     for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
+    this.#ballVisualController?.setDanger(nearest?.approachState === "danger");
     requireMenuElement(this.#interfaceLayerElement, "#speed-panel").dataset.warning = String(nearest?.approachState === "danger");
     const opportunity = nearest?.approachState === "boost";
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach p").textContent = this.#boostController?.hasCharge ? "Используй BOOST или обойди." : `${String(this.#config.boost.comboHitsRequired)} пробитий подряд заряжают BOOST.`;

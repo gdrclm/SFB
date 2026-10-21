@@ -30,6 +30,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   readonly #config: GameConfig["successfulHit"];
   readonly #platformBreaks = new Set<PlatformBreakState>();
   readonly #ballBaseScale: Vector3;
+  readonly #avatarManaged: boolean;
   #ballReactionElapsedSeconds: number | null = null;
   #cameraReactionElapsedSeconds: number | null = null;
   #cameraBasePosition: Vector3;
@@ -37,6 +38,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
 
   public constructor(ball: AbstractMesh, camera: Camera, config: GameConfig) {
     this.#ball = ball;
+    this.#avatarManaged = (ball.metadata as { avatarManaged?: boolean } | null)?.avatarManaged === true;
     this.#camera = camera;
     this.#config = config.successfulHit;
     this.#ballBaseScale = ball.scaling.clone();
@@ -49,6 +51,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   }
 
   public playBallReaction(): void {
+    if (this.#avatarManaged) return;
     this.#ball.scaling.copyFrom(this.#ballBaseScale);
     this.#ballReactionElapsedSeconds = 0;
   }
@@ -68,7 +71,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   public dispose(): void {
     for (const state of this.#platformBreaks) state.platform.renderBreak(1);
     this.#platformBreaks.clear();
-    this.#ball.scaling.copyFrom(this.#ballBaseScale);
+    if (!this.#avatarManaged) this.#ball.scaling.copyFrom(this.#ballBaseScale);
     this.#camera.position.copyFrom(this.#cameraBasePosition);
     this.#ballReactionElapsedSeconds = null;
     this.#cameraReactionElapsedSeconds = null;

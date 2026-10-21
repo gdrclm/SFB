@@ -1,3 +1,5 @@
+import { ToonBallMaterial } from "./ToonBallMaterial";
+import { createBallFace } from "./BallFace";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -11,7 +13,7 @@ export function createBallMesh(scene: Scene, config: GameConfig): Mesh {
     "Ball",
     {
       diameter: config.ball.radius * 2,
-      segments: 24,
+      segments: 32,
     },
     scene,
   );
@@ -28,6 +30,7 @@ export function createBallMesh(scene: Scene, config: GameConfig): Mesh {
   );
   material.specularColor = new Color3(0.18, 0.18, 0.18);
   material.specularPower = 24;
+  new ToonBallMaterial(material);
   ball.material = material;
   ball.renderOutline = true;
   ball.outlineColor = new Color3(
@@ -58,44 +61,28 @@ export function createBallMesh(scene: Scene, config: GameConfig): Mesh {
     scene,
   );
   cap.parent = ball;
-  cap.position.set(0, config.ball.radius * 0.7, -config.ball.radius * 0.56);
-  cap.rotation.x = Math.PI / 2;
+  cap.position.set(0, config.ball.radius * 0.84, -config.ball.radius * 0.22);
+  cap.rotation.x = .25;
   cap.material = blueMaterial;
   cap.isPickable = false;
 
   const lowerBand = MeshBuilder.CreateTorus(
     "BallLowerBand",
     {
-      diameter: config.ball.radius * 1.7,
+      diameter: config.ball.radius * 1.82,
       thickness: config.ball.radius * 0.12,
       tessellation: 32,
     },
     scene,
   );
   lowerBand.parent = ball;
-  lowerBand.position.set(0, -config.ball.radius * 0.42, -config.ball.radius * 0.84);
-  lowerBand.rotation.x = Math.PI / 2;
-  lowerBand.scaling.y = 0.24;
+  lowerBand.position.set(0, -config.ball.radius * 0.45, 0);
+  lowerBand.rotation.x = .06;
+
   lowerBand.material = blueMaterial;
   lowerBand.isPickable = false;
 
-  for (const direction of [-1, 1]) {
-    const eye = MeshBuilder.CreateSphere(
-      direction < 0 ? "BallEyeLeft" : "BallEyeRight",
-      { diameter: config.ball.radius * 0.22, segments: 12 },
-      scene,
-    );
-    eye.parent = ball;
-    eye.position.set(
-      direction * config.ball.radius * 0.34,
-      -config.ball.radius * 0.02,
-      -config.ball.radius * 0.95,
-    );
-    eye.scaling.y = 1.55;
-    eye.scaling.x = 0.72;
-    eye.material = darkMaterial;
-    eye.isPickable = false;
-  }
+  createBallFace(ball, config.ball.radius, darkMaterial, scene);
 
   return ball;
 }

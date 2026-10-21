@@ -21,6 +21,7 @@ export class UnsuccessfulHitEffects
   readonly #camera: Camera;
   readonly #config: GameConfig["unsuccessfulHit"];
   readonly #ballBaseScale: Vector3;
+  readonly #avatarManaged: boolean;
   #platform: AbstractMesh | null = null;
   #platformBaseVisibility = 1;
   #cameraBasePosition: Vector3;
@@ -28,13 +29,14 @@ export class UnsuccessfulHitEffects
 
   public constructor(ball: AbstractMesh, camera: Camera, config: GameConfig) {
     this.#ball = ball;
+    this.#avatarManaged = (ball.metadata as { avatarManaged?: boolean } | null)?.avatarManaged === true;
     this.#camera = camera;
     this.#config = config.unsuccessfulHit;
     this.#ballBaseScale = ball.scaling.clone();
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playErrorReaction(platform: PlatformController): void {
+  public playErrorReaction(platform: Pick<PlatformController, "mesh">): void {
     this.#resetVisuals();
     this.#platform = platform.mesh;
     this.#platformBaseVisibility = platform.mesh.visibility;
@@ -53,7 +55,7 @@ export class UnsuccessfulHitEffects
       progress <= 0.22 ? progress / 0.22 : 1 - (progress - 0.22) / 0.78;
     const verticalScale = lerp(1, this.#config.ballSquash, squashProgress);
     const horizontalScale = 1 / Math.sqrt(verticalScale);
-    this.#ball.scaling.set(
+    if (!this.#avatarManaged) this.#ball.scaling.set(
       this.#ballBaseScale.x * horizontalScale,
       this.#ballBaseScale.y * verticalScale,
       this.#ballBaseScale.z * horizontalScale,
@@ -87,7 +89,7 @@ export class UnsuccessfulHitEffects
   }
 
   #resetVisuals(): void {
-    this.#ball.scaling.copyFrom(this.#ballBaseScale);
+    if (!this.#avatarManaged) this.#ball.scaling.copyFrom(this.#ballBaseScale);
     this.#camera.position.copyFrom(this.#cameraBasePosition);
     if (this.#platform !== null) {
       this.#platform.visibility = this.#platformBaseVisibility;

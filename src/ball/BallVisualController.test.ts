@@ -2,6 +2,10 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { TrailMesh } from "@babylonjs/core/Meshes/trailMesh";
 import { Scene } from "@babylonjs/core/scene";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { SuccessfulHitEffects } from "../effects/SuccessfulHitEffects";
+import { UnsuccessfulHitEffects } from "../effects/UnsuccessfulHitEffects";
 import { describe, expect, it } from "vitest";
 import type { SuccessfulBoostResult } from "../boost/BoostController";
 import { gameConfig } from "../config/gameConfig";
@@ -30,6 +34,38 @@ function updateFor(controller: BallVisualController, seconds: number): void {
 }
 
 describe("BallVisualController", () => {
+  it("reacts to contact during BOOST while keeping the focused boost expression", () => {
+    const contact = createFixture(), free = createFixture();
+    const boost = { success: true, previousSpeed: 10, currentSpeed: 15, energyCost: 1 } as const;
+    for (const fixture of [contact, free]) { fixture.controller.playBoostReaction(boost); updateFor(fixture.controller, .1); }
+    contact.controller.react("break");
+    for (const fixture of [contact, free]) updateFor(fixture.controller, .06);
+    expect(contact.ball.scaling.y).toBeLessThan(free.ball.scaling.y);
+    expect(contact.ball.metadata).toMatchObject({ expression: "boost" });
+    for (const fixture of [contact, free]) { fixture.controller.dispose(); fixture.scene.dispose(); fixture.engine.dispose(); }
+  });
+
+  it("owns squash so legacy collision effects cannot overwrite the avatar pose", () => {
+    const { engine, scene, ball, motion, controller } = createFixture();
+    const camera = new FreeCamera("camera", new Vector3(0, 0, -10), scene);
+    const success = new SuccessfulHitEffects(ball, camera, gameConfig);
+    const failure = new UnsuccessfulHitEffects(ball, camera, gameConfig);
+    const baseline = { meshes: scene.meshes.length, materials: scene.materials.length };
+    controller.react("hurt"); updateFor(controller, .08);
+    expect(ball.scaling.y).toBeLessThan(1);
+    const pose = ball.scaling.asArray();
+    success.playBallReaction(); success.fixedUpdate(.05);
+    expect(ball.scaling.asArray()).toEqual(pose);
+    failure.playErrorReaction({ mesh: ball }); failure.fixedUpdate(.05);
+    expect(ball.scaling.asArray()).toEqual(pose);
+    updateFor(controller, 1.5);
+    expect(ball.scaling.y).toBeCloseTo(1, 5);
+    for (let i = 0; i < 30; i++) { controller.react("coin"); controller.fixedUpdate(1 / 60); }
+    expect({ meshes: scene.meshes.length, materials: scene.materials.length }).toEqual(baseline);
+    expect(motion.fallSpeed).toBe(gameConfig.ball.startFallSpeed);
+    success.dispose(); failure.dispose(); controller.dispose(); scene.dispose(); engine.dispose();
+  });
+
   it("creates a softly styled ball with a persistent readable outline", () => {
     const { engine, scene, ball, material } = createFixture();
     const trail = scene.getMeshByName("BallSpeedTrail");
