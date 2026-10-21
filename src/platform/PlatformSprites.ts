@@ -1,7 +1,8 @@
 import atlasUrl from "../assets/platforms/neon-rocks.webp";
 import idleAtlasUrl from "../assets/platforms/neon-idle-12.webp";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
-import { IDLE_ATLAS_SIZE, idleFrame, idlePhase, idleSpriteRect } from "./PlatformIdle";
+import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./PlatformIdle";
+import { PlatformIdleBlend } from "./PlatformIdleBlend";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Material } from "@babylonjs/core/Materials/material";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -33,6 +34,7 @@ function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
   texture.hasAlpha = true;
   texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
   material.diffuseTexture = texture;
+  if (idle) new PlatformIdleBlend(material);
   cache.set(scene, material);
   material.onDisposeObservable.addOnce(() => { cache.delete(scene); });
   return material;
@@ -110,8 +112,11 @@ export class PlatformSprite {
     this.mesh.position.z = -depth / 2 - .025;
   }
   public render(width: number, row: PlatformSpriteRow, elapsed: number): void {
-    const frame = idleFrame(elapsed, this.#phase);
-    if (frame === this.#frame && row === this.#row && width === this.#width) return;
+    const { frame, nextFrame, blend } = idleSample(elapsed, this.#phase);
+    if (frame === this.#frame && row === this.#row && width === this.#width) {
+      (this.mesh.metadata as { blend: number }).blend = blend;
+      return;
+    }
     const rebuild = width !== this.#width || this.#frame < 0;
     this.#frame = frame; this.#row = row; this.#width = width;
     this.mesh.scaling.x = 1 / Math.max(.01, this.#parent.scaling.x);
@@ -119,7 +124,7 @@ export class PlatformSprite {
     // The bright top rim coincides with the top of the unchanged collision box.
     const top = this.#height / 2 + .94;
     applySlices(this.mesh, platformSpriteSlices(width + .6, rect), top, top - 2.4, IDLE_ATLAS_SIZE, rebuild);
-    this.mesh.metadata = { spriteAtlas: "neon-rocks", row, frame, idleFrames: 12 };
+    this.mesh.metadata = { spriteAtlas: "neon-rocks", row, frame, nextFrame, blend, idleFrames: 12 };
   }
 }
 

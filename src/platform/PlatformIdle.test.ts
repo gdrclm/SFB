@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { IDLE_ATLAS_SIZE, IDLE_FRAME_COUNT, advanceIdleTime, idleFrame, idlePhase, idleSpriteRect } from "./PlatformIdle";
+import { IDLE_ATLAS_SIZE, IDLE_FRAME_COUNT, advanceIdleTime, idleFrame, idleSample, idlePhase, idleSpriteRect } from "./PlatformIdle";
 import { platformSpriteSlices } from "./PlatformSpriteLayout";
 
 describe("twelve-frame platform idle", () => {
+  it("interpolates at display rate without changing the one-second loop, including its seam", () => {
+    expect(idleSample(0)).toEqual({ frame: 0, nextFrame: 1, blend: 0 });
+    expect(idleSample(.5 / 12)).toEqual({ frame: 0, nextFrame: 1, blend: .5 });
+    expect(idleSample(11.5 / 12)).toEqual({ frame: 11, nextFrame: 0, blend: .5 });
+    for (let tick = 1; tick <= 60; tick++) {
+      const sample = idleSample(tick / 60);
+      const repeated = idleSample(1 + tick / 60);
+      expect(repeated.frame).toBe(sample.frame);
+      expect(repeated.nextFrame).toBe(sample.nextFrame);
+      expect(repeated.blend).toBeCloseTo(sample.blend);
+    }
+    expect(new Set(Array.from({ length: 60 }, (_, tick) => idleSample(tick / 60).blend.toFixed(2))).size).toBeGreaterThan(1);
+  });
+
   it("keeps all FX frames playing in reduced motion and freezes only while paused", () => {
     for (const reduced of [false, true]) {
       let elapsed = 0;

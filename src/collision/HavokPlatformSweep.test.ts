@@ -57,6 +57,12 @@ describe("HavokPlatformSweep", () => {
     expect(poses.size).toBe(12);
     platform.setApproachFeedback(null, .42);
     const pausedUVs = Array.from(sprite.getVerticesData(VertexBuffer.UVKind) ?? []);
+    const startBlend = (sprite.metadata as { blend: number }).blend;
+    platform.setApproachFeedback(null, .421);
+    expect((sprite.metadata as { blend: number }).blend).toBeGreaterThan(startBlend);
+    expect(Array.from(sprite.getVerticesData(VertexBuffer.UVKind) ?? [])).toEqual(pausedUVs);
+    expect(Array.from(sprite.getVerticesData(VertexBuffer.PositionKind) ?? [])).toEqual(positions);
+    platform.setApproachFeedback(null, .42);
     for (let i = 0; i < 20; i++) platform.setApproachFeedback(null, .42);
     expect(Array.from(sprite.getVerticesData(VertexBuffer.UVKind) ?? [])).toEqual(pausedUVs);
     platform.setApproachFeedback(null, 0);

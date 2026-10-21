@@ -19,6 +19,15 @@ export function idleFrame(elapsed: number, phase = 0): number {
   return Math.floor(((cycles % 1 + 1) % 1) * IDLE_FRAME_COUNT + 1e-8) % IDLE_FRAME_COUNT;
 }
 
+export function idleSample(elapsed: number, phase = 0): { frame: number; nextFrame: number; blend: number } {
+  const frame = idleFrame(elapsed, phase);
+  if (!Number.isFinite(elapsed) || elapsed <= 0) return { frame, nextFrame: 1, blend: 0 };
+  const position = ((elapsed * IDLE_FPS + phase * IDLE_FRAME_COUNT) % IDLE_FRAME_COUNT + IDLE_FRAME_COUNT) % IDLE_FRAME_COUNT;
+  // Snap floating point noise at exact frame boundaries, including 11 -> 0.
+  const fraction = position - Math.floor(position);
+  return { frame, nextFrame: (frame + 1) % IDLE_FRAME_COUNT, blend: fraction > 1 - 1e-8 ? 0 : fraction };
+}
+
 export function idlePhase(id: string): number {
   let hash = 0;
   for (const character of id) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) >>> 0;
