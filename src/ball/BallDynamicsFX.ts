@@ -1,3 +1,4 @@
+import { getRenderQuality } from "../rendering/AdaptiveQuality";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -150,6 +151,7 @@ export class BallDynamicsFX {
   }
 
   #emit(pool: Particle[], count: number, follow: boolean, life: number): void {
+    if (getRenderQuality(this.#ball.getScene().getEngine()) === "low") count = Math.min(count, 3);
     for (let i = 0; i < count; i++) {
       const cursor = follow ? this.#starCursor++ : this.#shardCursor++;
       const particle = pool[cursor % pool.length]; if (!particle) continue;
@@ -170,6 +172,7 @@ export class BallDynamicsFX {
   public update(delta: number, motion: BallFXMotion): void {
     this.#time += delta; this.#impactAge += delta; this.#hurtAge += delta; this.#coinAge += delta;
     const r = this.#radius, t = this.#time;
+    const low = getRenderQuality(this.#ball.getScene().getEngine()) === "low";
     this.#root.position.copyFrom(this.#ball.position);
     this.#root.rotation.z = this.#ball.rotation.z * .8;
     const smooth = 1 - Math.exp(-16 * delta);
@@ -180,8 +183,10 @@ export class BallDynamicsFX {
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;
     const windTarget = motion.slow ? 0 : Math.max(speedPower > 0 ? .18 + speedPower * .82 : 0, burst);
     this.#windAmount += (windTarget - this.#windAmount) * smooth;
+    if (arcTarget === 0 && this.#arcAmount < .001) this.#arcAmount = 0;
     this.#arcs.forEach((arc, i) => {
-      arc.visibility = this.#arcAmount * (this.#reduced ? .18 : i >= 2 && !motion.slow ? .4 : 1);
+      arc.visibility = low && i >= 2 && !motion.slow ? 0 : this.#arcAmount * (this.#reduced ? .18 : i >= 2 && !motion.slow ? .4 : 1);
+      if (arc.visibility === 0) return;
       arc.rotation.z = (this.#reduced ? 0 : t * (motion.slow ? .7 : 1.8) * (i % 2 ? -1 : 1)) + i * 1.6 + motion.look * .6;
       arc.rotation.x = motion.slow ? .55 + i * .15 : .1;
       arc.rotation.y = motion.slow ? .3 : motion.look * .4;
@@ -190,20 +195,23 @@ export class BallDynamicsFX {
     this.#wind.forEach((wind, i) => {
       const flame = clamp(speedPower * 1.5 - .2 + burst), pair = Math.floor((i - 3) / 2);
       const density = clamp(speedPower * 5 - pair + .2 + burst * 2);
-      wind.visibility = this.#reduced ? 0 : this.#windAmount * (i < 3 ? .12 * flame : density);
+      wind.visibility = this.#reduced || low && i >= 9 ? 0 : this.#windAmount * (i < 3 ? .12 * flame : density);
+      if (wind.visibility === 0) return;
       const crossSection = 1 / Math.sqrt(1 + speedPower * 2);
       wind.position.x = i < 3 ? (i - 1) * r * .3 : (i % 2 ? -1 : 1) * r * (.85 * crossSection + pair * .19);
       wind.position.y = r * ((t * (3 + speedPower * 7 + i * .2) + i * .17) % 1);
       wind.scaling.set(i < 3 ? .65 + this.#windAmount * .9 : .8 + speedPower * 2, 1 + speedPower * 2.7 + burst * .4, 1);
     });
     this.#dots.forEach((dot, i) => {
+      dot.visibility = motion.slow && (!low || i % 2 === 0) ? .85 : 0;
+      if (dot.visibility === 0) return;
       const a = (this.#reduced ? 0 : t * .8) + i / 8 * Math.PI * 2;
-      dot.visibility = motion.slow ? .85 : 0;
       dot.position.set(Math.cos(a) * r * 1.5, Math.sin(a) * r * 1.25, Math.sin(a) * r * .6);
     });
     this.#drops.forEach((drop, i) => {
+      if (!motion.danger || this.#reduced) { drop.visibility = 0; return; }
       const p = (t * 1.4 + i * .25) % 1;
-      drop.visibility = motion.danger && !this.#reduced ? Math.sin(p * Math.PI) * .8 : 0;
+      drop.visibility = Math.sin(p * Math.PI) * .8;
       drop.position.set((i % 2 ? -1 : 1) * r * (1.1 + p * .25), r * (.6 - p * .9), -r * .15);
     });
     const flash = clamp(this.#impactAge / .16);

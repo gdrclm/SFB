@@ -1,3 +1,4 @@
+import { getRenderQuality } from "../rendering/AdaptiveQuality";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { getGameSounds } from "./GameSounds";
@@ -25,14 +26,14 @@ export class GameFeel {
     return { x: point.x / w * bounds.width, y: point.y / h * bounds.height };
   }
   #animate(element: HTMLElement, frames: Keyframe[], duration: number, transient = true): void {
-    if (this.#animations.size >= 40) { if (transient) element.remove(); return; }
+    if (this.#animations.size >= (getRenderQuality(this.#scene.getEngine()) === "low" ? 8 : 24)) { if (transient) element.remove(); return; }
     const animation = element.animate(frames, { duration, easing: "ease-out" });
     this.#animations.set(animation, transient ? element : null);
     animation.onfinish = () => { this.#animations.delete(animation); if (transient) element.remove(); };
     if (this.#paused) animation.pause();
   }
   #particle(position: { x: number; y: number }, kind: string, frames: Keyframe[], duration: number): void {
-    if (this.#animations.size >= 40) return;
+    if (this.#animations.size >= (getRenderQuality(this.#scene.getEngine()) === "low" ? 8 : 24)) return;
     const node = document.createElement("i"); node.className = `feel-${kind}`;
     node.style.left = `${String(position.x)}px`; node.style.top = `${String(position.y)}px`;
     this.#root.append(node); this.#animate(node, frames, duration);
@@ -83,7 +84,7 @@ export class GameFeel {
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
       { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
-    if (this.#reduced) return;
+    if (this.#reduced || getRenderQuality(this.#scene.getEngine()) === "low") return;
     for (let i = 0; i < (heavy ? 5 : 3); i++) {
       const angle = i * 2.4;
       this.#particle(point, "spark", [{ opacity: 1, transform: "scale(1)" },

@@ -2365,3 +2365,14 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
   font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer;
 }
 .reset-data-actions button:focus-visible, #reset-data-button:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }
+
+/* Preserve the white/cyan speed cue while reducing mobile filter layers. */
+html[data-quality="medium"] .speed-streaks i,
+html[data-quality="medium"] .speed-streaks i::after,
+html[data-quality="low"] .speed-streaks i,
+html[data-quality="low"] .speed-streaks i::after { filter: none; }
+html[data-quality="low"] .speed-streaks i:nth-child(n+13),
+html[data-quality="low"] .atmosphere-particles { display: none; }
+html[data-quality="low"] #pause-menu,
+html[data-quality="low"] #game-over,
+html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }

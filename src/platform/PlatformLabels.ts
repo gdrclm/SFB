@@ -42,6 +42,7 @@ export class PlatformLabels {
       label.hidden = !visible || !numbers && approachSymbol(platform.approachState) === "";
       if (!visible) continue;
       this.#visible.push(platform);
+      if (label.hidden) continue;
       const state = platform.approachState;
       label.textContent = numbers ? String(platform.strength) : approachSymbol(state);
       label.dataset.kind = platform.kind;

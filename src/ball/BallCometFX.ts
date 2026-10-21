@@ -53,7 +53,7 @@ void main() {
   // Fade the outer boundary of the quad, even during the strongest boost.
   float edge = smoothstep(0.0,.2,vUV.y)*(1.0-smoothstep(.9,1.0,vUV.y))
     *smoothstep(0.0,.18,vUV.x)*(1.0-smoothstep(.82,1.0,vUV.x));
-  gl_FragColor = vec4(light*strength*edge, 1.0);
+  gl_FragColor = vec4(light*strength*edge*2.0, 1.0);
 }
 `;
 
@@ -62,7 +62,7 @@ export class BallCometFX {
   readonly #mesh: Mesh;
   readonly #material: ShaderMaterial;
   public constructor(scene: Scene, root: TransformNode, radius: number) {
-    this.#mesh = MeshBuilder.CreatePlane("BallFXComet", { width: radius*4.8, height: radius*11, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    this.#mesh = MeshBuilder.CreatePlane("BallFXComet", { width: radius*4.8, height: radius*11, sideOrientation: Mesh.FRONTSIDE }, scene);
     this.#mesh.parent = root;
     this.#mesh.position.set(0, radius*4, radius*.3);
     this.#mesh.isPickable = false;

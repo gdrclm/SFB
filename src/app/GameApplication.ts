@@ -1,3 +1,4 @@
+import type { AdaptiveQuality } from "../rendering/AdaptiveQuality";
 import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
@@ -177,6 +178,10 @@ export class GameApplication {
   );
 
   #engine: AbstractEngine | null = null;
+  #quality: AdaptiveQuality | null = null;
+  #lastCurrencyKey = "";
+  #lastHudTime = -Infinity;
+  #lastOverlayTime = -Infinity;
   #scene: Scene | null = null;
   #horizontalInput: PointerHorizontalInput | null = null;
   #ballController: BallController | null = null;
@@ -307,9 +312,10 @@ export class GameApplication {
     this.#renderLives();
     this.#renderCurrency();
     if (this.#mainScene === null) {
-      const { engine, renderer } = await createEngine(this.#canvas);
+      const { engine, renderer, quality } = await createEngine(this.#canvas);
       if (this.#hasBeenDisposed()) { engine.dispose(); return; }
       this.#engine = engine;
+      this.#quality = quality;
       this.#renderer = renderer;
       const mainScene = await createMainScene(engine, this.#config, {
         theme: this.#profile.equipment.world,
@@ -515,6 +521,8 @@ export class GameApplication {
     this.#resizeObserver = new ResizeObserver(this.#resize);
     this.#resizeObserver.observe(this.#canvas);
     this.#resize();
+    this.#lastCurrencyKey = "";
+    this.#lastHudTime = -Infinity; this.#lastOverlayTime = -Infinity;
     this.#lastFrameTimeMs = performance.now();
     engine.runRenderLoop(this.#renderFrame);
   }
@@ -612,6 +620,7 @@ export class GameApplication {
   readonly #renderFrame = (): void => {
     const nowMs = performance.now();
     const realDeltaSeconds = (nowMs - this.#lastFrameTimeMs) / 1_000;
+    if (document.hidden) { this.#lastFrameTimeMs = nowMs; this.#quality?.update(0, false); this.#feel?.setPaused(true); return; }
     let isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     const timeScale = isPaused
       ? 1
@@ -622,37 +631,41 @@ export class GameApplication {
     }
     isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     this.#lastFrameTimeMs = nowMs;
-    this.#boostButton?.render();
-    this.#slowModeButton?.render();
-    this.#renderCurrency();
-    this.#renderTelemetry();
-    this.#speedFeedback?.render(
-      this.#ballController?.fallSpeed ?? 0,
-      isPaused || this.#gameState.current === GameState.GameOver,
-    );
-    const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver || document.hidden;
+    this.#quality?.update(realDeltaSeconds, !isPaused && this.#gameState.current !== GameState.GameOver);
+    const updateHud = nowMs - this.#lastHudTime >= 1000 / 15;
+    if (updateHud) {
+      this.#lastHudTime = nowMs;
+      if (!isPaused) {
+        this.#boostButton?.render(); this.#slowModeButton?.render();
+        this.#renderCurrency(); this.#renderTelemetry();
+      }
+      this.#speedFeedback?.render(this.#ballController?.fallSpeed ?? 0, isPaused || this.#gameState.current === GameState.GameOver);
+    }
+    const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
     this.#elapsedPlatformSeconds = advanceIdleTime(this.#elapsedPlatformSeconds, realDeltaSeconds, platformAnimationPaused, this.#reducedMotion);
-    this.#renderCombo(isPaused || this.#gameState.current === GameState.GameOver);
-    this.#feel?.setPaused(isPaused || document.hidden || !document.hasFocus());
+    if (isPaused) this.#comboView?.setPaused(true);
+    else this.#renderCombo(this.#gameState.current === GameState.GameOver, updateHud);
+    this.#feel?.setPaused(isPaused || !document.hasFocus());
     const hideNotices = isPaused || this.#gameState.current === GameState.GameOver;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || !this.#boostCoach.visible;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
-    if (isPaused) {
-      this.#renderPauseSummary();
-    }
     this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
-    this.#scene?.render();
-    this.#contextGuide?.layout();
-    this.#platformLabels?.render();
-    for (const platform of this.#platformLabels?.visiblePlatforms ?? []) {
+    if (!isPaused || updateHud) this.#scene?.render();
+    if (nowMs - this.#lastOverlayTime >= 1000 / 30) {
+      this.#lastOverlayTime = nowMs;
+      this.#contextGuide?.layout();
+      this.#platformLabels?.render();
+    }
+    if (updateHud && this.#opening !== null) for (const platform of this.#platformLabels?.visiblePlatforms ?? []) {
       this.#guideStrengths = [platform.strength];
-      this.#opening?.platformAppeared(platform.kind);
+      this.#opening.platformAppeared(platform.kind);
     }
   };
 
   readonly #resize = (): void => {
-    this.#engine?.resize(true);
+    this.#quality?.resize();
+    this.#engine?.resize();
     const height = this.#canvas.getBoundingClientRect().height;
     if (height > 0) {
       const top = this.#livesElement.getBoundingClientRect().bottom + 12;
@@ -825,6 +838,9 @@ export class GameApplication {
   }
 
   #renderCurrency(): void {
+    const key = `${String(this.#wallet.coins)}|${String(this.#wallet.energy)}|${String(this.#boostController?.energyCost)}|${String(this.#slowModeController?.isActive)}`;
+    if (key === this.#lastCurrencyKey) return;
+    this.#lastCurrencyKey = key;
     const energy = formatEnergy(this.#wallet.energy);
     this.#coinCountElement.textContent = String(this.#wallet.coins);
     this.#coinCountElement.style.fontSize = this.#wallet.coins >= 1000 ? "14px" : this.#wallet.coins >= 100 ? "18px" : "24px";
@@ -1064,7 +1080,7 @@ export class GameApplication {
     });
   }
 
-  #renderCombo(paused: boolean): void {
+  #renderCombo(paused: boolean, updateHud = true): void {
     const ball = this.#ballController;
     if (ball === null) return;
     const platforms = this.#platformPool?.platforms ?? [];
@@ -1075,6 +1091,7 @@ export class GameApplication {
     const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;
     for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
     this.#ballVisualController?.setDanger(nearest?.approachState === "danger");
+    if (!updateHud) return;
     requireMenuElement(this.#interfaceLayerElement, "#speed-panel").dataset.warning = String(nearest?.approachState === "danger");
     const opportunity = nearest?.approachState === "boost";
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach p").textContent = this.#boostController?.hasCharge ? "Используй BOOST или обойди." : `${String(this.#config.boost.comboHitsRequired)} пробитий подряд заряжают BOOST.`;
@@ -1096,6 +1113,8 @@ export class GameApplication {
   readonly #dismissBoostCoach = (): void => { this.#boostCoach.dismiss(); };
 
   readonly #cancelHiddenCelebration = (): void => {
+    this.#lastFrameTimeMs = performance.now();
+    this.#quality?.update(0, false);
     if ((document.hidden || !document.hasFocus()) && this.#recordHapticTimer !== null) {
       clearTimeout(this.#recordHapticTimer);
       this.#recordHapticTimer = null;
