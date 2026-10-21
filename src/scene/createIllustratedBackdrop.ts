@@ -1,5 +1,6 @@
-import skyUrl from "../assets/worlds/sky-islands.webp";
-import crystalUrl from "../assets/worlds/neon-crystal.webp";
+import crystalUrl from "../assets/worlds/neon-crystal-distance.webp";
+import skyDistanceUrl from "../assets/worlds/sky-islands-distance.webp";
+import { BackdropScenery } from "./BackdropScenery";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
@@ -13,6 +14,10 @@ import type { WorldAppearance } from "./createPhaseOneBackdrop";
 export function preloadCrystalBackdrop(): void {
   const image = new Image();
   image.src = crystalUrl;
+  // Warm only the next location; retain no decoded canvas copies in game memory.
+  for (const url of Object.values(import.meta.glob<string>("../assets/worlds/neon-crystal-card-*.webp", { eager: true, query: "?url", import: "default" }))) {
+    const card = new Image(); card.src = url;
+  }
 }
 
 export function createIllustratedBackdrop(
@@ -22,7 +27,7 @@ export function createIllustratedBackdrop(
   location: "sky" | "crystal",
 ): Mesh {
   const prefix = location === "sky" ? "Sky" : "Crystal";
-  const url = location === "sky" ? skyUrl : crystalUrl;
+  const url = location === "sky" ? skyDistanceUrl : crystalUrl;
   const material = new StandardMaterial(`${prefix}BackdropMaterial`, scene);
   material.disableLighting = true;
   material.specularColor = Color3.Black();
@@ -40,7 +45,7 @@ export function createIllustratedBackdrop(
   material.diffuseTexture = texture;
   const mesh = MeshBuilder.CreatePlane(`${prefix}Backdrop`, { width: 28, height: 42 }, scene);
   mesh.parent = rig; mesh.position.z = 6; mesh.isPickable = false; mesh.material = material;
-  mesh.metadata = { location, imageAspect: 941 / 1672 };
+  mesh.metadata = { location, scenery: new BackdropScenery(scene, mesh, location) };
   if (appearance.lanterns === true) addLanterns(scene, mesh, prefix);
   return mesh;
 }

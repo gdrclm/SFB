@@ -1,9 +1,10 @@
-import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { preloadCrystalBackdrop } from "./createIllustratedBackdrop";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { BackdropScenery } from "./BackdropScenery";
+import { pageProgress } from "./BackdropMotion";
 import { DepthLocations, type DepthLocation } from "./DepthLocations";
 import { createPhaseOneBackdrop, type WorldAppearance } from "./createPhaseOneBackdrop";
 
@@ -16,11 +17,15 @@ export class DepthBackdrop {
   #currentLocation: DepthLocation = "sky";
   #current: Mesh;
   #next: Mesh | null = null;
+  #elapsed = 0;
   #blend = 0;
+  #travel = 0;
+  #previousCameraY: number;
   readonly #reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, rig: TransformNode, appearance: WorldAppearance) {
     this.#scene = scene; this.#rig = rig; this.#appearance = appearance;
+    this.#previousCameraY = rig.position.y;
     this.#current = createPhaseOneBackdrop(scene, rig, appearance);
     preloadCrystalBackdrop();
   }
@@ -30,44 +35,43 @@ export class DepthBackdrop {
   }
   public update(depth: number, realSeconds: number): void {
     const location = this.#locations.observe(depth);
-    if (location !== this.#location) {
-      this.#next?.dispose(false, true);
+    // Finish an in-flight page before starting the next, including very fast runs.
+    if (location !== this.#location && this.#next === null) {
       this.#next = createPhaseOneBackdrop(this.#scene, this.#rig, this.#appearance, location);
-      this.#next.position.z = 5.95;
-      this.#blend = 0;
-      (this.#next.material as StandardMaterial).alpha = 0;
-      this.#location = location;
-    }
-    if (this.#next !== null && (this.#next.material as StandardMaterial).diffuseTexture?.isReady() !== false) {
-      this.#blend = this.#reduced ? 1 : Math.min(1, this.#blend + realSeconds / 2);
-      (this.#next.material as StandardMaterial).alpha = this.#blend;
-      if (this.#blend >= 1) {
-        this.#current.dispose(false, true);
-        this.#current = this.#next; this.#next = null;
-        this.#currentLocation = this.#location;
-        this.#current.position.z = 6;
-      }
+      this.#elapsed = 0; this.#blend = 0; this.#location = location;
+      this.#next.setEnabled(false);
     }
     const camera = this.#scene.activeCamera;
-    if (camera !== null) {
-      const width = (camera.orthoRight ?? 14) - (camera.orthoLeft ?? -14);
-      const height = (camera.orthoTop ?? 21) - (camera.orthoBottom ?? -21);
-      // Fit both axes: a portrait crop must not hide the location's side silhouettes.
-      this.#current.scaling.set(width / 28 * 1.04, height / 42 * 1.04, 1);
-      this.#next?.scaling.copyFrom(this.#current.scaling);
-      this.#fitImage(this.#current, width / height);
-      if (this.#next !== null) this.#fitImage(this.#next, width / height);
+    const width = (camera?.orthoRight ?? 14) - (camera?.orthoLeft ?? -14);
+    const height = (camera?.orthoTop ?? 21) - (camera?.orthoBottom ?? -21);
+    if (realSeconds > 0) this.#travel += (this.#previousCameraY - this.#rig.position.y) * 42 / height;
+    this.#previousCameraY = this.#rig.position.y;
+    const ready = this.#next !== null && this.#isReady(this.#next);
+    if (ready && this.#next !== null) {
+      this.#next.setEnabled(true);
+      this.#elapsed += Math.max(0, realSeconds);
+      this.#blend = this.#reduced ? 1 : pageProgress(this.#elapsed);
+    }
+    this.#place(this.#current, width, height, this.#blend * height);
+    if (this.#next !== null) this.#place(this.#next, width, height, (this.#blend - 1) * height);
+    if (ready && this.#blend >= 1 && this.#next !== null) {
+      this.#current.dispose(false, true);
+      this.#current = this.#next; this.#next = null;
+      this.#currentLocation = this.#location;
+      this.#current.position.y = 0; this.#blend = 0;
     }
   }
-  #fitImage(mesh: Mesh, viewAspect: number): void {
-    const metadata = mesh.metadata as { imageAspect?: number } | null;
-    const imageAspect = metadata?.imageAspect;
-    const texture = (mesh.material as StandardMaterial).diffuseTexture;
-    if (imageAspect === undefined || !(texture instanceof Texture)) return;
-    texture.uScale = Math.min(1, viewAspect / imageAspect);
-    texture.vScale = Math.min(1, imageAspect / viewAspect);
-    texture.uOffset = (1 - texture.uScale) / 2;
-    texture.vOffset = (1 - texture.vScale) / 2;
+  #isReady(mesh: Mesh): boolean {
+    return (mesh.material as StandardMaterial).diffuseTexture?.isReady() !== false
+      && this.#scenery(mesh)?.isReady() !== false;
+  }
+  #scenery(mesh: Mesh): BackdropScenery | undefined {
+    return (mesh.metadata as { scenery?: BackdropScenery } | null)?.scenery;
+  }
+  #place(mesh: Mesh, width: number, height: number, offset: number): void {
+    mesh.scaling.set(width / 28, height / 42, 1);
+    mesh.position.y = offset;
+    this.#scenery(mesh)?.update(this.#travel, this.#rig.position.x, this.#rig.position.y + offset, height, this.#reduced);
   }
   public dispose(): void { this.#next?.dispose(false, true); this.#current.dispose(false, true); }
 }
