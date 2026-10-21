@@ -199,7 +199,7 @@ export const gameConfig: GameConfig = Object.freeze({
     baseOutlineColor: Object.freeze({ r: 0.02, g: 0.6, b: 1 }),
     phaseOutlineColor: Object.freeze({ r: 0.02, g: 0.08, b: 0.28 }),
     speedEffectRange: 30,
-    maximumMovementStretch: 1.22,
+    maximumMovementStretch: 3,
     boostStretch: 0.68,
     boostDurationSeconds: 0.38,
     scaleSharpness: 18,

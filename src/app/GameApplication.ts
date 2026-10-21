@@ -472,7 +472,7 @@ export class GameApplication {
       this.#gameState,
       this.#wallet,
       this.#config,
-      (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); if (active) this.#ballVisualController?.react("slow"); },
+      (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); this.#ballVisualController?.setSlow(active); if (active) this.#ballVisualController?.react("slow"); },
     );
     this.#slowModeButton = new SlowModeButtonController(
       this.#slowModeButtonElement,

@@ -34,6 +34,21 @@ function updateFor(controller: BallVisualController, seconds: number): void {
 }
 
 describe("BallVisualController", () => {
+  it("continues stretching through later speed doublings and relaxes after slowing down", () => {
+    const { engine, scene, ball, motion, controller } = createFixture();
+    let height = 1;
+    for (const speed of [20, 40, 80, 160, 320]) {
+      motion.fallSpeed = speed; updateFor(controller, 1.5);
+      expect(ball.scaling.y).toBeGreaterThan(height + .3);
+      expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 8);
+      height = ball.scaling.y;
+    }
+    expect(height).toBeGreaterThan(2.9);
+    motion.fallSpeed = gameConfig.ball.startFallSpeed; updateFor(controller, 2);
+    expect(ball.scaling.y).toBeCloseTo(1, 3);
+    controller.dispose(); scene.dispose(); engine.dispose();
+  });
+
   it("compresses before the boost burst and preserves volume at every intermediate pose", () => {
     const { engine, scene, ball, controller } = createFixture();
     controller.playBoostReaction({ success: true, previousSpeed: 10, currentSpeed: 15, energyCost: 1 });

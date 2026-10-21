@@ -3,7 +3,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TrailMesh } from "@babylonjs/core/Meshes/trailMesh";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { BallDynamicsFX } from "./BallDynamicsFX";
+import { speedVisualPower } from "./BallSpeedVisuals";
 import { BallExpressionState, type BallExpression } from "./BallExpression";
 import { getBallFace } from "./BallFace";
 import type { SuccessfulBoostResult } from "../boost/BoostController";
@@ -47,15 +48,15 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #baseOutlineColor: Color3;
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;
+  #stretchIntensity = 0;
   #trailIntensity = 0;
   #phaseTransitionTarget = 0;
   #phaseTransitionBlend = 0;
   #boostElapsedSeconds: number | null = null;
   #boostStrength = 0;
   readonly #expression = new BallExpressionState();
-  readonly #pulse: Mesh;
-  readonly #pulseMaterial: StandardMaterial;
-  #pulseElapsed = 1;
+  readonly #fx: BallDynamicsFX;
+  #slowActive = false;
   #impactElapsed = 1;
   #impactKind: "hurt" | "break" = "break";
   #danger = false;
@@ -94,11 +95,8 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trailMaterial.diffuseColor = Color3.Black();
     this.#trailMaterial.alpha = 0.72;
     this.#trail.material = this.#trailMaterial;
-    this.#pulse = MeshBuilder.CreateTorus("BallReactionRing", { diameter: config.ball.radius * 2.2, thickness: config.ball.radius * .06, tessellation: 32 }, ball.getScene());
-    this.#pulse.parent = ball; this.#pulse.rotation.x = Math.PI / 2; this.#pulse.isPickable = false;
-    this.#pulseMaterial = new StandardMaterial("BallReactionRingMaterial", ball.getScene());
-    this.#pulseMaterial.disableLighting = true; this.#pulseMaterial.emissiveColor = new Color3(.1, .85, 1);
-    this.#pulse.material = this.#pulseMaterial; this.#pulse.visibility = 0;
+    this.#fx = new BallDynamicsFX(ball, config.ball.radius,
+      typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches, config.ball.startFallSpeed);
     this.#applyMaterial(0);
   }
 
@@ -120,18 +118,15 @@ export class BallVisualController implements FixedSimulationSystem {
   }
 
   public react(event: BallExpression): void {
+    this.#fx.trigger(event);
     // Contact still deforms the body while a higher-priority facial pose is held.
     if (event === "hurt" || event === "break") { this.#impactElapsed = 0; this.#impactKind = event; }
     if (!this.#expression.react(event)) return;
     (this.#ball.metadata as { expression: BallExpression }).expression = this.#expression.current;
     getBallFace(this.#ball)?.update(this.#expression.current, event === "defeat" ? .2 : .025, 0, event === "boost");
-    if (event !== "neutral" && event !== "focus") {
-      this.#pulseElapsed = 0;
-      this.#pulseMaterial.emissiveColor.set(event === "hurt" || event === "defeat" ? 1 : event === "coin" ? 1 : .1,
-        event === "hurt" || event === "defeat" ? .12 : event === "coin" ? .75 : 1,
-        event === "hurt" || event === "defeat" ? .2 : event === "coin" ? .12 : event === "heal" ? .45 : 1);
-    }
   }
+
+  public setSlow(active: boolean): void { this.#slowActive = active; }
 
   public setDanger(danger: boolean): void { this.#danger = danger; }
 
@@ -141,16 +136,17 @@ export class BallVisualController implements FixedSimulationSystem {
 
   public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
     this.#expression.update(realDeltaSeconds, this.#motion.fallSpeed >= 45, this.#danger, this.#motion.fallSpeed >= 16);
-    (this.#ball.metadata as { expression: BallExpression }).expression = this.#expression.current;
+    const faceExpression = this.#slowActive && ["neutral", "focus", "fall"].includes(this.#expression.current) ? "slow" : this.#expression.current;
+    (this.#ball.metadata as { expression: BallExpression }).expression = faceExpression;
     const look = Math.max(-1, Math.min(1, (this.#motion.horizontalVelocity ?? 0) / 9));
-    const blinking = getBallFace(this.#ball)?.update(this.#expression.current, realDeltaSeconds, look, (this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1) || (this.#expression.current === "break" && this.#impactElapsed < .07)) ?? false;
+    const blinking = getBallFace(this.#ball)?.update(faceExpression, realDeltaSeconds, look, (this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1) || (this.#expression.current === "break" && this.#impactElapsed < .07)) ?? false;
     const poseAmount = smoothFactor(10, realDeltaSeconds);
     this.#ball.rotation.z += (-look * .35 - this.#ball.rotation.z) * poseAmount;
     this.#ball.rotation.y += (look * .35 - this.#ball.rotation.y) * poseAmount;
-    this.#pulseElapsed += realDeltaSeconds;
-    const pulse = clamp01(this.#pulseElapsed / .36);
-    this.#pulse.scaling.setAll(1 + pulse * 1.4);
-    this.#pulse.visibility = (1 - pulse) * .65;
+    this.#fx.update(realDeltaSeconds, { speed: this.#motion.fallSpeed, look,
+      boost: this.#boostElapsedSeconds === null ? 0 : this.#boostStrength,
+      anticipating: this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1,
+      slow: this.#slowActive || this.#expression.current === "slow", danger: this.#danger });
     this.#impactElapsed += realDeltaSeconds;
     const targetSpeedIntensity =
       1 -
@@ -159,6 +155,7 @@ export class BallVisualController implements FixedSimulationSystem {
           this.#config.speedEffectRange,
       );
     const colorAmount = smoothFactor(this.#config.colorSharpness, fixedDeltaSeconds);
+    this.#stretchIntensity = lerp(this.#stretchIntensity, speedVisualPower(this.#motion.fallSpeed, this.#ballConfig.startFallSpeed), colorAmount);
     // Each doubling keeps adding visible weight instead of saturating after a few boosts.
     const trailTarget = clamp01(Math.log2(Math.max(1, this.#motion.fallSpeed / this.#ballConfig.startFallSpeed)) / 5);
     this.#trailIntensity = lerp(this.#trailIntensity, trailTarget, colorAmount);
@@ -176,7 +173,7 @@ export class BallVisualController implements FixedSimulationSystem {
     const movementStretch = lerp(
       1,
       this.#config.maximumMovementStretch,
-      this.#speedIntensity,
+      this.#stretchIntensity,
     );
     const boostStretch = this.#updateBoostReaction(fixedDeltaSeconds);
     const impactProgress = clamp01(this.#impactElapsed / (this.#impactKind === "hurt" ? .4 : .25));
@@ -197,6 +194,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#ball.rotation.setAll(0);
     this.#ball.metadata = { avatarManaged: false, expression: "neutral" };
     this.#speedIntensity = 0;
+    this.#stretchIntensity = 0;
     this.#trailIntensity = 0;
     this.#phaseTransitionBlend = 0;
     this.#phaseTransitionTarget = 0;
@@ -206,7 +204,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trail.stop();
     this.#trail.dispose();
     this.#trailMaterial.dispose();
-    this.#pulse.dispose(); this.#pulseMaterial.dispose();
+    this.#fx.dispose();
   }
 
   #updateBoostReaction(fixedDeltaSeconds: number): number {
