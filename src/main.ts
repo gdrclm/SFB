@@ -118,7 +118,7 @@ function exitApplication(): void {
   requireElement("#start-error").textContent = "";
   shop.refreshBalance();
   renderMissionBoard(missionsDialog, getPlayerProfile());
-  startButton.focus();
+  startButton.focus({ preventScroll: true });
 }
 
 restartButton.addEventListener("click", () => {
@@ -160,7 +160,7 @@ if (!(resetDialog instanceof HTMLDialogElement)) throw new TypeError("#reset-dat
 requireElement("#reset-data-button").addEventListener("click", () => {
   requireElement("#reset-data-error").hidden = true;
   resetDialog.showModal();
-  requireElement("#reset-data-cancel").focus();
+  requireElement("#reset-data-cancel").focus({ preventScroll: true });
 });
 requireElement("#reset-data-cancel").addEventListener("click", () => { resetDialog.close(); });
 requireElement("#reset-data-confirm").addEventListener("click", () => {
@@ -206,7 +206,7 @@ const startRun = (guided = !hasFinishedOpening()): void => {
     requestedGuidedRun = false;
     startScreen.hidden = true;
     interfaceLayer.inert = false;
-    canvas.focus();
+    canvas.focus({ preventScroll: true });
   }).catch((error: unknown) => {
     showStartupError(error);
     requireElement("#start-error").textContent = status.textContent;
@@ -216,7 +216,7 @@ const startRun = (guided = !hasFinishedOpening()): void => {
 };
 startButton.addEventListener("click", () => { startRun(); });
 requireElement("#guided-run-button").addEventListener("click", () => { startRun(true); });
-startButton.focus();
+startButton.focus({ preventScroll: true });
 
 window.addEventListener("pagehide", () => {
   lifecycle.dispose();

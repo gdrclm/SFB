@@ -296,7 +296,7 @@ export class GameApplication {
     this.#guideStrengths = [];
     this.#stateBeforePause = GameState.Playing;
     await this.start(false);
-    this.#canvas.focus();
+    this.#canvas.focus({ preventScroll: true });
   }
 
   public async start(guided = this.#actions.guided === true): Promise<void> {
@@ -729,7 +729,7 @@ export class GameApplication {
         requireMenuElement(this.#gameOverElement, "#result-save-status").textContent =
           this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
         this.#gameOverElement.hidden = false;
-        document.querySelector<HTMLButtonElement>("#restart-button")?.focus();
+        document.querySelector<HTMLButtonElement>("#restart-button")?.focus({ preventScroll: true });
         return;
       }
 
@@ -912,7 +912,7 @@ export class GameApplication {
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");
     this.#pauseButtonElement.setAttribute("aria-expanded", "true");
     this.#renderPauseSummary();
-    this.#resumeButtonElement.focus();
+    this.#resumeButtonElement.focus({ preventScroll: true });
   };
 
   readonly #resumeGame = (): void => {
@@ -924,7 +924,7 @@ export class GameApplication {
     this.#pauseMenuElement.hidden = true;
     this.#pauseButtonElement.setAttribute("aria-label", "Открыть меню паузы");
     this.#pauseButtonElement.setAttribute("aria-expanded", "false");
-    this.#pauseButtonElement.focus();
+    this.#pauseButtonElement.focus({ preventScroll: true });
   };
 
   readonly #restartGame = (): void => {

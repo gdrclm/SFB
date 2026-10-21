@@ -16,6 +16,7 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 @supports (height: 100dvh) {
@@ -27,13 +28,23 @@ body,
   }
 }
 
+/* Explicit viewport centering, including mobile browsers with dynamic toolbars.
+   The contextual coach has its own anchor and must not be centered. */
+dialog:not(#context-guide) {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+}
+
 button,
 input {
   font: inherit;
 }
 
 #app {
-  position: relative;
+  /* Prevent mobile focus/overflow scrolling from shifting every overlay. */
+  position: fixed;
+  inset: 0;
   isolation: isolate;
   background:
     radial-gradient(circle at 12% 34%, rgb(255 255 255 / 78%) 0 2.5%, transparent 7%),
@@ -583,7 +594,7 @@ input {
 }
 
 #pause-menu {
-  position: absolute;
+  position: fixed;
   z-index: 20;
   inset: 0;
   display: grid;
@@ -893,7 +904,7 @@ input {
 }
 
 #game-over {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: grid;
   padding: 1.5rem;
@@ -1446,7 +1457,7 @@ input {
 }
 
 #start-screen {
-  position: absolute;
+  position: fixed;
   z-index: 30;
   inset: 0;
   display: grid;
