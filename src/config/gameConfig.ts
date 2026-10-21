@@ -317,7 +317,7 @@ export const gameConfig: GameConfig = Object.freeze({
   }),
   successfulHit: Object.freeze({
     speedLoss: 1,
-    platformEffectSeconds: 0.38,
+    platformEffectSeconds: 0.48,
     fragmentSpread: 2.4,
     fragmentDrop: 2,
     ballEffectSeconds: 0.16,

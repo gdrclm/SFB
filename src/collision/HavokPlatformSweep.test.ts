@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { PlatformController } from "../platform/PlatformController";
+import { PlatformPool } from "../platform/PlatformPool";
 import { HavokPlatformSweep } from "./HavokPlatformSweep";
 
 describe("HavokPlatformSweep", () => {
@@ -159,6 +160,26 @@ describe("HavokPlatformSweep", () => {
       expect(scene.textures.length).toBe(textureCount);
       expect(scene.materials.length).toBe(materialCount);
     }
+
+    const pool = new PlatformPool([platform]);
+    expect(pool.beginRelease(platform)).toBe(true);
+    expect(pool.availableCount).toBe(0);
+    expect(sweep.cast({ x: 0, y: -5, z: 0 }, { x: 0, y: -11, z: 0 })).toBeNull();
+    const destroyMaterial = sprite.material;
+    const allocated = { textures: scene.textures.length, materials: scene.materials.length };
+    for (let frame = 0; frame < 12; frame++) {
+      platform.renderBreak(frame / 11);
+      expect(sprite.metadata).toMatchObject({ spriteAtlas: "neon-destroy", frame, destroyFrames: 12 });
+      expect(pool.availableCount).toBe(0);
+    }
+    expect(sprite.visibility).toBe(0);
+    expect(pool.completeRelease(platform)).toBe(true);
+    expect(pool.completeRelease(platform)).toBe(false);
+    expect(pool.acquire()).toBe(platform);
+    expect(sprite.visibility).toBe(1);
+    expect(sprite.material).not.toBe(destroyMaterial);
+    expect(sprite.metadata).toMatchObject({ spriteAtlas: "neon-rocks", idleFrames: 12 });
+    expect({ textures: scene.textures.length, materials: scene.materials.length }).toEqual(allocated);
 
     sweep.dispose();
     platform.dispose();

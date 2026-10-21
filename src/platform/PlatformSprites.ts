@@ -1,5 +1,7 @@
 import atlasUrl from "../assets/platforms/neon-rocks.webp";
 import idleAtlasUrl from "../assets/platforms/neon-idle-12.webp";
+import destroyAtlasUrl from "../assets/platforms/neon-destroy-12.webp";
+import { DESTROY_ATLAS_SIZE, DESTROY_RIM_Y, destroySample, destroySpriteRect } from "./PlatformDestroy";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./PlatformIdle";
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
@@ -15,9 +17,12 @@ import { PLATFORM_ATLAS_SIZE, platformSpriteRect, platformSpriteSlices, type Pla
 
 const materials = new WeakMap<Scene, StandardMaterial>();
 const idleMaterials = new WeakMap<Scene, StandardMaterial>();
-function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
-  const cache = idle ? idleMaterials : materials;
-  const prefix = idle ? "PlatformIdleAtlas" : "PlatformSpriteAtlas";
+const destroyMaterials = new WeakMap<Scene, StandardMaterial>();
+type AtlasKind = "debris" | "idle" | "destroy";
+function atlasMaterial(scene: Scene, kind: AtlasKind = "debris"): StandardMaterial {
+  const animated = kind !== "debris";
+  const cache = kind === "destroy" ? destroyMaterials : kind === "idle" ? idleMaterials : materials;
+  const prefix = kind === "destroy" ? "PlatformDestroyAtlas" : kind === "idle" ? "PlatformIdleAtlas" : "PlatformSpriteAtlas";
   const cached = cache.get(scene);
   if (cached !== undefined) return cached;
   const material = new StandardMaterial(`${prefix}Material`, scene);
@@ -28,14 +33,14 @@ function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
   material.useAlphaFromDiffuseTexture = true;
   // Idle frames include soft sparks, smoke and rings. Alpha testing cuts off
   // their faint edges, especially against the bright first location.
-  material.transparencyMode = idle ? Material.MATERIAL_ALPHABLEND : Material.MATERIAL_ALPHATESTANDBLEND;
+  material.transparencyMode = animated ? Material.MATERIAL_ALPHABLEND : Material.MATERIAL_ALPHATESTANDBLEND;
   material.alphaCutOff = .025;
-  const texture = new Texture(idle ? idleAtlasUrl : atlasUrl, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+  const texture = new Texture(kind === "destroy" ? destroyAtlasUrl : kind === "idle" ? idleAtlasUrl : atlasUrl, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
   texture.name = `${prefix}Texture`;
   texture.hasAlpha = true;
   texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
   material.diffuseTexture = texture;
-  if (idle) new PlatformIdleBlend(material);
+  if (animated) new PlatformIdleBlend(material);
   new PlatformCrystalSkin(material);
   cache.set(scene, material);
   material.onDisposeObservable.addOnce(() => { cache.delete(scene); });
@@ -43,9 +48,9 @@ function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
 }
 
 /** One GPU atlas/material per scene, UVs per mesh; no canvas uploads during animation. */
-export function createAtlasSprite(name: string, scene: Scene, idle = false): Mesh {
+export function createAtlasSprite(name: string, scene: Scene, kind: AtlasKind = "debris"): Mesh {
   const mesh = new Mesh(name, scene);
-  mesh.material = atlasMaterial(scene, idle);
+  mesh.material = atlasMaterial(scene, kind);
   mesh.isPickable = false;
   mesh.metadata = { spriteAtlas: "neon-rocks" };
   return mesh;
@@ -53,7 +58,7 @@ export function createAtlasSprite(name: string, scene: Scene, idle = false): Mes
 
 /** Begin falling only after the collision surfaces have visible artwork. */
 export async function waitForPlatformSprites(scene: Scene): Promise<void> {
-  await Promise.all([waitForAtlas(atlasMaterial(scene)), waitForAtlas(atlasMaterial(scene, true))]);
+  await Promise.all([waitForAtlas(atlasMaterial(scene, "idle")), waitForAtlas(atlasMaterial(scene, "destroy"))]);
 }
 
 async function waitForAtlas(material: StandardMaterial): Promise<void> {
@@ -107,13 +112,20 @@ export class PlatformSprite {
   #row: PlatformSpriteRow = 0;
   #frame = -1;
   #width = 0;
+  #destroying = false;
   public constructor(parent: Mesh, height: number, depth: number, scene: Scene) {
     this.#parent = parent; this.#height = height; this.#phase = idlePhase(parent.name);
-    this.mesh = createAtlasSprite(`${parent.name}-sprite`, scene, true);
+    this.mesh = createAtlasSprite(`${parent.name}-sprite`, scene, "idle");
     this.mesh.parent = parent;
     this.mesh.position.z = -depth / 2 - .025;
   }
   public render(width: number, row: PlatformSpriteRow, elapsed: number): void {
+    if (this.#destroying) {
+      this.#destroying = false;
+      this.#frame = -1;
+      this.mesh.material = atlasMaterial(this.mesh.getScene(), "idle");
+      this.mesh.visibility = 1;
+    }
     const { frame, nextFrame, blend } = idleSample(elapsed, this.#phase);
     if (frame === this.#frame && row === this.#row && width === this.#width) {
       (this.mesh.metadata as { blend: number }).blend = blend;
@@ -127,6 +139,17 @@ export class PlatformSprite {
     const top = this.#height / 2 + .94;
     applySlices(this.mesh, platformSpriteSlices(width + .6, rect), top, top - 2.4, IDLE_ATLAS_SIZE, rebuild);
     this.mesh.metadata = { spriteAtlas: "neon-rocks", row, frame, nextFrame, blend, idleFrames: 12 };
+  }
+
+  public renderBreak(width: number, progress: number): void {
+    const rebuild = !this.#destroying;
+    this.#destroying = true;
+    this.mesh.material = atlasMaterial(this.mesh.getScene(), "destroy");
+    const sample = destroySample(progress);
+    const top = this.#height / 2 + 2.8 * (DESTROY_RIM_Y[this.#row] - 2) / (DESTROY_ATLAS_SIZE.height / 5 - 4);
+    applySlices(this.mesh, platformSpriteSlices(width + .6, destroySpriteRect(this.#row, sample.frame)), top, top - 2.8, DESTROY_ATLAS_SIZE, rebuild);
+    this.mesh.visibility = sample.opacity;
+    this.mesh.metadata = { spriteAtlas: "neon-destroy", row: this.#row, ...sample, destroyFrames: 12 };
   }
 }
 

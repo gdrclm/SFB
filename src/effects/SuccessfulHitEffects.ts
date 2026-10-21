@@ -1,28 +1,13 @@
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { SuccessfulHitFeedback } from "../collision/SuccessfulPlatformHitHandler";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { PlatformController } from "../platform/PlatformController";
 
-const platformFragmentCount = 4;
-
-interface PlatformFragmentState {
-  readonly mesh: Mesh;
-  readonly startPosition: Vector3;
-  readonly endPosition: Vector3;
-  readonly endRotation: number;
-}
-
 interface PlatformBreakState {
-  readonly platform: AbstractMesh;
-  readonly baseScale: Vector3;
-  readonly crushedScale: Vector3;
-  readonly flattenedScale: Vector3;
-  readonly baseVisibility: number;
-  readonly fragments: readonly PlatformFragmentState[];
+  readonly platform: Pick<PlatformController, "renderBreak">;
   readonly onComplete: () => void;
   elapsedSeconds: number;
 }
@@ -36,11 +21,7 @@ function lerp(start: number, end: number, amount: number): number {
 }
 
 function copyLerp(target: Vector3, start: Vector3, end: Vector3, amount: number): void {
-  target.set(
-    lerp(start.x, end.x, amount),
-    lerp(start.y, end.y, amount),
-    lerp(start.z, end.z, amount),
-  );
+  target.set(lerp(start.x, end.x, amount), lerp(start.y, end.y, amount), lerp(start.z, end.z, amount));
 }
 
 export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulationSystem {
@@ -62,40 +43,9 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playPlatformBreak(platform: PlatformController, onComplete: () => void, force = 1): void {
-    const baseScale = platform.mesh.scaling.clone();
-    const origin = platform.mesh.position.clone();
-    const platformWidth = Number.isFinite(platform.width)
-      ? platform.width
-      : platform.size.width;
-    const fragmentWidth = platformWidth / platformFragmentCount;
-    const fragments: PlatformFragmentState[] = [];
-
-    for (let index = 0; index < platformFragmentCount; index += 1) {
-      const offsetX = -platformWidth / 2 + fragmentWidth * (index + 0.5);
-      fragments.push(
-        this.#createFragment(platform, origin, platformWidth, fragmentWidth, offsetX, index, force),
-      );
-    }
-
-    this.#platformBreaks.add({
-      platform: platform.mesh,
-      baseScale,
-      crushedScale: new Vector3(
-        baseScale.x * 1.04,
-        baseScale.y * 0.82,
-        baseScale.z * 1.04,
-      ),
-      flattenedScale: new Vector3(
-        baseScale.x * 0.9,
-        baseScale.y * 0.68,
-        baseScale.z * 0.9,
-      ),
-      baseVisibility: platform.mesh.visibility,
-      fragments,
-      onComplete,
-      elapsedSeconds: 0,
-    });
+  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak">, onComplete: () => void): void {
+    platform.renderBreak(0);
+    this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0 });
   }
 
   public playBallReaction(): void {
@@ -109,20 +59,14 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraReactionElapsedSeconds = 0;
   }
 
-  public fixedUpdate(fixedDeltaSeconds: number): void {
-    this.#updatePlatformBreaks(fixedDeltaSeconds);
+  public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
+    this.#updatePlatformBreaks(realDeltaSeconds);
     this.#updateBallReaction(fixedDeltaSeconds);
     this.#updateCameraReaction(fixedDeltaSeconds);
   }
 
   public dispose(): void {
-    for (const state of this.#platformBreaks) {
-      state.platform.scaling.copyFrom(state.baseScale);
-      state.platform.visibility = state.baseVisibility;
-      for (const fragment of state.fragments) {
-        fragment.mesh.dispose();
-      }
-    }
+    for (const state of this.#platformBreaks) state.platform.renderBreak(1);
     this.#platformBreaks.clear();
     this.#ball.scaling.copyFrom(this.#ballBaseScale);
     this.#camera.position.copyFrom(this.#cameraBasePosition);
@@ -130,59 +74,15 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraReactionElapsedSeconds = null;
   }
 
-  #updatePlatformBreaks(fixedDeltaSeconds: number): void {
-    for (const state of [...this.#platformBreaks]) {
-      state.elapsedSeconds += fixedDeltaSeconds;
-      const progress = clamp01(
-        state.elapsedSeconds / this.#config.platformEffectSeconds,
-      );
-
-      if (progress <= 0.18) {
-        copyLerp(
-          state.platform.scaling,
-          state.baseScale,
-          state.crushedScale,
-          progress / 0.18,
-        );
-      } else {
-        copyLerp(
-          state.platform.scaling,
-          state.crushedScale,
-          state.flattenedScale,
-          (progress - 0.18) / 0.3,
-        );
+  #updatePlatformBreaks(realDeltaSeconds: number): void {
+    for (const state of this.#platformBreaks) {
+      state.elapsedSeconds += realDeltaSeconds;
+      const progress = clamp01(state.elapsedSeconds / this.#config.platformEffectSeconds);
+      state.platform.renderBreak(progress);
+      if (progress >= 1) {
+        this.#platformBreaks.delete(state);
+        state.onComplete();
       }
-
-      state.platform.visibility =
-        progress <= 0.08
-          ? state.baseVisibility
-          : state.baseVisibility * (1 - clamp01((progress - 0.08) / 0.2));
-
-      const easedProgress = 1 - (1 - progress) ** 3;
-      for (const fragment of state.fragments) {
-        copyLerp(
-          fragment.mesh.position,
-          fragment.startPosition,
-          fragment.endPosition,
-          easedProgress,
-        );
-        fragment.mesh.rotation.z = fragment.endRotation * easedProgress;
-        fragment.mesh.scaling.setAll(lerp(1, 0.72, progress));
-        fragment.mesh.visibility =
-          progress <= 0.65 ? 1 : 1 - clamp01((progress - 0.65) / 0.35);
-      }
-
-      if (progress < 1) {
-        continue;
-      }
-
-      state.platform.scaling.copyFrom(state.baseScale);
-      state.platform.visibility = state.baseVisibility;
-      for (const fragment of state.fragments) {
-        fragment.mesh.dispose();
-      }
-      this.#platformBreaks.delete(state);
-      state.onComplete();
     }
   }
 
@@ -254,40 +154,4 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     }
   }
 
-  #createFragment(
-    platform: PlatformController,
-    origin: Vector3,
-    platformWidth: number,
-    fragmentWidth: number,
-    offsetX: number,
-    index: number,
-    force: number,
-  ): PlatformFragmentState {
-    const direction = offsetX < 0 ? -1 : 1;
-    const mesh = platform.createBreakFragment(index, fragmentWidth);
-    mesh.isPickable = false;
-    const spriteDepth = mesh.position.z;
-    mesh.position.copyFrom(origin);
-    mesh.position.z = spriteDepth;
-    mesh.position.x += offsetX;
-
-    const startPosition = mesh.position.clone();
-    const distanceFromCenter = Math.abs(offsetX) / (platformWidth / 2);
-    const outwardForce = 0.55 + distanceFromCenter * 0.45;
-    const verticalScatter = index % 2 === 0 ? 0.28 : -0.08;
-    const endPosition = startPosition.add(
-      new Vector3(
-        direction * this.#config.fragmentSpread * outwardForce * force,
-        -this.#config.fragmentDrop + verticalScatter,
-        0,
-      ),
-    );
-
-    return {
-      mesh,
-      startPosition,
-      endPosition,
-      endRotation: direction * (0.55 + index * 0.13),
-    };
-  }
 }

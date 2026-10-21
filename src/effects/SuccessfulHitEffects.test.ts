@@ -5,7 +5,6 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
-import type { PlatformController } from "../platform/PlatformController";
 import { SuccessfulHitEffects } from "./SuccessfulHitEffects";
 
 describe("SuccessfulHitEffects", () => {
@@ -17,10 +16,10 @@ describe("SuccessfulHitEffects", () => {
     const platformMesh = MeshBuilder.CreateBox("platform", { width: 4 }, scene);
     const platform = {
       id: "platform",
-      createBreakFragment: (index: number, width: number) => MeshBuilder.CreatePlane(`platform-fragment-${String(index)}`, { width, height: .4 }, scene),
+      renderBreak: vi.fn(),
       mesh: platformMesh,
       size: { width: 4, height: 0.4, depth: 1 },
-    } as PlatformController;
+    };
     const effects = new SuccessfulHitEffects(ball, camera, gameConfig);
     const meshCountBeforeBreak = scene.meshes.length;
     const completePlatformBreak = vi.fn();
@@ -30,27 +29,22 @@ describe("SuccessfulHitEffects", () => {
     effects.playBallReaction();
     effects.playCameraReaction();
 
-    const platformFragments = scene.meshes.filter((mesh) =>
-      mesh.name.startsWith("platform-fragment-"),
-    );
-    expect(platformFragments).toHaveLength(4);
-    expect(scene.meshes.length).toBe(meshCountBeforeBreak + 4);
+    expect(scene.meshes.length).toBe(meshCountBeforeBreak);
+    expect(platform.renderBreak).toHaveBeenLastCalledWith(0);
     expect(completePlatformBreak).not.toHaveBeenCalled();
-    expect(platformFragments[0]?.position.x).toBeLessThan(platformMesh.position.x);
-    expect(platformFragments.at(-1)?.position.x).toBeGreaterThan(platformMesh.position.x);
-    const firstFragmentStartX = platformFragments[0]?.position.x;
 
     effects.fixedUpdate(0.05);
 
-    expect(platformMesh.scaling.y).toBeLessThan(1);
-    expect(platformFragments[0]?.position.x).not.toBe(firstFragmentStartX);
+    expect(platformMesh.scaling.asArray()).toEqual([1, 1, 1]);
+    expect(platform.renderBreak).toHaveBeenLastCalledWith(.05 / gameConfig.successfulHit.platformEffectSeconds);
     expect(ball.scaling.y).toBeGreaterThan(1);
     expect(camera.position.y).not.toBe(initialCameraPosition.y);
 
     effects.fixedUpdate(gameConfig.successfulHit.platformEffectSeconds);
 
     expect(completePlatformBreak).toHaveBeenCalledOnce();
-    expect(platformMesh.scaling).toEqual(Vector3.One());
+    expect(platform.renderBreak).toHaveBeenLastCalledWith(1);
+    expect(platformMesh.scaling.asArray()).toEqual([1, 1, 1]);
     expect(platformMesh.visibility).toBe(1);
     expect(scene.meshes.length).toBe(meshCountBeforeBreak);
 

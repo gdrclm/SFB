@@ -82,9 +82,11 @@ export class PlatformController {
 
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
+    this.#sprite.renderBreak(this.width, 0);
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
+  public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); }
   public finishBreak(): boolean {
     if (!this.#isBreaking) return false;
     this.mesh.setEnabled(false); this.#isBreaking = false;
