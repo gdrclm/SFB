@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { IDLE_ATLAS_SIZE, IDLE_FRAME_COUNT, idleFrame, idlePhase, idleSpriteRect } from "./PlatformIdle";
+import { IDLE_ATLAS_SIZE, IDLE_FRAME_COUNT, advanceIdleTime, idleFrame, idlePhase, idleSpriteRect } from "./PlatformIdle";
 import { platformSpriteSlices } from "./PlatformSpriteLayout";
 
 describe("twelve-frame platform idle", () => {
+  it("keeps all FX frames playing in reduced motion and freezes only while paused", () => {
+    for (const reduced of [false, true]) {
+      let elapsed = 0;
+      const frames = new Set<number>();
+      for (let i = 0; i < 120; i++) {
+        elapsed = advanceIdleTime(elapsed, 1 / 60, false, reduced);
+        frames.add(idleFrame(elapsed));
+      }
+      expect(frames.size).toBe(12);
+      expect(elapsed).toBeCloseTo(reduced ? 1 : 2);
+      expect(advanceIdleTime(elapsed, 5, true, reduced)).toBe(elapsed);
+      expect(advanceIdleTime(elapsed, 0, false, reduced)).toBe(elapsed);
+      expect(advanceIdleTime(elapsed, NaN, false, reduced)).toBe(elapsed);
+      expect(advanceIdleTime(elapsed, 30, false, reduced) - elapsed).toBeCloseTo(reduced ? .05 : .1);
+    }
+  });
+
   it("plays all twelve poses once per second and loops from 11 to 0", () => {
     const frames = Array.from({ length: 12 }, (_, frame) => idleFrame(frame / 12));
     expect(frames).toEqual(Array.from({ length: 12 }, (_, frame) => frame));
@@ -11,7 +28,7 @@ describe("twelve-frame platform idle", () => {
     for (let frame = 0; frame < 12; frame++) expect(idleFrame(30 + frame / 12)).toBe(frame);
   });
 
-  it("freezes a supplied clock and fixes reduced-motion/invalid clocks to the first pose", () => {
+  it("fixes invalid clocks to the first pose and distributes platform phases", () => {
     const phase = idlePhase("platform-low");
     for (const time of [0, -1, NaN, Infinity]) expect(idleFrame(time, phase)).toBe(0);
     expect(idlePhase("platform-low")).toBe(phase);

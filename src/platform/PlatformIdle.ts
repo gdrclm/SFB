@@ -4,7 +4,15 @@ export const IDLE_FRAME_COUNT = 12;
 export const IDLE_FPS = 12;
 export const IDLE_ATLAS_SIZE = { width: 1942, height: 809 };
 
-/** The simulation supplies a frozen clock in pause and zero for reduced motion. */
+/** Surface FX use real time: SLOW affects the ball, not the atlas playback. */
+export function advanceIdleTime(elapsed: number, delta: number, paused: boolean, reducedMotion = false): number {
+  if (paused || !Number.isFinite(delta) || delta <= 0) return elapsed;
+  // Avoid skipping a whole loop on tab restoration. Reduced motion keeps a
+  // gentler material animation rather than silently disabling every FX frame.
+  return elapsed + Math.min(delta, .1) * (reducedMotion ? .5 : 1);
+}
+
+/** Supplying the same time preserves the exact pose while paused. */
 export function idleFrame(elapsed: number, phase = 0): number {
   if (!Number.isFinite(elapsed) || elapsed <= 0) return 0;
   const cycles = elapsed * IDLE_FPS / IDLE_FRAME_COUNT + phase;

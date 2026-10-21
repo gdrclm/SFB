@@ -9,6 +9,7 @@ import { tutorialVisuals as tutorialArt } from "./TutorialController";
 import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missions";
 import { renderPinnedMission } from "../run/renderMissionBoard";
 import { waitForPlatformSprites } from "../platform/PlatformSprites";
+import { advanceIdleTime } from "../platform/PlatformIdle";
 import { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -120,7 +121,7 @@ export class GameApplication {
   #comboView: ComboView | null = null;
   #feel: GameFeel | null = null;
   #backdrop: DepthBackdrop | null = null;
-  #elapsedGameplaySeconds = 0;
+  #elapsedPlatformSeconds = 0;
   #opening: StagedOpening | null = null;
   #guideStrengths: number[] = [];
   #contextGuide: ContextGuide | null = null;
@@ -285,7 +286,7 @@ export class GameApplication {
     this.#gameState = new GameStateController();
     this.#lives = new LifeCounter(this.#config.run.initialLives);
     this.#wallet = new RunWallet(this.#config.economy.initialEnergy, this.#config.economy.energyPerCoin);
-    this.#elapsedGameplaySeconds = 0;
+    this.#elapsedPlatformSeconds = 0;
     this.#destroyedPlatformCount = 0;
     this.#recordCelebrated = false;
     this.#recordHapticTimer = null;
@@ -351,7 +352,6 @@ export class GameApplication {
         this.#missionIntroRemaining = Math.max(0, this.#missionIntroRemaining - realDeltaSeconds);
         if (this.#missionIntroRemaining === 0) this.#renderMission();
       }
-      this.#elapsedGameplaySeconds += delta;
       this.#runProgress.observeDepth(this.#getDepth());
       this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
       const scripted = this.#opening?.isScripted === true;
@@ -629,6 +629,8 @@ export class GameApplication {
       this.#ballController?.fallSpeed ?? 0,
       isPaused || this.#gameState.current === GameState.GameOver,
     );
+    const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver || document.hidden;
+    this.#elapsedPlatformSeconds = advanceIdleTime(this.#elapsedPlatformSeconds, realDeltaSeconds, platformAnimationPaused, this.#reducedMotion);
     this.#renderCombo(isPaused || this.#gameState.current === GameState.GameOver);
     this.#feel?.setPaused(isPaused || document.hidden || !document.hasFocus());
     const hideNotices = isPaused || this.#gameState.current === GameState.GameOver;
@@ -1059,7 +1061,7 @@ export class GameApplication {
     if (ball === null) return;
     const platforms = this.#platformPool?.platforms ?? [];
     const nearest = nearestInCurrentLane(platforms, ball.position, this.#config.ball.radius);
-    const elapsed = this.#reducedMotion ? 0 : this.#elapsedGameplaySeconds;
+    const elapsed = this.#elapsedPlatformSeconds;
     const closingSpeed = ball.fallSpeed * (this.#slowModeController?.timeScale ?? 1);
     const secondsToImpact = nearest === null ? Infinity : Math.max(0, ball.position.y - this.#config.ball.radius - nearest.mesh.position.y - nearest.size.height / 2) / Math.max(.001, closingSpeed);
     const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;

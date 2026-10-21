@@ -24,7 +24,9 @@ function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
   material.specularColor = Color3.Black();
   material.backFaceCulling = false;
   material.useAlphaFromDiffuseTexture = true;
-  material.transparencyMode = Material.MATERIAL_ALPHATESTANDBLEND;
+  // Idle frames include soft sparks, smoke and rings. Alpha testing cuts off
+  // their faint edges, especially against the bright first location.
+  material.transparencyMode = idle ? Material.MATERIAL_ALPHABLEND : Material.MATERIAL_ALPHATESTANDBLEND;
   material.alphaCutOff = .025;
   const texture = new Texture(idle ? idleAtlasUrl : atlasUrl, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
   texture.name = `${prefix}Texture`;
