@@ -1,6 +1,7 @@
 """Split the supplied illustrations into feathered scenery cards (requires Pillow).
 Run from the repository root. Runtime uses the resulting small WebP cards directly;
 there is no image readback, segmentation or per-frame texture upload on phones.
+Then run extract-crystal-islands.py to separate its distant island atlas.
 """
 from PIL import Image
 from pathlib import Path

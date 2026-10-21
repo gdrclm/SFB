@@ -1,9 +1,12 @@
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import crystalDistantUrl from "../assets/worlds/neon-crystal-distant-atlas.webp";
+import { CRYSTAL_DISTANT_ISLANDS } from "./CrystalSceneryLayout";
+import { Vector4 } from "@babylonjs/core/Maths/math.vector";
 import { Plane } from "@babylonjs/core/Maths/math.plane";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { sceneryRate, sceneryY } from "./BackdropMotion";
 
@@ -12,7 +15,7 @@ const bands = {
   sky: [[0, 480, 735, 1020, 1230, 1672], [0, 550, 810, 1110, 1330, 1672]],
   crystal: [[0, 390, 700, 1010, 1330, 1672], [0, 350, 700, 1010, 1320, 1672]],
 } as const;
-interface Card { mesh: Mesh; anchor: number; x: number; edgeLimit: number; rate: number; copy: number; material: StandardMaterial }
+interface Card { mesh: Mesh; anchor: number; x: number; edgeLimit: number | null; rate: number; copy: number; material: StandardMaterial }
 /** Baked scenery cards: no runtime canvas, image readback or texture uploads. */
 export class BackdropScenery {
   readonly #cards: Card[] = [];
@@ -45,6 +48,32 @@ export class BackdropScenery {
         this.#cards.push({ mesh, material, x: mesh.position.x, edgeLimit: 14.2 - 14 * 410 / 941 * apparentSize, anchor: 21 - 42 * (start + end) / 2 / 1672, rate, copy });
       }
     }
+    if (location === "crystal") this.#addDistantIslands(scene, parent);
+  }
+  #addDistantIslands(scene: Scene, parent: Mesh): void {
+    const texture = new Texture(crystalDistantUrl, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+    texture.hasAlpha = true; texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    const material = new StandardMaterial("CrystalDistantIslandsMaterial", scene);
+    material.diffuseTexture = texture; material.useAlphaFromDiffuseTexture = true;
+    material.disableLighting = true; material.emissiveColor.copyFrom((parent.material as StandardMaterial).emissiveColor);
+    material.specularColor = Color3.Black(); material.backFaceCulling = false;
+    material.clipPlane = this.#top; material.clipPlane2 = this.#bottom;
+    for (const [index, island] of CRYSTAL_DISTANT_ISLANDS.entries()) {
+      const [left, top, right, bottom] = island.bounds;
+      const x = ((left + right) / 2 / 941 - .5) * 28;
+      const anchor = (.5 - (top + bottom) / 2 / 1672) * 42;
+      for (const copy of [0, 1]) {
+        const mesh = MeshBuilder.CreatePlane(`CrystalDistantIsland${String(index)}-${String(copy)}`, {
+          width: 28 * 160 / 941, height: 42 * 192 / 1672,
+          sideOrientation: Mesh.DOUBLESIDE,
+          frontUVs: new Vector4(index / 7, 0, (index + 1) / 7, 1),
+          backUVs: new Vector4(index / 7, 0, (index + 1) / 7, 1),
+        }, scene);
+        mesh.parent = parent; mesh.material = material; mesh.isPickable = false;
+        mesh.position.set(x, 0, -.02);
+        this.#cards.push({ mesh, material, x, edgeLimit: null, anchor, rate: island.rate, copy });
+      }
+    }
   }
   public isReady(): boolean { return this.#cards.every(card => card.material.diffuseTexture?.isReady() === true); }
   public update(cameraTravel: number, cameraX: number, worldCenterY: number, height: number, reduced: boolean): void {
@@ -57,7 +86,8 @@ export class BackdropScenery {
       // Keep large foreground silhouettes outside the central play corridor.
       const x = card.x - Math.max(-1.8, Math.min(1.8, lateral));
       // Source art is cropped at the outer screen edge: keep that edge offscreen.
-      card.mesh.position.x = card.x < 0 ? Math.min(-card.edgeLimit, x) : Math.max(card.edgeLimit, x);
+      card.mesh.position.x = card.edgeLimit === null ? x
+        : card.x < 0 ? Math.min(-card.edgeLimit, x) : Math.max(card.edgeLimit, x);
     }
   }
 }
