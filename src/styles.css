@@ -1525,6 +1525,17 @@ input {
   animation: speed-streak var(--streak-duration) linear infinite;
   animation-delay: calc(var(--lane) * -.173s);
 }
+.speed-streaks i::after {
+  content: "";
+  position: absolute;
+  top: 53%;
+  left: 50%;
+  width: calc(7px + var(--wind-power) * 9px);
+  height: calc(17px + var(--wind-power) * 22px);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, #fff 0 12%, #b8faff 18%, #20cbff88 35%, transparent 70%);
+  filter: drop-shadow(0 0 3px #57eaff);
+}
 .speed-streaks i:nth-child(even) {
   left: auto;
   right: calc(1.5% + var(--lane) * 1%);

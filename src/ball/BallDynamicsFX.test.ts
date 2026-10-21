@@ -20,6 +20,23 @@ it("adds more, longer and thicker side wind as speed doubles", () => {
   fx.dispose(); scene.dispose(); engine.dispose();
 });
 
+it("shows the comet on acceleration and suppresses it during SLOW and reduced motion", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, 1);
+  const motion = { speed: 10, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
+  fx.update(1 / 60, motion);
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(0);
+  fx.update(1 / 60, { ...motion, speed: 20 });
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(1);
+  fx.update(1 / 60, { ...motion, speed: 80, slow: true });
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(0);
+  fx.dispose();
+  const reduced = new BallDynamicsFX(ball, 1, true);
+  reduced.update(1 / 60, { ...motion, speed: 80, boost: 1 });
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(0);
+  reduced.dispose(); scene.dispose(); engine.dispose();
+});
+
 it("places the first impact frame at contact even before the next simulation update", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const ball = MeshBuilder.CreateSphere("ball", {}, scene); ball.position.set(20, -500, 0);

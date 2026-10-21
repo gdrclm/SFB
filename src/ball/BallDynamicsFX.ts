@@ -9,6 +9,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { BallExpression } from "./BallExpression";
+import { BallCometFX } from "./BallCometFX";
 import { speedVisualPower } from "./BallSpeedVisuals";
 
 interface Particle {
@@ -58,6 +59,7 @@ export class BallDynamicsFX {
   readonly #ball: Mesh;
   readonly #radius: number;
   readonly #root: TransformNode;
+  readonly #comet: BallCometFX;
   readonly #materials: StandardMaterial[] = [];
   readonly #arcs: Mesh[] = [];
   readonly #wind: Mesh[] = [];
@@ -82,6 +84,7 @@ export class BallDynamicsFX {
     this.#baselineSpeed = baselineSpeed;
     const scene = ball.getScene();
     this.#root = new TransformNode("BallFXRoot", scene);
+    this.#comet = new BallCometFX(scene, this.#root, radius);
     const material = (name: string, color: Color3, additive = true): StandardMaterial => {
       const m = new StandardMaterial(name, scene); m.disableLighting = true; m.diffuseColor = Color3.Black();
       m.emissiveColor = color; m.backFaceCulling = false; m.disableDepthWrite = true;
@@ -172,6 +175,7 @@ export class BallDynamicsFX {
     const smooth = 1 - Math.exp(-16 * delta);
     const burst = motion.anticipating ? .15 : motion.boost;
     const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);
+    this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || this.#reduced);
     const arcTarget = motion.slow ? .8 : Math.max(Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;
     const windTarget = motion.slow ? 0 : Math.max(speedPower > 0 ? .18 + speedPower * .82 : 0, burst);
@@ -186,7 +190,7 @@ export class BallDynamicsFX {
     this.#wind.forEach((wind, i) => {
       const flame = clamp(speedPower * 1.5 - .2 + burst), pair = Math.floor((i - 3) / 2);
       const density = clamp(speedPower * 5 - pair + .2 + burst * 2);
-      wind.visibility = this.#reduced ? 0 : this.#windAmount * (i < 3 ? .75 * flame : density);
+      wind.visibility = this.#reduced ? 0 : this.#windAmount * (i < 3 ? .12 * flame : density);
       const crossSection = 1 / Math.sqrt(1 + speedPower * 2);
       wind.position.x = i < 3 ? (i - 1) * r * .3 : (i % 2 ? -1 : 1) * r * (.85 * crossSection + pair * .19);
       wind.position.y = r * ((t * (3 + speedPower * 7 + i * .2) + i * .17) % 1);
@@ -219,6 +223,7 @@ export class BallDynamicsFX {
   }
 
   public dispose(): void {
+    this.#comet.dispose();
     this.#root.dispose();
     for (const pool of [this.#stars, this.#shards]) for (const p of pool) p.mesh.dispose();
     for (const material of this.#materials) material.dispose();
