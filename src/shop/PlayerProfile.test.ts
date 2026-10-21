@@ -49,6 +49,9 @@ describe("player profile and shop", () => {
     const config = createPlayerConfig(gameConfig, profile);
     expect(config.economy.initialEnergy).toBe(55);
     expect(config.economy.energyPerCoin).toBe(3);
+    const ranked = createPlayerConfig(gameConfig, profile, true);
+    expect(ranked.economy).toEqual(gameConfig.economy);
+    expect(ranked.boost).toEqual(gameConfig.boost);
     expect(gameConfig.economy.initialEnergy).toBe(30);
     expect(gameConfig.economy.energyPerCoin).toBe(2);
   });

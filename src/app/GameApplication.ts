@@ -1,3 +1,4 @@
+import type { RunResult } from "../run/RunHistory";
 import type { AdaptiveQuality } from "../rendering/AdaptiveQuality";
 import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
@@ -71,6 +72,8 @@ export interface PauseMenuElements {
 
 export interface GameApplicationActions {
   readonly guided?: boolean;
+  readonly ranked?: boolean;
+  readonly onFinished?: (result: RunResult, durationMs: number) => void;
   readonly restart: () => Promise<void>;
   readonly exit: () => void;
 }
@@ -133,6 +136,8 @@ export class GameApplication {
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
   #hitStopRemaining = 0;
+  #runSeconds = 0;
+  #sentResult: string | null = null;
   #lastDepthCheckpoint = 0;
   #energyHighWater = this.#config.economy.initialEnergy;
   #missionIntroRemaining = 0;
@@ -234,6 +239,11 @@ export class GameApplication {
     pauseMenu: PauseMenuElements,
     actions: GameApplicationActions,
   ) {
+    if (actions.ranked) {
+      this.#config = createPlayerConfig(defaultGameConfig, this.#profile, true);
+      this.#wallet = new RunWallet(this.#config.economy.initialEnergy, this.#config.economy.energyPerCoin);
+      this.#energyHighWater = this.#config.economy.initialEnergy;
+    }
     this.#canvas = canvas;
     this.#status = status;
     this.#boostButtonElement = boostButton;
@@ -283,6 +293,7 @@ export class GameApplication {
     this.#challengeRemaining = 0;
     this.#challengeDirector = null;
     this.#hitStopRemaining = 0;
+    this.#runSeconds = 0; this.#sentResult = null;
     this.#energyHighWater = this.#config.economy.initialEnergy;
     this.#lastDepthCheckpoint = 0;
     this.#missionIntroRemaining = 0;
@@ -348,7 +359,18 @@ export class GameApplication {
       requireMenuElement(document.body, "#speed-feedback"),
       requireMenuElement(document.body, "#boost-feedback"),
     );
-    this.#fixedStep.register({ fixedUpdate: (delta: number) => { this.#opening?.fixedUpdate(delta); } });
+    this.#fixedStep.register({ fixedUpdate: (delta: number, real = delta) => {
+      this.#runSeconds += real;
+      if (this.#actions.ranked && this.#runSeconds >= 120) {
+        this.#runSeconds = 120;
+        requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Демо пройдено!";
+        this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.setAttribute("hidden", "");
+        this.#showRunResults();
+      }
+      this.#opening?.fixedUpdate(delta);
+    } });
+    requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Забег завершён";
+    this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("hidden");
     this.#fixedStep.register(this.#ballController);
     this.#fixedStep.register({ fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
       if (this.#missionRewardRemaining > 0) {
@@ -724,25 +746,8 @@ export class GameApplication {
         this.#pauseButtonElement.disabled = true;
         requireMenuElement(this.#gameOverElement, "#death-reason").textContent = describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
-        const previousBest = this.#history.top(1)[0]?.score ?? 0;
-        const result = this.#finishRun("completed");
-        const newRecord = result.score > previousBest;
-        this.#gameOverElement.dataset.newRecord = String(newRecord);
-        requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = newRecord ? "Новый рекорд!" : "Твой результат";
         requireMenuElement(this.#gameOverElement, "#death-hint").textContent = boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
-        this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("open");
-        requireMenuElement(this.#gameOverElement, "#run-result").textContent = result.score.toLocaleString("ru-RU");
-        const stats: Record<string, string> = {
-          depth: `${String(result.depth)} м`, platforms: String(result.platforms),
-          coins: String(result.coins), speed: `${(result.maxSpeed ?? 0).toFixed(1)} ед/с`,
-          best: (this.#history.top(1)[0]?.score ?? result.score).toLocaleString("ru-RU"),
-          combo: String(result.bestCombo ?? 0),
-        };
-        for (const [name, value] of Object.entries(stats)) requireMenuElement(this.#gameOverElement, `[data-result="${name}"]`).textContent = value;
-        requireMenuElement(this.#gameOverElement, "#result-save-status").textContent =
-          this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
-        this.#gameOverElement.hidden = false;
-        document.querySelector<HTMLButtonElement>("#restart-button")?.focus({ preventScroll: true });
+        this.#showRunResults();
         return;
       }
 
@@ -806,6 +811,29 @@ export class GameApplication {
     this.#renderPhaseStage();
     this.#status.textContent = "Первая фаза пройдена";
   };
+
+  #showRunResults(): void {
+    this.#gameState.transitionTo(GameState.GameOver);
+    this.#pauseButtonElement.disabled = true;
+    const previousBest = this.#history.top(1)[0]?.score ?? 0;
+    const result = this.#finishRun("completed");
+    const newRecord = result.score > previousBest;
+    this.#gameOverElement.dataset.newRecord = String(newRecord);
+    requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = newRecord ? "Новый рекорд!" : "Твой результат";
+    this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("open");
+    requireMenuElement(this.#gameOverElement, "#run-result").textContent = result.score.toLocaleString("ru-RU");
+    const stats: Record<string, string> = {
+      depth: `${String(result.depth)} м`, platforms: String(result.platforms),
+      coins: String(result.coins), speed: `${(result.maxSpeed ?? 0).toFixed(1)} ед/с`,
+      best: (this.#history.top(1)[0]?.score ?? result.score).toLocaleString("ru-RU"),
+      combo: String(result.bestCombo ?? 0),
+    };
+    for (const [name, value] of Object.entries(stats)) requireMenuElement(this.#gameOverElement, `[data-result="${name}"]`).textContent = value;
+    requireMenuElement(this.#gameOverElement, "#result-save-status").textContent =
+      this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
+    this.#gameOverElement.hidden = false;
+    document.querySelector<HTMLButtonElement>("#restart-button")?.focus({ preventScroll: true });
+  }
 
   #hasBeenDisposed(): boolean {
     return this.#isDisposed;
@@ -1103,7 +1131,7 @@ export class GameApplication {
     const phase = this.#phaseOneController;
     if (phase !== null) {
       const progress = requireMenuElement(this.#interfaceLayerElement, "#phase-progress");
-      progress.setAttribute("value", String(phase.phaseElapsedSeconds / phase.totalDurationSeconds));
+      progress.setAttribute("value", String(this.#actions.ranked ? this.#runSeconds / 120 : phase.phaseElapsedSeconds / phase.totalDurationSeconds));
       progress.setAttribute("aria-valuetext", `Этап ${String(phase.currentStageNumber)}`);
 
     }
@@ -1137,6 +1165,10 @@ export class GameApplication {
       { best: this.#combo.best, bonus: this.#combo.bonus },
     );
     this.#profile.creditRuns([result]);
+    if (outcome === "completed" && this.#sentResult !== result.id) {
+      this.#sentResult = result.id;
+      this.#actions.onFinished?.(result, Math.round(this.#runSeconds * 1000));
+    }
     if (outcome === "completed" && !this.#recordCelebrated && result.score > previousBest) {
       this.#recordCelebrated = true;
       this.#recordHapticTimer = setTimeout(() => {

@@ -1,3 +1,5 @@
+import { NetworkView } from "./network/NetworkView";
+import type { RunTicket } from "./network/types";
 import { initializeHudArt } from "./ui/HudArt";
 import { getGameSounds } from "./feedback/GameSounds";
 import { initializeFeedbackControls } from "./feedback/FeedbackControls";
@@ -60,9 +62,12 @@ const restartButton = restartButtonElement;
 initializeHudArt();
 initializeFeedbackControls();
 getGameSounds();
+const network = new NetworkView();
 let requestedGuidedRun = false;
+let requestedRanked = false;
+let activeTicket: RunTicket | null = null;
 const lifecycle = new ApplicationLifecycle(
-  () => new GameApplication(
+  () => { return new GameApplication(
     canvas,
     status,
     boostButtonElement,
@@ -83,14 +88,17 @@ const lifecycle = new ApplicationLifecycle(
       menu: pauseMenu,
     },
     {
-      guided: requestedGuidedRun || !hasFinishedOpening(),
+      guided: !requestedRanked && (requestedGuidedRun || !hasFinishedOpening()),
+      ranked: requestedRanked,
+      onFinished: (result, durationMs) => { const ticket = activeTicket; if (ticket !== null) network.online.enqueue({ticket,result,durationMs}); },
       restart: restartApplication,
       exit: exitApplication,
     },
-  ),
+  ); },
 );
 
 function showStartupError(error: unknown): void {
+  lifecycle.dispose();
   const message = error instanceof Error ? error.message : "Unknown startup error";
   status.textContent = `Ошибка запуска: ${message}`;
   requireElement("#start-error").textContent = status.textContent;
@@ -103,6 +111,7 @@ async function restartApplication(): Promise<void> {
   requestedGuidedRun = false;
   restartButton.disabled = true;
   try {
+    activeTicket = requestedRanked ? await network.beginRun() : null;
     await lifecycle.restart();
   } catch (error: unknown) {
     showStartupError(error);
@@ -114,6 +123,7 @@ async function restartApplication(): Promise<void> {
 function exitApplication(): void {
   lifecycle.dispose();
   startScreen.hidden = false;
+  network.showMenu();
   interfaceLayer.inert = true;
   requireElement("#start-error").textContent = "";
   shop.refreshBalance();
@@ -182,6 +192,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-re
   button.addEventListener("click", () => {
     renderRunHistory(recordsDialog, getBrowserRunHistory());
     recordsDialog.showModal();
+    network.openRecords();
   });
 }
 requireElement("#records-close").addEventListener("click", () => { recordsDialog.close(); });
@@ -197,12 +208,16 @@ const tutorial = new TutorialController(tutorialDialog);
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-tutorial]")) {
   button.addEventListener("click", () => { tutorial.open(); });
 }
-const startRun = (guided = !hasFinishedOpening()): void => {
+const startRun = (guided = !network.wantsRanked && !hasFinishedOpening()): void => {
   if (startButton.disabled) return;
   requestedGuidedRun = guided;
+  requestedRanked = network.wantsRanked && !guided;
   startButton.disabled = true;
   requireElement("#start-error").textContent = "Загрузка…";
-  void lifecycle.restart().then(() => {
+  void (async () => {
+    activeTicket = requestedRanked ? await network.beginRun() : null;
+    await lifecycle.restart();
+  })().then(() => {
     requestedGuidedRun = false;
     startScreen.hidden = true;
     interfaceLayer.inert = false;

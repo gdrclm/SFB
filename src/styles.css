@@ -2376,3 +2376,21 @@ html[data-quality="low"] .atmosphere-particles { display: none; }
 html[data-quality="low"] #pause-menu,
 html[data-quality="low"] #game-over,
 html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }
+
+.player-badge { display:block; width:100%; margin:0 0 8px; padding:7px; border:1px solid #19cfff; border-radius:12px; background:#032245; color:#aff8ff; font:inherit; font-size:.8rem; cursor:pointer; overflow-wrap:anywhere; }
+.ranked-mode { display:flex; align-items:center; justify-content:center; gap:6px; color:#d6faff; font-size:.72rem; }
+.ranked-mode input { accent-color:#00e7b4; }
+#start-screen .network-note, .network-note { color:#a2cfe5; font-size:.68rem; line-height:1.4; overflow-wrap:anywhere; }
+#start-screen .network-note { margin:6px 0 10px; }
+#player-dialog { width:min(360px,calc(100vw - 24px)); }
+#player-form { display:grid; gap:10px; text-align:left; }
+#player-form input { width:100%; border:1px solid #29d8ff; border-radius:12px; padding:12px; background:#01152e; color:#fff; font-size:1rem; }
+.network-action, .records-tabs button { padding:10px 14px; border:1px solid #23d9ff; border-radius:12px; background:linear-gradient(#085287,#022349); color:#fff; font:inherit; font-weight:800; cursor:pointer; }
+.records-tabs { display:flex; gap:7px; margin-bottom:15px; }
+.records-tabs button { flex:1; font-size:.74rem; }
+.records-tabs button[aria-selected="true"] { border-color:#5cffe2; background:#075a64; box-shadow:0 0 8px #00e3bd55; }
+.leaderboard-self { padding:12px; border:1px solid #47f4dc; border-radius:12px; color:#b4ffee; font-size:.8rem; }
+.record-self { outline:1px solid #52ffe1; }
+#result-network-status:empty { display:none; }
+@media(max-height:620px){#start-screen .game-over-card{padding-top:10px;}#start-screen .bank-balance{margin-bottom:7px;}#start-screen .menu-tagline{display:none;}#start-screen .network-note{margin:3px 0 6px;}}
+@media(max-height:470px) and (orientation:landscape){#start-screen .player-badge,#start-screen .ranked-mode,#start-screen .network-note{grid-column:1;}#start-screen .main-menu-actions{grid-column:2;grid-row:1 / span 8;}#start-screen .menu-training{grid-column:1;grid-row:auto;}}

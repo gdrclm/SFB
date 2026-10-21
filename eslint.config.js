@@ -8,6 +8,7 @@ export default tseslint.config(
   {
     ignores: ["docs/**", "dist/**", "coverage/**", "eslint.config.js"],
   },
+  { ...tseslint.configs.disableTypeChecked, files:["server/**/*.mjs"], languageOptions:{globals:globals.node} },
   {
     files: ["src/**/*.ts", "*.config.ts"],
     languageOptions: {

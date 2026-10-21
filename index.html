@@ -152,7 +152,7 @@
               <p id="death-reason"></p>
             </details>
             <button id="restart-button" type="button"><span aria-hidden="true">↻</span> Ещё раз</button>
-            <p id="result-save-status" role="status"></p>
+            <p id="result-save-status" role="status"></p><p id="result-network-status" class="network-note" role="status"></p>
             <button class="records-button" type="button" data-open-records><span class="records-medal" aria-hidden="true">★</span><span>Рекорды</span><span aria-hidden="true">›</span></button>
             <button id="results-menu-button" type="button"><svg class="result-home-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 15 16 5l12 10M7 13v14h7v-8h4v8h7V13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Главное меню</span><span class="result-menu-arrow" aria-hidden="true">›</span></button>
           </div>
@@ -164,6 +164,9 @@
           <h1 id="start-title">Speed Fall Ball</h1>
           <p class="menu-tagline">Падай. Разбивай. Ускоряйся.</p>
           <p class="bank-balance"><span class="coin-emblem" aria-hidden="true">★</span><strong data-bank-coins>0</strong><span class="bank-caption">монет</span></p>
+          <button id="player-button" class="player-badge" type="button">Игрок · выбрать имя</button>
+          <label class="ranked-mode"><input id="ranked-mode" type="checkbox" disabled> Демо 120 с · общий рейтинг</label>
+          <p id="network-status" class="network-note" role="status">Подключение…</p>
           <div class="main-menu-actions">
             <button id="start-run-button" type="button"><span aria-hidden="true">▶︎</span> Начать забег</button>
             <button id="missions-button" class="menu-tile" type="button" aria-controls="missions-dialog"><span aria-hidden="true">◇</span> Задания<span aria-hidden="true">›</span></button>
@@ -176,6 +179,11 @@
 
         </div>
       </section>
+      <dialog id="player-dialog" class="arcade-records" aria-labelledby="player-title">
+        <header class="records-header"><h1 id="player-title">Твой игрок</h1><button id="player-close" class="settings-close" type="button" aria-label="Закрыть">×</button></header>
+        <form id="player-form"><label for="player-name">Имя в рейтинге</label><input id="player-name" name="nickname" minlength="2" maxlength="16" autocomplete="nickname" required placeholder="Например, Метеор"><p class="network-note">2–16 букв или цифр. Без пароля и почты.</p><button id="player-save" class="network-action" type="submit">Сохранить имя</button></form>
+        <p id="player-id" class="network-note"></p><p id="player-error" role="alert" class="network-note"></p>
+      </dialog>
       <dialog id="missions-dialog" class="arcade-records" aria-labelledby="missions-title">
         <header class="records-header"><h1 id="missions-title">Задания</h1><button id="missions-close" class="settings-close" type="button" aria-label="Закрыть задания">×</button></header>
         <p class="missions-caption">Выбери одно для забега</p>
@@ -202,18 +210,27 @@
         <p id="reset-data-description">Рекорды, монеты, все покупки, задания и настройки будут удалены. Текущий забег завершится.</p>
         <p class="reset-data-warning">Вернуть данные не получится.</p>
         <p id="reset-data-error" role="alert" hidden></p>
-        <div class="reset-data-actions">
+        <p class="network-note">Сетевой профиль и общий рекорд сохранятся.</p><div class="reset-data-actions">
           <button id="reset-data-cancel" type="button" autofocus>Отмена</button>
           <button id="reset-data-confirm" class="reset-data-action" type="button">Сбросить всё</button>
         </div>
       </dialog>
       <dialog id="records" class="arcade-records" aria-labelledby="records-title">
         <header class="records-header"><div><span class="menu-eyebrow">ЛИЧНЫЙ ТОП</span><h1 id="records-title">Рекорды</h1></div><button id="records-close" type="button" aria-label="Закрыть рекорды">×</button></header>
+        <nav class="records-tabs" role="tablist" aria-label="Рекорды"><button type="button" data-records-tab="local" role="tab" aria-selected="true">Мои рекорды</button><button type="button" data-records-tab="global" role="tab" aria-selected="false">Общий рейтинг</button></nav>
+        <div id="local-records" role="tabpanel">
         <div class="records-bests" data-personal-bests></div>
         <h2 class="records-list-title">Лучшие забеги <span>ТОП 10</span></h2>
         <ol class="records-list" data-run-records aria-label="Забеги по очкам"></ol>
         <p class="records-local-note">Твои результаты на этом устройстве</p>
         <p data-storage-status role="status"></p>
+        </div>
+        <div id="global-records" role="tabpanel" hidden>
+          <p id="leaderboard-self" class="leaderboard-self">Твой первый результат впереди</p>
+          <ol id="global-record-list" class="records-list" aria-label="Общий рейтинг"></ol>
+          <p id="leaderboard-status" class="network-note" role="status"></p>
+          <button id="leaderboard-refresh" class="network-action" type="button">Обновить</button>
+        </div>
       </dialog>
       <dialog id="shop" aria-labelledby="shop-title">
         <header class="shop-header"><div><h1 id="shop-title">Магазин</h1><p>Монеты: ★ <strong data-bank-coins>0</strong></p></div><button id="shop-close" type="button">Назад</button></header>

@@ -37,3 +37,8 @@ it("restores removed values and reports failure if deletion is interrupted", () 
   expect(() => { resetGameData(storage); }).toThrow("Storage blocked");
   expect(data).toEqual(before);
 });
+
+it("keeps network identity and pending results when resetting local game progress",()=>{
+ const {data,storage}=storageFixture();data.set("speed-fall-ball.network.auth.v1","session");data.set("speed-fall-ball.network.outbox.v1","pending");
+ resetGameData(storage);expect(data.get("speed-fall-ball.network.auth.v1")).toBe("session");expect(data.get("speed-fall-ball.network.outbox.v1")).toBe("pending");expect(data.has("speed-fall-ball.profile.v1")).toBe(false);
+});

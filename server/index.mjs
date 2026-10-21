@@ -1,0 +1,10 @@
+import { mkdirSync, chmodSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createRatingServer } from './rating.mjs';
+process.umask(0o077);
+mkdirSync('.runtime',{recursive:true});
+const filename=resolve(process.env.SFB_RATING_DB??'.runtime/ratings.sqlite');
+const origins=(process.env.SFB_ALLOWED_ORIGINS??'https://gdrclm.github.io,http://127.0.0.1:5173,http://127.0.0.1:4173').split(',');
+const server=createRatingServer({filename,origins});chmodSync(filename,0o600);
+server.listen(Number(process.env.PORT??8787),process.env.HOST??(process.env.PORT?'0.0.0.0':'127.0.0.1'),()=>console.log('SFB temporary rating API listening on 127.0.0.1:'+String(server.address().port)));
+for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>process.exit(0)));

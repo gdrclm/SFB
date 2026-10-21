@@ -198,14 +198,14 @@ export class PlayerProfile {
   }
 }
 
-export function createPlayerConfig(config: GameConfig, profile: PlayerProfile): GameConfig {
+export function createPlayerConfig(config: GameConfig, profile: PlayerProfile, ranked = false): GameConfig {
   const color = profile.equipment.ball === "ball-gold" ? { r: 1, g: 0.72, b: 0.18 }
     : profile.equipment.ball === "ball-mint" ? { r: 0.22, g: 1, b: 0.68 } : null;
   return { ...config,
-    boost: { ...config.boost, comboHitsRequired: Math.max(4, config.boost.comboHitsRequired - profile.level("combo-charge")) },
+    boost: { ...config.boost, comboHitsRequired: Math.max(4, config.boost.comboHitsRequired - (ranked ? 0 : profile.level("combo-charge"))) },
     economy: { ...config.economy,
-      initialEnergy: config.economy.initialEnergy + profile.level("energy") * 5,
-      energyPerCoin: config.economy.energyPerCoin + profile.level("coin-energy"),
+      initialEnergy: config.economy.initialEnergy + (ranked ? 0 : profile.level("energy")) * 5,
+      energyPerCoin: config.economy.energyPerCoin + (ranked ? 0 : profile.level("coin-energy")),
     },
     ballVisual: { ...config.ballVisual, ...(color === null ? {} : { baseColor: color, speedColor: color }) },
   };

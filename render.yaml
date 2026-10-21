@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sfb-demo-rating
+    runtime: node
+    plan: free
+    buildCommand: node --version
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOST
+        value: 0.0.0.0
+      - key: SFB_ALLOWED_ORIGINS
+        value: https://gdrclm.github.io

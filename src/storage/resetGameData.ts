@@ -1,11 +1,11 @@
 type GameStorage = Pick<Storage, "length" | "key" | "getItem" | "setItem" | "removeItem">;
 
-/** GitHub Pages shares an origin with other projects: only remove SFB keys. */
+/** GitHub Pages shares an origin with other projects: only remove SFB game keys; retain online identity and pending submissions. */
 export function resetGameData(storage: GameStorage): void {
   const saved = new Map<string, string>();
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i);
-    if (key?.startsWith("speed-fall-ball.")) {
+    if (key?.startsWith("speed-fall-ball.") && !key.startsWith("speed-fall-ball.network.")) {
       const value = storage.getItem(key);
       if (value !== null) saved.set(key, value);
     }
