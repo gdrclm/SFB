@@ -10,6 +10,7 @@ import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missio
 import { renderPinnedMission } from "../run/renderMissionBoard";
 import { waitForPlatformSprites } from "../platform/PlatformSprites";
 import { advanceIdleTime } from "../platform/PlatformIdle";
+import { setPlatformCrystalBlend } from "../platform/PlatformCrystalSkin";
 import { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -640,6 +641,7 @@ export class GameApplication {
       this.#renderPauseSummary();
     }
     this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds);
+    if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     this.#scene?.render();
     this.#contextGuide?.layout();
     this.#platformLabels?.render();

@@ -71,7 +71,9 @@ export class PlatformController {
 
   public createBreakFragment(index: number, fragmentWidth: number): Mesh {
     const fragment = createAtlasSprite(`${this.id}-fragment-${String(index)}`, this.#scene);
-    const rect = debrisSpriteRect(platformSpriteRow(this.#kind, this.#approachState), index);
+    const row = platformSpriteRow(this.#kind, this.#approachState);
+    fragment.metadata = { spriteAtlas: "neon-rocks", row };
+    const rect = debrisSpriteRect(row, index);
     const width = Math.max(.48, Math.min(1.05, fragmentWidth * .85));
     setAtlasQuad(fragment, rect, width, width * rect.height / rect.width);
     fragment.position.z = this.mesh.position.z - this.size.depth / 2 - .04;

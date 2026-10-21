@@ -13,6 +13,7 @@ export class DepthBackdrop {
   readonly #appearance: WorldAppearance;
   readonly #locations = new DepthLocations();
   #location: DepthLocation = "sky";
+  #currentLocation: DepthLocation = "sky";
   #current: Mesh;
   #next: Mesh | null = null;
   #blend = 0;
@@ -22,6 +23,10 @@ export class DepthBackdrop {
     this.#scene = scene; this.#rig = rig; this.#appearance = appearance;
     this.#current = createPhaseOneBackdrop(scene, rig, appearance);
     preloadCrystalBackdrop();
+  }
+  public get crystalBlend(): number {
+    if (this.#next === null) return this.#currentLocation === "crystal" ? 1 : 0;
+    return (this.#currentLocation === "crystal" ? 1 - this.#blend : 0) + (this.#location === "crystal" ? this.#blend : 0);
   }
   public update(depth: number, realSeconds: number): void {
     const location = this.#locations.observe(depth);
@@ -39,6 +44,7 @@ export class DepthBackdrop {
       if (this.#blend >= 1) {
         this.#current.dispose(false, true);
         this.#current = this.#next; this.#next = null;
+        this.#currentLocation = this.#location;
         this.#current.position.z = 6;
       }
     }

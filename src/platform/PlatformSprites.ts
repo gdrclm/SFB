@@ -3,6 +3,7 @@ import idleAtlasUrl from "../assets/platforms/neon-idle-12.webp";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./PlatformIdle";
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
+import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Material } from "@babylonjs/core/Materials/material";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -35,6 +36,7 @@ function atlasMaterial(scene: Scene, idle = false): StandardMaterial {
   texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
   material.diffuseTexture = texture;
   if (idle) new PlatformIdleBlend(material);
+  new PlatformCrystalSkin(material);
   cache.set(scene, material);
   material.onDisposeObservable.addOnce(() => { cache.delete(scene); });
   return material;
