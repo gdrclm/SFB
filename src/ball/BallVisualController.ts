@@ -124,7 +124,7 @@ export class BallVisualController implements FixedSimulationSystem {
     if (event === "hurt" || event === "break") { this.#impactElapsed = 0; this.#impactKind = event; }
     if (!this.#expression.react(event)) return;
     (this.#ball.metadata as { expression: BallExpression }).expression = this.#expression.current;
-    getBallFace(this.#ball)?.update(this.#expression.current, event === "defeat" ? .2 : .025, 0);
+    getBallFace(this.#ball)?.update(this.#expression.current, event === "defeat" ? .2 : .025, 0, event === "boost");
     if (event !== "neutral" && event !== "focus") {
       this.#pulseElapsed = 0;
       this.#pulseMaterial.emissiveColor.set(event === "hurt" || event === "defeat" ? 1 : event === "coin" ? 1 : .1,
@@ -140,13 +140,13 @@ export class BallVisualController implements FixedSimulationSystem {
   }
 
   public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
-    this.#expression.update(realDeltaSeconds, this.#danger || this.#motion.fallSpeed >= 24);
+    this.#expression.update(realDeltaSeconds, this.#motion.fallSpeed >= 45, this.#danger, this.#motion.fallSpeed >= 16);
     (this.#ball.metadata as { expression: BallExpression }).expression = this.#expression.current;
     const look = Math.max(-1, Math.min(1, (this.#motion.horizontalVelocity ?? 0) / 9));
-    getBallFace(this.#ball)?.update(this.#expression.current, realDeltaSeconds, look);
+    const blinking = getBallFace(this.#ball)?.update(this.#expression.current, realDeltaSeconds, look, (this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1) || (this.#expression.current === "break" && this.#impactElapsed < .07)) ?? false;
     const poseAmount = smoothFactor(10, realDeltaSeconds);
-    this.#ball.rotation.z += (-look * .18 - this.#ball.rotation.z) * poseAmount;
-    this.#ball.rotation.y += (look * .2 - this.#ball.rotation.y) * poseAmount;
+    this.#ball.rotation.z += (-look * .35 - this.#ball.rotation.z) * poseAmount;
+    this.#ball.rotation.y += (look * .35 - this.#ball.rotation.y) * poseAmount;
     this.#pulseElapsed += realDeltaSeconds;
     const pulse = clamp01(this.#pulseElapsed / .36);
     this.#pulse.scaling.setAll(1 + pulse * 1.4);
@@ -183,26 +183,12 @@ export class BallVisualController implements FixedSimulationSystem {
     const impact = impactProgress < .22 ? -Math.sin(impactProgress / .22 * Math.PI / 2)
       : Math.sin((impactProgress - .22) / .78 * Math.PI * 2 - Math.PI / 2) * (1 - impactProgress);
     const impactScale = impactProgress >= 1 ? 1 : 1 + impact * (this.#impactKind === "hurt" ? .38 : .22);
-    const targetVerticalScale = Math.max(.55, (movementStretch + boostStretch) * impactScale);
-    const targetHorizontalScale = 1 / Math.sqrt(targetVerticalScale);
+    const targetVerticalScale = Math.max(.55, (movementStretch + boostStretch + Math.abs(look) * .08) * impactScale * (blinking ? .9 : 1));
     const scaleAmount = smoothFactor(this.#config.scaleSharpness, fixedDeltaSeconds);
-    this.#ball.scaling.set(
-      lerp(
-        this.#ball.scaling.x,
-        this.#baseScale.x * targetHorizontalScale,
-        scaleAmount,
-      ),
-      lerp(
-        this.#ball.scaling.y,
-        this.#baseScale.y * targetVerticalScale,
-        scaleAmount,
-      ),
-      lerp(
-        this.#ball.scaling.z,
-        this.#baseScale.z * targetHorizontalScale,
-        scaleAmount,
-      ),
-    );
+    const verticalScale = lerp(this.#ball.scaling.y / this.#baseScale.y, targetVerticalScale, scaleAmount);
+    // Preserve volume throughout interpolation, not only at the target poses.
+    const crossScale = 1 / Math.sqrt(verticalScale);
+    this.#ball.scaling.set(this.#baseScale.x * crossScale, this.#baseScale.y * verticalScale, this.#baseScale.z * crossScale);
     this.#applyMaterial(this.#speedIntensity);
   }
 
@@ -230,9 +216,9 @@ export class BallVisualController implements FixedSimulationSystem {
     }
 
     const progress = clamp01(elapsedSeconds / this.#config.boostDurationSeconds);
-    const boostStretch = progress < .12
-      ? -.18 * this.#boostStrength * Math.sin(progress / .12 * Math.PI / 2)
-      : this.#config.boostStretch * this.#boostStrength * (1 - (progress - .12) / .88) ** 2;
+    const boostStretch = progress < .26
+      ? -.38 * this.#boostStrength * Math.sin(progress / .26 * Math.PI / 2)
+      : this.#config.boostStretch * this.#boostStrength * (1 - (progress - .26) / .74) ** 2;
     const nextElapsedSeconds = elapsedSeconds + fixedDeltaSeconds;
     this.#boostElapsedSeconds = nextElapsedSeconds;
     if (

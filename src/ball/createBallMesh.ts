@@ -49,38 +49,27 @@ export function createBallMesh(scene: Scene, config: GameConfig): Mesh {
   const darkMaterial = new StandardMaterial("BallFaceDetails", scene);
   darkMaterial.diffuseColor = new Color3(0.01, 0.045, 0.09);
   darkMaterial.emissiveColor = new Color3(0.01, 0.025, 0.055);
-  darkMaterial.specularColor = new Color3(0.35, 0.6, 0.8);
+  darkMaterial.specularColor = new Color3(0.06, 0.09, 0.15);
 
   const cap = MeshBuilder.CreateTorus(
     "BallCap",
     {
       diameter: config.ball.radius * 0.72,
-      thickness: config.ball.radius * 0.17,
+      thickness: config.ball.radius * 0.075,
       tessellation: 28,
     },
     scene,
   );
   cap.parent = ball;
-  cap.position.set(0, config.ball.radius * 0.84, -config.ball.radius * 0.22);
-  cap.rotation.x = .25;
-  cap.material = blueMaterial;
+  cap.position.set(0, config.ball.radius * 0.88, -config.ball.radius * 0.48);
+  cap.rotation.x = -.5;
+  cap.material = darkMaterial;
   cap.isPickable = false;
 
-  const lowerBand = MeshBuilder.CreateTorus(
-    "BallLowerBand",
-    {
-      diameter: config.ball.radius * 1.82,
-      thickness: config.ball.radius * 0.12,
-      tessellation: 32,
-    },
-    scene,
-  );
-  lowerBand.parent = ball;
-  lowerBand.position.set(0, -config.ball.radius * 0.45, 0);
-  lowerBand.rotation.x = .06;
-
-  lowerBand.material = blueMaterial;
-  lowerBand.isPickable = false;
+  const button = MeshBuilder.CreateSphere("BallCapButton", { diameter: config.ball.radius * .62, segments: 20 }, scene);
+  button.parent = ball; button.position.copyFrom(cap.position); button.position.y += config.ball.radius * .02; button.position.z -= config.ball.radius * .01;
+  button.rotation.copyFrom(cap.rotation);
+  button.scaling.set(1, .18, 1); button.material = blueMaterial; button.isPickable = false;
 
   createBallFace(ball, config.ball.radius, darkMaterial, scene);
 

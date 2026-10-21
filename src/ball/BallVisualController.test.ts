@@ -34,6 +34,20 @@ function updateFor(controller: BallVisualController, seconds: number): void {
 }
 
 describe("BallVisualController", () => {
+  it("compresses before the boost burst and preserves volume at every intermediate pose", () => {
+    const { engine, scene, ball, controller } = createFixture();
+    controller.playBoostReaction({ success: true, previousSpeed: 10, currentSpeed: 15, energyCost: 1 });
+    let compressed = false, stretched = false;
+    for (let step = 0; step < 40; step++) {
+      controller.fixedUpdate(1 / 60);
+      if (step < 6 && ball.scaling.y < .85) compressed = true;
+      if (step >= 6 && ball.scaling.y > 1.15) stretched = true;
+      expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 10);
+    }
+    expect(compressed).toBe(true); expect(stretched).toBe(true);
+    controller.dispose(); scene.dispose(); engine.dispose();
+  });
+
   it("reacts to contact during BOOST while keeping the focused boost expression", () => {
     const contact = createFixture(), free = createFixture();
     const boost = { success: true, previousSpeed: 10, currentSpeed: 15, energyCost: 1 } as const;

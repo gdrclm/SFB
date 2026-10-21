@@ -678,6 +678,7 @@ export class GameApplication {
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
+      if (hit.tierIncreased) this.#ballVisualController?.react("combo");
       if (this.#boostController?.recordSuccessfulHit()) this.#boostButton?.playCharged();
       this.#comboView?.hit(hit);
       this.#updateMission({ type: "hit", combo: hit.count });
