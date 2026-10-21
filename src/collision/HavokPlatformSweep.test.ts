@@ -1,3 +1,4 @@
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -42,6 +43,24 @@ describe("HavokPlatformSweep", () => {
     platform.setApproachFeedback(null);
     expect(platform.approachState).toBeNull();
     expect(sprite.metadata).toMatchObject({ row: 0 });
+    const positions = Array.from(sprite.getVerticesData(VertexBuffer.PositionKind) ?? []);
+    const positionBuffer = sprite.getVertexBuffer(VertexBuffer.PositionKind);
+    const uvBuffer = sprite.getVertexBuffer(VertexBuffer.UVKind);
+    const poses = new Set<number>();
+    for (let frame = 1; frame <= 12; frame++) {
+      platform.setApproachFeedback(null, frame / 12);
+      poses.add((sprite.metadata as { frame: number }).frame);
+      expect(Array.from(sprite.getVerticesData(VertexBuffer.PositionKind) ?? [])).toEqual(positions);
+      expect(sprite.getVertexBuffer(VertexBuffer.PositionKind)).toBe(positionBuffer);
+      expect(sprite.getVertexBuffer(VertexBuffer.UVKind)).toBe(uvBuffer);
+    }
+    expect(poses.size).toBe(12);
+    platform.setApproachFeedback(null, .42);
+    const pausedUVs = Array.from(sprite.getVerticesData(VertexBuffer.UVKind) ?? []);
+    for (let i = 0; i < 20; i++) platform.setApproachFeedback(null, .42);
+    expect(Array.from(sprite.getVerticesData(VertexBuffer.UVKind) ?? [])).toEqual(pausedUVs);
+    platform.setApproachFeedback(null, 0);
+    expect(sprite.metadata).toMatchObject({ frame: 0, idleFrames: 12 });
     const standardVertexCount = platform.mesh.getTotalVertices();
     expect(platform.mesh.getTotalVertices()).toBe(24);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.x * 2)

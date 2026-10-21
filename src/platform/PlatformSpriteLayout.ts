@@ -40,14 +40,16 @@ export interface PlatformSpriteSlice { readonly left: number; readonly right: nu
 /** Fixed-size end caps and repeated middle pieces avoid stretching the rock on wide lanes. */
 export function platformSpriteSlices(width: number, rect: SpriteRect): readonly PlatformSpriteSlice[] {
   const cap = Math.min(.72, width / 3);
+  const leftPixels = rect.width * 69 / 244;
+  const middlePixels = rect.width * 106 / 244;
   const middle = width - cap * 2;
   const count = Math.max(1, Math.ceil(middle / 1.35));
   const left = -width / 2;
-  const slices: PlatformSpriteSlice[] = [{ left, right: left + cap, rect: { ...rect, width: 69 } }];
+  const slices: PlatformSpriteSlice[] = [{ left, right: left + cap, rect: { ...rect, width: leftPixels } }];
   for (let i = 0; i < count; i++) slices.push({
     left: left + cap + middle * i / count, right: left + cap + middle * (i + 1) / count,
-    rect: { ...rect, x: rect.x + 69, width: 106 },
+    rect: { ...rect, x: rect.x + leftPixels, width: middlePixels },
   });
-  slices.push({ left: width / 2 - cap, right: width / 2, rect: { ...rect, x: rect.x + 175, width: 69 } });
+  slices.push({ left: width / 2 - cap, right: width / 2, rect: { ...rect, x: rect.x + leftPixels + middlePixels, width: leftPixels } });
   return slices;
 }

@@ -66,8 +66,7 @@ export class PlatformController {
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, this.#approachState), elapsedSeconds);
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.
-    const pulse = (Math.sin(elapsedSeconds * Math.PI * 1.6) + 1) / 2;
-    this.#sprite.mesh.visibility = this.#approachState === "danger" ? .78 + pulse * .22 : this.#approachState === "boost" ? .84 + pulse * .16 : 1;
+    this.#sprite.mesh.visibility = 1;
   }
 
   public createBreakFragment(index: number, fragmentWidth: number): Mesh {
