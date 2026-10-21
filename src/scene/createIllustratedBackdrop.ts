@@ -1,4 +1,5 @@
-import crystalDistantUrl from "../assets/worlds/neon-crystal-distant-atlas.webp";
+import crystalObjectUrl from "../assets/worlds/neon-crystal-object-atlas.webp";
+import crystalCloudUrl from "../assets/worlds/neon-crystal-clouds.webp";
 import crystalUrl from "../assets/worlds/neon-crystal-distance.webp";
 import skyDistanceUrl from "../assets/worlds/sky-islands-distance.webp";
 import { BackdropScenery } from "./BackdropScenery";
@@ -15,10 +16,8 @@ import type { WorldAppearance } from "./createPhaseOneBackdrop";
 export function preloadCrystalBackdrop(): void {
   const image = new Image();
   image.src = crystalUrl;
-  const distant = new Image(); distant.src = crystalDistantUrl;
-  // Warm only the next location; retain no decoded canvas copies in game memory.
-  for (const url of Object.values(import.meta.glob<string>("../assets/worlds/neon-crystal-card-*.webp", { eager: true, query: "?url", import: "default" }))) {
-    const card = new Image(); card.src = url;
+  for (const url of [crystalObjectUrl, crystalCloudUrl]) {
+    const image = new Image(); image.src = url;
   }
 }
 

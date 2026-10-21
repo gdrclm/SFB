@@ -1,47 +1,94 @@
-"""Separate distant crystal islands from the supplied illustration (requires Pillow).
-Run after extract-backdrop-layers.py. Atlas cells are 160x192, matching
-src/scene/CrystalSceneryLayout.ts. No image processing runs on the phone.
+"""Bake complete crystal silhouettes and a separate cloud plate. Requires Pillow and NumPy.
+Run from the repository root (Pillow and NumPy). Geometry comes from crystal-contours.json: objects
+are cut by their outlines, never by horizontal bands or rectangular RGB mattes.
+The original illustration is untouched. Generated TS is the atlas manifest.
 """
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 from pathlib import Path
+import json
 import math
+import numpy as np
 
 root = Path('src/assets/worlds')
 source = Image.open(root / 'neon-crystal.webp').convert('RGB').resize((941, 1672))
-regions = [(205,165,282,255), (238,380,308,455), (641,600,745,716),
-           (271,1420,368,1533), (590,1228,706,1377), (678,148,816,289),
-           (177,1122,319,1247)]
-atlas = Image.new('RGBA', (1120, 192))
-for index, (x0,y0,x1,y1) in enumerate(regions):
-    island = source.crop((x0,y0,x1,y1)).convert('RGBA')
-    alpha = Image.new('L', island.size)
-    for y in range(island.height):
-        for x in range(island.width):
-            pixel = island.getpixel((x,y))[:3]
-            sky = source.getpixel((470,y0+y))
-            distance = math.sqrt(sum((a-b)**2 for a,b in zip(pixel, sky)))
-            matte = max(0, min(1, (distance-24)/28))
-            edge = min(1, x/10, y/10, (island.width-1-x)/10, (island.height-1-y)/10)
-            alpha.putpixel((x,y), round(255*matte*edge))
-    island.putalpha(alpha)
-    atlas.paste(island, (index*160+(160-island.width)//2, (192-island.height)//2))
-atlas.save(root / 'neon-crystal-distant-atlas.webp', quality=92)
+objects = json.loads(Path('tools/crystal-contours.json').read_text())
+combined = Image.new('L', source.size)
+records = []
+for obj in objects:
+    # Supersampled silhouettes preserve opaque dark rock inside the contour.
+    mask = Image.new('L', (941*2, 1672*2))
+    ImageDraw.Draw(mask).polygon([(x*2,y*2) for x,y in obj['points']], fill=255)
+    mask = mask.resize(source.size, Image.Resampling.LANCZOS)
+    combined = Image.composite(Image.new('L',source.size,255), combined, mask)
+    mask = mask.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(1.8))
+    bounds = mask.getbbox()
+    if bounds is None:
+        raise ValueError(obj['name'])
+    sprite = source.convert('RGBA').crop(bounds)
+    sprite.putalpha(mask.crop(bounds))
+    records.append((obj, bounds, sprite))
 
-# Clear the original copies from foreground cards, so they no longer move
-# together with the nearer cloud bank or appear twice at different depths.
-bands = ([0,390,700,1010,1330,1672],[0,350,700,1010,1320,1672])
-for side, edges in enumerate(bands):
-    for i, (start,end) in enumerate(zip(edges,edges[1:])):
-        y0,y1=max(0,start-34),min(1672,end+34)
-        x0=0 if side==0 else 531
-        path=root/f'neon-crystal-card-{side}-{i}.webp'
-        card=Image.open(path).convert('RGBA')
-        for left,top,right,bottom in regions:
-            for y in range(max(top-40,y0), min(bottom+40,y1)):
-                for x in range(max(left-40,x0),min(right+40,x0+410)):
-                    r,g,b,a=card.getpixel((x-x0,y-y0))
-                    radius=math.sqrt(((x-(left+right)/2)/((right-left)/2+20))**2 + ((y-(top+bottom)/2)/((bottom-top)/2+20))**2)
-                    t=max(0,min(1,(radius-.65)/.65))
-                    clear=1-t*t*(3-2*t)
-                    card.putpixel((x-x0,y-y0),(r,g,b,round(a*(1-clear))))
-        card.save(path,quality=92)
+# Pack whole silhouettes with transparent gutters. Each atlas entry is unique.
+atlas = Image.new('RGBA', (1024, 2048))
+x = y = row = 4
+manifest = []
+for obj,bounds,sprite in sorted(records, key=lambda item: -item[2].height):
+    if x + sprite.width + 4 > 1024:
+        x = 4
+        y += row + 8
+        row = 0
+    atlas.paste(sprite, (x,y))
+    manifest.append({'name':obj['name'],'bounds':list(bounds),'atlas':[x,y,sprite.width,sprite.height],
+                     'rate':obj['rate'],'edge':obj['edge']})
+    x += sprite.width + 8
+    row = max(row, sprite.height)
+height = math.ceil((y+row+4)/16)*16
+if height > 2048:
+    raise ValueError('Atlas overflow')
+atlas.crop((0,0,1024,height)).save(root/'neon-crystal-object-atlas.webp',quality=94)
+
+# A flattened illustration has no cloud pixels behind its rocks. Reconstruct
+# that hidden area as soft atmospheric haze rather than punching transparent
+# island-shaped holes in the cloud plate. Keep the visible cloud contours.
+unknown = combined.filter(ImageFilter.MaxFilter(71))
+known = 1 - np.asarray(unknown, dtype=np.float32) / 255
+def blur(values, sigma=80):
+    # Float convolution avoids contour bands from dividing two 8-bit blurs.
+    padded=np.pad(values,((192,192),(192,192)),mode='reflect')
+    fy=np.fft.fftfreq(padded.shape[0])[:,None]
+    fx=np.fft.rfftfreq(padded.shape[1])[None,:]
+    kernel=np.exp(-2*math.pi**2*sigma**2*(fy*fy+fx*fx))
+    result=np.fft.irfft2(np.fft.rfft2(padded)*kernel,s=padded.shape)
+    return result[192:-192,192:-192]
+weight = blur(known)
+repaired = np.zeros((1672,941,3), dtype=np.uint8)
+for channel in range(3):
+    values = np.asarray(source,dtype=np.float32)[:,:,channel] * known
+    repaired[:,:,channel] = np.uint8(np.clip(blur(values) / np.maximum(.0001,weight),0,255))
+repair = unknown.filter(ImageFilter.GaussianBlur(8))
+clouds = Image.composite(Image.fromarray(repaired), source, repair)
+alpha = Image.new('L',source.size)
+for py in range(1672):
+    sky=source.getpixel((470,py))
+    for px in range(941):
+        pixel=clouds.getpixel((px,py))
+        distance=math.sqrt(sum((a-b)**2 for a,b in zip(pixel,sky)))
+        opacity=max(0,min(1,(distance-10)/32))
+        alpha.putpixel((px,py),round(255*opacity*min(1,py/72,(1671-py)/72)))
+clouds=clouds.convert('RGBA')
+clouds.putalpha(alpha)
+clouds.resize((512,912),Image.Resampling.LANCZOS).save(root/'neon-crystal-clouds.webp',quality=92)
+
+header='// Generated by tools/extract-crystal-islands.py from complete silhouette masks.\n'
+Path('src/scene/CrystalSceneryLayout.ts').write_text(header+
+    f'export const CRYSTAL_ATLAS_SIZE = [1024, {height}] as const;\n'+
+    'export const CRYSTAL_SCENERY = '+json.dumps(manifest,indent=2)+' as const;\n')
+# Reviewable contact sheet shows each complete extracted object on charcoal.
+thumbs=Image.new('RGB',(800,math.ceil(len(records)/4)*210),'#172030')
+for index,(obj,bounds,sprite) in enumerate(records):
+    tile=sprite.copy();tile.thumbnail((185,175))
+    tx=(index%4)*200+(200-tile.width)//2;ty=(index//4)*210
+    thumbs.paste(tile,(tx,ty),tile)
+    ImageDraw.Draw(thumbs).text(((index%4)*200+5,ty+180),obj['name'],fill='white')
+thumbs.save('/tmp/sfb-crystal-contours-review.png')
+print(f'Baked {len(records)} whole islands into 1024x{height}, plus a separate cloud plate.')

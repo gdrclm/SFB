@@ -12,7 +12,6 @@ root = Path('src/assets/worlds')
 # remain in each card, with a soft matte blending them into the distant sky.
 bands = {
     'sky-islands': ([0, 480, 735, 1020, 1230, 1672], [0, 550, 810, 1110, 1330, 1672]),
-    'neon-crystal': ([0, 390, 700, 1010, 1330, 1672], [0, 350, 700, 1010, 1320, 1672]),
 }
 for name, sides in bands.items():
     source = Image.open(root / f'{name}.webp').convert('RGB')
