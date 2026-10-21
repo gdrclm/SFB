@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-Dm_zO4bG.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D7vKEA8C.css">
+    <script type="module" crossorigin src="./assets/index-BkdfNZ5a.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BmSM0nAO.css">
   </head>
   <body>
     <main id="app">
@@ -197,6 +197,17 @@
           <button id="platform-numbers-toggle" type="button" aria-pressed="false">Числа прочности: выкл.</button>
         </div>
         <p class="vibration-support" data-vibration-support></p>
+        <button id="reset-data-button" class="reset-data-action" type="button">Сбросить данные</button>
+      </dialog>
+      <dialog id="reset-data-dialog" class="arcade-records reset-data-dialog" aria-labelledby="reset-data-title" aria-describedby="reset-data-description">
+        <h1 id="reset-data-title">Начать с нуля?</h1>
+        <p id="reset-data-description">Рекорды, монеты, все покупки, задания и настройки будут удалены. Текущий забег завершится.</p>
+        <p class="reset-data-warning">Вернуть данные не получится.</p>
+        <p id="reset-data-error" role="alert" hidden></p>
+        <div class="reset-data-actions">
+          <button id="reset-data-cancel" type="button" autofocus>Отмена</button>
+          <button id="reset-data-confirm" class="reset-data-action" type="button">Сбросить всё</button>
+        </div>
       </dialog>
       <dialog id="records" class="arcade-records" aria-labelledby="records-title">
         <header class="records-header"><div><span class="menu-eyebrow">ЛИЧНЫЙ ТОП</span><h1 id="records-title">Рекорды</h1></div><button id="records-close" type="button" aria-label="Закрыть рекорды">×</button></header>

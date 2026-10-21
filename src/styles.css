@@ -2191,7 +2191,7 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 
 /* The menu, settings and records use the same glossy cyan arcade surfaces as the HUD. */
 #start-screen { background: radial-gradient(ellipse at 50% 5%, #0a6aa2 0%, #06335a 45%, #020e23 100%); padding: 12px; }
-#start-screen .game-over-card, #game-settings, #records {
+#start-screen .game-over-card, #game-settings, #records, #reset-data-dialog {
   border: 2px solid #1ee4ff; border-radius: 25px;
   background: linear-gradient(155deg, #075095, #032b5b 28%, #02152e 100%);
   box-shadow: 0 0 0 2px #065eae, 0 0 20px #00c8ff66, inset 0 2px 3px #b8f9ffcc, inset 0 0 18px #008cff44;
@@ -2213,7 +2213,7 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 #start-screen .menu-training { margin: 16px 0 0; padding: 6px 4px; min-height: 32px; border: 0; background: none; box-shadow: none; color: #a2d7ed; font: inherit; font-size: .72rem; cursor: pointer; }
 #start-screen #start-error:empty { display: none; }
 #start-screen #start-error { margin: 8px 0 0; font-size: .72rem; color: #ffd68c; }
-#game-settings::backdrop, #records::backdrop { background: #010d24d9; backdrop-filter: blur(6px); }
+#game-settings::backdrop, #records::backdrop, #reset-data-dialog::backdrop { background: #010d24d9; backdrop-filter: blur(6px); }
 #game-settings .records-header h1, #records-title { color: #efffff; text-shadow: 0 2px 1px #001126, 0 0 12px #00c8ff66; }
 #records-close, #settings-close { border: 2px solid #1ee4ff; background: linear-gradient(#0c5c9b, #032951); box-shadow: 0 0 7px #00c8ff88, inset 0 1px 2px #b8f9ff; }
 #game-settings .feedback-controls { gap: 10px; }
@@ -2309,3 +2309,23 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
   #game-over .result-impact { margin-bottom: 6px; }
   #game-over .records-button { margin-top: 8px; }
 }
+
+/* A separate, deliberate action keeps destructive controls out of the switches. */
+.reset-data-action {
+  min-height: 46px; padding: 10px 16px; border: 2px solid #ff758b; border-radius: 14px;
+  background: linear-gradient(#a72e4e, #571d38); color: #fff1f5;
+  box-shadow: inset 0 1px 2px #ffb5c4, 0 0 8px #ff315433;
+  font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer;
+}
+#game-settings > .reset-data-action { width: 100%; margin-top: 18px; }
+#reset-data-dialog { width: min(420px, calc(100vw - 24px)); padding: 24px; color: #eaffff; }
+#reset-data-dialog h1 { margin: 0 0 12px; font-size: 1.5rem; }
+#reset-data-dialog p { font-size: .9rem; line-height: 1.5; }
+.reset-data-warning, #reset-data-error { color: #ffb7c5; }
+.reset-data-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+#reset-data-cancel {
+  min-height: 46px; border: 2px solid #36ddff; border-radius: 14px;
+  background: linear-gradient(#105e91, #052c52); color: #efffff;
+  font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer;
+}
+.reset-data-actions button:focus-visible, #reset-data-button:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }

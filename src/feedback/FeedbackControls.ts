@@ -1,14 +1,17 @@
 import { FeedbackSettings, type FeedbackSetting } from "./FeedbackSettings";
 import { getHaptics } from "./Haptics";
+import { initializeBackgroundMusic } from "./BackgroundMusic";
 
 /** One settings owner for main menu and pause; audio channels never control haptics. */
 export function initializeFeedbackControls(): void {
   const settings = new FeedbackSettings(() => window.localStorage);
   const haptics = getHaptics();
+  const music = initializeBackgroundMusic();
   const apply = (): void => {
     haptics.setEnabled(settings.get("vibration"));
     document.documentElement.dataset.musicEnabled = String(settings.get("music"));
     document.documentElement.dataset.effectsEnabled = String(settings.get("effects"));
+    music.setEnabled(settings.get("music"));
     for (const media of document.querySelectorAll<HTMLMediaElement>("audio, video")) {
       media.muted = !settings.get(media.dataset.audioChannel === "music" ? "music" : "effects");
     }

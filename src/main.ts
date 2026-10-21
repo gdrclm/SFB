@@ -11,6 +11,7 @@ import { ApplicationLifecycle } from "./app/ApplicationLifecycle";
 import { GameApplication } from "./app/GameApplication";
 import { getPlayerProfile } from "./shop/PlayerProfile";
 import { renderMissionBoard } from "./run/renderMissionBoard";
+import { resetGameData } from "./storage/resetGameData";
 
 function requireElement(selector: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(selector);
@@ -154,6 +155,27 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-se
   });
 }
 requireElement("#settings-close").addEventListener("click", () => { settingsDialog.close(); });
+const resetDialog = requireElement("#reset-data-dialog");
+if (!(resetDialog instanceof HTMLDialogElement)) throw new TypeError("#reset-data-dialog must be a dialog.");
+requireElement("#reset-data-button").addEventListener("click", () => {
+  requireElement("#reset-data-error").hidden = true;
+  resetDialog.showModal();
+  requireElement("#reset-data-cancel").focus();
+});
+requireElement("#reset-data-cancel").addEventListener("click", () => { resetDialog.close(); });
+requireElement("#reset-data-confirm").addEventListener("click", () => {
+  try {
+    // Disposing may save an interrupted run: finish it BEFORE clearing storage.
+    lifecycle.dispose();
+    resetGameData(window.localStorage);
+    window.location.reload();
+  } catch {
+    exitApplication();
+    const error = requireElement("#reset-data-error");
+    error.hidden = false;
+    error.textContent = "Не удалось сбросить данные. Проверь доступ браузера к хранилищу и попробуй ещё раз.";
+  }
+});
 const recordsDialog = requireElement("#records");
 if (!(recordsDialog instanceof HTMLDialogElement)) throw new TypeError("#records must be a dialog.");
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-records]")) {
