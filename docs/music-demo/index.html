@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SFB — Freefall / музыкальный эскиз</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;color:#e9fbff;background:#031326}*{box-sizing:border-box}body{margin:0;padding:32px 18px;background:radial-gradient(ellipse at top,#0a4870,transparent 65%);min-height:100dvh}main{max-width:720px;margin:auto;padding:28px;border:1px solid #25d5ee;border-radius:24px;background:linear-gradient(150deg,#063a60ee,#03152bef);box-shadow:0 0 28px #00c8ff24}a{color:#8af9e1;text-underline-offset:4px}header p{font-size:12px;letter-spacing:.13em;color:#8bc9df;margin:0 0 8px}h1{font-size:clamp(30px,8vw,44px);margin:0 0 10px;letter-spacing:-.04em}h1 span{color:#49efd0}p{line-height:1.65;color:#c0dbe7}audio{width:100%;margin:12px 0 8px}label{display:inline-flex;align-items:center;gap:8px;color:#aed5e5;font-size:14px}input{accent-color:#3af2c8;width:17px;height:17px}.chips,.downloads{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.chips span{padding:6px 12px;background:#051c35;border:1px solid #23718b;border-radius:20px;font-size:13px}.downloads a{display:block;padding:10px 14px;border:1px solid #2aacc5;border-radius:12px;text-decoration:none;background:#063c57;font-weight:650}.chords{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:24px 0}.chords div{padding:14px 6px;background:#04213a;border:1px solid #176882;border-radius:14px;text-align:center}.chords strong{display:block;color:#62f4d4;font-size:clamp(16px,4.5vw,23px)}.chords small{display:block;font-size:10px;color:#a8cfdf;margin-top:6px}.structure{list-style:none;padding:0;display:grid;gap:10px}.structure li{display:grid;grid-template-columns:95px 1fr;gap:10px;color:#b8d7e6;font-size:14px}.structure time{color:#69e8dc;font-variant-numeric:tabular-nums}.note{font-size:13px;color:#8baebf;margin-top:24px}footer{margin-top:26px;font-size:14px}@media(max-width:390px){body{padding:16px 10px}main{padding:20px 16px}.chords{gap:5px}.structure li{grid-template-columns:85px 1fr}}
+</style>
+</head>
+<body><main>
+<header><p>SPEED FALL BALL · ЭСКИЗ 01</p><h1>Free<span>fall</span></h1></header>
+<p>Неоновое свободное падение: воздух, упругий бас и ритм, который подталкивает рисковать. Нисходящая мелодия снова набирает высоту.</p>
+<div class="chips"><span>128 BPM</span><span>Ля минор</span><span>16 тактов · 30 секунд</span></div>
+<audio id="demo" controls preload="metadata" aria-label="Freefall — музыкальный эскиз, 30 секунд"><source src="sfb-freefall-30s.ogg" type="audio/ogg"><source src="sfb-freefall-30s.mp3" type="audio/mpeg">Скачайте MP3 по ссылке ниже.</audio>
+<label><input id="loop" type="checkbox">Повторять петлю</label>
+<div class="downloads"><a href="sfb-freefall-30s.mp3" download>Скачать MP3</a><a href="sfb-freefall-30s.mid" download>Ноты в MIDI</a><a href="concept.md">Замысел и аккорды</a></div>
+<div class="chords" aria-label="Последовательность аккордов"><div><strong>Am9</strong><small>A · C · E · G · B</small></div><div><strong>Fmaj7</strong><small>F · A · C · E</small></div><div><strong>Cmaj9</strong><small>C · E · G · B · D</small></div><div><strong>G6</strong><small>G · B · D · E</small></div></div>
+<ul class="structure"><li><time>0–7,5 с</time><span>Воздух, клавиши и появление ритма.</span></li><li><time>7,5–15 с</time><span>Основной мотив и уверенный грув.</span></li><li><time>15–22,5 с</time><span>Более яркий мотив, акцент на разгоне.</span></li><li><time>22,5–30 с</time><span>Ответ мелодии и возвращение к началу.</span></li></ul>
+<p class="note">Это отдельный музыкальный эскиз. В самой игре он пока не включён. Монеты и удары остаются самостоятельными звуками действий.</p>
+<footer><a href="../">← Вернуться в SFB</a></footer>
+</main><script>document.querySelector('#loop').addEventListener('change',e=>{document.querySelector('#demo').loop=e.target.checked})</script></body></html>
