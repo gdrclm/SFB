@@ -113,6 +113,17 @@ export class PlatformSprite {
   #frame = -1;
   #width = 0;
   #destroying = false;
+  #impactAt = -Infinity;
+  #impactForce = 1;
+  public impact(elapsed: number, force: number): void { this.#impactAt = elapsed; this.#impactForce = Math.max(.7, Math.min(1.8, force)); }
+  public resetImpact(): void { this.#impactAt = -Infinity; this.mesh.position.y = 0; this.mesh.rotation.z = 0; }
+  #updateImpact(elapsed: number): void {
+    if (this.#impactAt === -Infinity) return;
+    const t = Math.max(0, elapsed - this.#impactAt);
+    if (t >= .45) { this.resetImpact(); return; }
+    this.mesh.position.y = -.25 * this.#impactForce * Math.exp(-9 * t) * Math.sin(t * 27);
+    this.mesh.rotation.z = .025 * this.#impactForce * Math.exp(-11 * t) * Math.sin(t * 23);
+  }
   public constructor(parent: Mesh, height: number, depth: number, scene: Scene) {
     this.#parent = parent; this.#height = height; this.#phase = idlePhase(parent.name);
     this.mesh = createAtlasSprite(`${parent.name}-sprite`, scene, "idle");
@@ -120,6 +131,7 @@ export class PlatformSprite {
     this.mesh.position.z = -depth / 2 - .025;
   }
   public render(width: number, row: PlatformSpriteRow, elapsed: number): void {
+    this.#updateImpact(elapsed);
     if (this.#destroying) {
       this.#destroying = false;
       this.#frame = -1;
@@ -142,6 +154,7 @@ export class PlatformSprite {
   }
 
   public renderBreak(width: number, progress: number): void {
+    this.#updateImpact(this.#impactAt + progress * .48);
     const rebuild = !this.#destroying;
     this.#destroying = true;
     this.mesh.material = atlasMaterial(this.mesh.getScene(), "destroy");

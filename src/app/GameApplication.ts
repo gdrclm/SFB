@@ -687,7 +687,7 @@ export class GameApplication {
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
       this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
-      if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .05 : .03;
+      if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .04 : .02;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);

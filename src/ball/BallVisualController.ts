@@ -1,6 +1,6 @@
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TrailMesh } from "@babylonjs/core/Meshes/trailMesh";
 import { BallDynamicsFX } from "./BallDynamicsFX";
@@ -14,6 +14,9 @@ import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 interface BallMotion {
   readonly fallSpeed: number;
   readonly horizontalVelocity?: number;
+  readonly verticalVelocity?: number;
+  readonly isBouncing?: boolean;
+  readonly impactCompression?: number;
 }
 
 function clamp01(value: number): number {
@@ -58,6 +61,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #fx: BallDynamicsFX;
   #slowActive = false;
   #impactElapsed = 1;
+  #contactAnchored = false;
   #impactKind: "hurt" | "break" = "break";
   #danger = false;
 
@@ -120,7 +124,12 @@ export class BallVisualController implements FixedSimulationSystem {
   public react(event: BallExpression): void {
     this.#fx.trigger(event);
     // Contact still deforms the body while a higher-priority facial pose is held.
-    if (event === "hurt" || event === "break") { this.#impactElapsed = 0; this.#impactKind = event; }
+    if (event === "hurt" || event === "break") {
+      this.#impactElapsed = 0; this.#impactKind = event;
+      this.#anchorContact(true);
+      const sy = event === "hurt" ? .56 : .66, cross = 1 / Math.sqrt(sy);
+      this.#ball.scaling.set(this.#baseScale.x * cross, this.#baseScale.y * sy, this.#baseScale.z * cross);
+    }
     if (!this.#expression.react(event)) return;
     (this.#ball.metadata as { expression: BallExpression }).expression = this.#expression.current;
     getBallFace(this.#ball)?.update(this.#expression.current, event === "defeat" ? .2 : .025, 0, event === "boost");
@@ -143,8 +152,8 @@ export class BallVisualController implements FixedSimulationSystem {
     const poseAmount = smoothFactor(10, realDeltaSeconds);
     this.#ball.rotation.z += (-look * .35 - this.#ball.rotation.z) * poseAmount;
     this.#ball.rotation.y += (look * .35 - this.#ball.rotation.y) * poseAmount;
-    this.#fx.update(realDeltaSeconds, { speed: this.#motion.fallSpeed, look,
-      boost: this.#boostElapsedSeconds === null ? 0 : this.#boostStrength,
+    this.#fx.update(realDeltaSeconds, { speed: this.#motion.isBouncing ? 0 : this.#motion.fallSpeed, look,
+      boost: this.#motion.isBouncing || this.#boostElapsedSeconds === null ? 0 : this.#boostStrength,
       anticipating: this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1,
       slow: this.#slowActive || this.#expression.current === "slow", danger: this.#danger });
     this.#impactElapsed += realDeltaSeconds;
@@ -176,22 +185,27 @@ export class BallVisualController implements FixedSimulationSystem {
       this.#stretchIntensity,
     );
     const boostStretch = this.#updateBoostReaction(fixedDeltaSeconds);
-    const impactProgress = clamp01(this.#impactElapsed / (this.#impactKind === "hurt" ? .4 : .25));
-    const impact = impactProgress < .22 ? -Math.sin(impactProgress / .22 * Math.PI / 2)
-      : Math.sin((impactProgress - .22) / .78 * Math.PI * 2 - Math.PI / 2) * (1 - impactProgress);
-    const impactScale = impactProgress >= 1 ? 1 : 1 + impact * (this.#impactKind === "hurt" ? .38 : .22);
-    const targetVerticalScale = Math.max(.55, (movementStretch + boostStretch + Math.abs(look) * .08) * impactScale * (blinking ? .9 : 1));
+    const contact = this.#motion.impactCompression ?? (this.#impactElapsed < .045 ? 1 : 0);
+    const airborne = this.#motion.isBouncing === true && (this.#motion.verticalVelocity ?? 0) > 0;
+    const rebound = this.#impactElapsed >= .045 && this.#impactElapsed < .19
+      ? Math.sin((this.#impactElapsed - .045) / .145 * Math.PI) * (this.#impactKind === "hurt" ? .35 : .6) : 0;
+    const targetVerticalScale = contact > 0 ? (this.#impactKind === "hurt" ? .56 : .66)
+      : airborne ? 1 + Math.min(.35, (this.#motion.verticalVelocity ?? 0) * .045)
+      : Math.max(.55, movementStretch + boostStretch + rebound + Math.abs(look) * .08) * (blinking ? .9 : 1);
+    this.#anchorContact(contact > 0);
     const scaleAmount = smoothFactor(this.#config.scaleSharpness, fixedDeltaSeconds);
     const verticalScale = lerp(this.#ball.scaling.y / this.#baseScale.y, targetVerticalScale, scaleAmount);
     // Preserve volume throughout interpolation, not only at the target poses.
     const crossScale = 1 / Math.sqrt(verticalScale);
     this.#ball.scaling.set(this.#baseScale.x * crossScale, this.#baseScale.y * verticalScale, this.#baseScale.z * crossScale);
     this.#applyMaterial(this.#speedIntensity);
+    if (this.#motion.isBouncing) this.#trail.visibility = 0;
   }
 
   public dispose(): void {
     this.#ball.scaling.copyFrom(this.#baseScale);
     this.#ball.rotation.setAll(0);
+    this.#ball.setPivotPoint(Vector3.Zero());
     this.#ball.metadata = { avatarManaged: false, expression: "neutral" };
     this.#speedIntensity = 0;
     this.#stretchIntensity = 0;
@@ -205,6 +219,12 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trail.dispose();
     this.#trailMaterial.dispose();
     this.#fx.dispose();
+  }
+
+  #anchorContact(active: boolean): void {
+    if (active === this.#contactAnchored) return;
+    this.#contactAnchored = active;
+    this.#ball.setPivotPoint(new Vector3(0, active ? -this.#ballConfig.radius : 0, 0));
   }
 
   #updateBoostReaction(fixedDeltaSeconds: number): number {

@@ -19,6 +19,7 @@ interface CameraTarget {
     y: number;
   };
   readonly fallSpeed: number;
+  readonly isBouncing?: boolean;
 }
 
 export type CameraBehavior = "gameplay" | "phase-transition";
@@ -107,11 +108,11 @@ export class CameraController implements FixedSimulationSystem {
       calculateCameraSize(this.#target.fallSpeed, this.#config) + transitionSize;
     const zoomAmount = smoothFactor(this.#config.zoomSharpness, fixedDeltaSeconds);
     const boostDelay = this.#boostZoomElapsedSeconds !== null && this.#boostZoomElapsedSeconds < this.#config.boostZoomDelaySeconds;
-    if (!boostDelay) this.#baseOrthographicSize = lerp(this.#baseOrthographicSize, targetSize, zoomAmount);
+    if (!boostDelay && !this.#target.isBouncing) this.#baseOrthographicSize = lerp(this.#baseOrthographicSize, targetSize, zoomAmount);
     this.#updateBoostZoom(realFixedDeltaSeconds);
     const desiredY = this.#target.position.y - this.#lookAhead();
-    const smoothedY = lerp(this.#rig.position.y, desiredY, smoothFactor(this.#config.followSharpness, fixedDeltaSeconds));
-    const maximumOffset = this.#getVisibleVerticalHalfSize() * this.#config.safeVerticalRatio;
+    const smoothedY = lerp(this.#rig.position.y, desiredY, smoothFactor(this.#config.followSharpness * (this.#target.isBouncing ? .12 : 1), fixedDeltaSeconds));
+    const maximumOffset = this.#getVisibleVerticalHalfSize() * (this.#target.isBouncing ? .16 : this.#config.safeVerticalRatio);
     this.#rig.position.y = Math.max(desiredY - maximumOffset, Math.min(desiredY + maximumOffset, smoothedY));
     this.resizeViewport();
   }

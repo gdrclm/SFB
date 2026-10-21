@@ -86,6 +86,8 @@ export class PlatformController {
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
+  public playImpact(force = 1): void { this.#sprite.impact(this.#elapsed, force); }
+
   public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); }
   public finishBreak(): boolean {
     if (!this.#isBreaking) return false;
@@ -117,6 +119,7 @@ export class PlatformController {
   #applyActivationProperties(properties: PlatformActivationProperties): void {
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
+    this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,

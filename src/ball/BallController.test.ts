@@ -142,6 +142,40 @@ describe("BallController", () => {
     }).toThrow(RangeError);
   });
 
+  it("arrests a break at contact, transfers momentum gradually and keeps steering responsive", () => {
+    const transform = createTransform(), controller = new BallController(transform, createInput(true, 1), gameConfig);
+    controller.fallSpeed = 29;
+    controller.startBreakImpact(-5, .9);
+    controller.fixedUpdate(1 / 60);
+    expect(transform.position.y).toBe(-5);
+    expect(controller.verticalVelocity).toBe(0);
+    expect(transform.position.x).toBeGreaterThan(0);
+    simulate(controller, .08, 60);
+    expect(transform.position.y).toBeLessThan(-5);
+    expect(transform.position.y).toBeGreaterThan(-5.5);
+    simulate(controller, .2, 60);
+    expect(controller.verticalVelocity).toBeCloseTo(-controller.fallSpeed * gameConfig.ball.movementScale, 8);
+  });
+
+  it("converts incoming speed into rebound height and passes through an apex before falling", () => {
+    const peak = (speed: number, frequency: number): number => {
+      const transform = createTransform(), controller = new BallController(transform, createInput(), gameConfig);
+      controller.fallSpeed = speed; controller.startBounce(0);
+      let highest = 0, up = false, down = false;
+      for (let i = 0; i < Math.round(gameConfig.unsuccessfulHit.bounceDurationSeconds * frequency); i++) {
+        controller.fixedUpdate(1 / frequency);
+        highest = Math.max(highest, transform.position.y);
+        up ||= controller.verticalVelocity > 0; down ||= controller.verticalVelocity < 0;
+        expect(transform.position.y).toBeGreaterThanOrEqual(0);
+      }
+      expect(up && down).toBe(true);
+      expect(controller.verticalVelocity).toBeCloseTo(-gameConfig.ball.startFallSpeed * gameConfig.ball.movementScale, 8);
+      return highest;
+    };
+    expect(peak(60, 60)).toBeGreaterThan(peak(10, 60) * 1.4);
+    expect(peak(60, 60)).toBeCloseTo(peak(60, 120), 2);
+  });
+
   it("bounces upward, resets speed and then returns to falling", () => {
     const transform = createTransform();
     const controller = new BallController(transform, createInput(), gameConfig);
@@ -154,11 +188,13 @@ describe("BallController", () => {
     expect(controller.isBouncing).toBe(true);
 
     controller.fixedUpdate(1 / 60);
+    expect(transform.position.y).toBe(contactY);
+    simulate(controller, 3 / 60, 60);
     expect(transform.position.y).toBeGreaterThan(contactY);
 
     simulate(
       controller,
-      gameConfig.unsuccessfulHit.bounceDurationSeconds - 1 / 60,
+      gameConfig.unsuccessfulHit.bounceDurationSeconds - 4 / 60,
       60,
     );
     expect(controller.isBouncing).toBe(false);

@@ -45,7 +45,8 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak">, onComplete: () => void): void {
+  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak"> & Partial<Pick<PlatformController, "playImpact">>, onComplete: () => void, force = 1): void {
+    platform.playImpact?.(force);
     platform.renderBreak(0);
     this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0 });
   }

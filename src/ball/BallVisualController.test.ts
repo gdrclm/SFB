@@ -34,6 +34,18 @@ function updateFor(controller: BallVisualController, seconds: number): void {
 }
 
 describe("BallVisualController", () => {
+  it("compresses on the contact frame and keeps the bottom anchored to the surface", () => {
+    const { engine, scene, ball, controller } = createFixture(60);
+    controller.react("hurt");
+    expect(ball.scaling.y).toBeLessThan(.6);
+    expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 8);
+    const bottom = Vector3.TransformCoordinates(new Vector3(0, -gameConfig.ball.radius, 0), ball.computeWorldMatrix(true));
+    expect(bottom.y).toBeCloseTo(ball.position.y - gameConfig.ball.radius, 6);
+    updateFor(controller, .6);
+    expect(ball.getPivotPoint().length()).toBe(0);
+    controller.dispose(); scene.dispose(); engine.dispose();
+  });
+
   it("continues stretching through later speed doublings and relaxes after slowing down", () => {
     const { engine, scene, ball, motion, controller } = createFixture();
     let height = 1;

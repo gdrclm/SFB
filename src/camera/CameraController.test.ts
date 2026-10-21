@@ -13,6 +13,7 @@ function createFixture(aspectRatio = 16 / 9) {
   const target = {
     position: { y: gameConfig.ball.startPosition.y },
     fallSpeed: gameConfig.ball.startFallSpeed,
+    isBouncing: false,
   };
   const controller = new CameraController(
     camera,
@@ -26,6 +27,14 @@ function createFixture(aspectRatio = 16 / 9) {
 }
 
 describe("CameraController", () => {
+  it("lets a rebound travel visibly upward instead of pinning the ball to the HUD", () => {
+    const { controller, rig, target } = createFixture();
+    const start = target.position.y - rig.position.y;
+    target.isBouncing = true;
+    for (let i = 0; i < 20; i++) { target.position.y += .075; controller.fixedUpdate(1 / 60); }
+    expect(target.position.y - rig.position.y - start).toBeGreaterThan(.8);
+  });
+
   it("scales visible height with the square root of speed without a cap", () => {
     expect(calculateCameraSize(10, gameConfig.camera)).toBe(6);
     expect(calculateCameraSize(20, gameConfig.camera)).toBeCloseTo(

@@ -34,6 +34,25 @@ export class BallController implements FixedSimulationSystem {
   #fallSpeed: number;
   #horizontalVelocity = 0;
   #bounceElapsedSeconds: number | null = null;
+  #bounceContactY = 0;
+  #bounceLaunchSpeed = 0;
+  #breakElapsed: number | null = null;
+  #breakHold = .04;
+  #verticalVelocity = 0;
+
+  public get verticalVelocity(): number { return this.#verticalVelocity; }
+  public get impactCompression(): number {
+    if (this.#bounceElapsedSeconds !== null) return this.#bounceElapsedSeconds < .045 ? 1 : 0;
+    return this.#breakElapsed !== null && this.#breakElapsed < this.#breakHold ? 1 : 0;
+  }
+  public startBreakImpact(contactY: number, resistance: number): void {
+    if (!Number.isFinite(contactY) || this.isBouncing) return;
+    this.#transform.position.y = contactY;
+    this.#copyCurrentPositionToPrevious();
+    this.#breakElapsed = 0;
+    this.#breakHold = .025 + .035 * Math.max(0, Math.min(1, resistance));
+    this.#verticalVelocity = 0;
+  }
 
   public constructor(
     transform: BallTransform,
@@ -86,6 +105,10 @@ export class BallController implements FixedSimulationSystem {
       return false;
     }
 
+    this.#bounceLaunchSpeed = Math.max(6, Math.min(10, this.#bounceConfig.bounceSpeed * this.#config.movementScale * 2 + this.#fallSpeed * this.#config.movementScale * .24));
+    this.#bounceContactY = contactY;
+    this.#breakElapsed = null;
+    this.#verticalVelocity = 0;
     this.#transform.position.y = contactY;
     this.#copyCurrentPositionToPrevious();
     this.#fallSpeed = this.#config.startFallSpeed;
@@ -115,8 +138,15 @@ export class BallController implements FixedSimulationSystem {
     }
 
     this.#fallSpeed += this.#config.naturalAcceleration * fixedDeltaSeconds;
-    this.#transform.position.y -=
-      this.#fallSpeed * this.#config.movementScale * fixedDeltaSeconds;
+    let transmission = 1;
+    if (this.#breakElapsed !== null) {
+      this.#breakElapsed += fixedDeltaSeconds;
+      const t = Math.max(0, (this.#breakElapsed - this.#breakHold) / .12);
+      transmission = t >= 1 ? 1 : t * t * (3 - 2 * t);
+      if (t >= 1) this.#breakElapsed = null;
+    }
+    this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission;
+    this.#transform.position.y += this.#verticalVelocity * fixedDeltaSeconds;
   }
 
   #updateBounce(fixedDeltaSeconds: number): void {
@@ -126,14 +156,15 @@ export class BallController implements FixedSimulationSystem {
     }
 
     const duration = this.#bounceConfig.bounceDurationSeconds;
-    const progress = Math.min(1, elapsedSeconds / duration);
-    const upwardSpeed = this.#bounceConfig.bounceSpeed * (1 - progress);
-    this.#transform.position.y +=
-      upwardSpeed * this.#config.movementScale * fixedDeltaSeconds;
-    const nextElapsedSeconds = elapsedSeconds + fixedDeltaSeconds;
-    this.#bounceElapsedSeconds = nextElapsedSeconds;
-
-    if (nextElapsedSeconds + Number.EPSILON >= duration) {
+    const hold = .045;
+    const nextElapsed = Math.min(duration, elapsedSeconds + fixedDeltaSeconds);
+    this.#bounceElapsedSeconds = nextElapsed;
+    const flight = Math.max(0, nextElapsed - hold);
+    // Match the downward velocity to ordinary falling at the end of recovery.
+    const gravity = (this.#bounceLaunchSpeed + this.#config.startFallSpeed * this.#config.movementScale) / (duration - hold);
+    this.#transform.position.y = this.#bounceContactY + this.#bounceLaunchSpeed * flight - .5 * gravity * flight * flight;
+    this.#verticalVelocity = flight === 0 ? 0 : this.#bounceLaunchSpeed - gravity * flight;
+    if (nextElapsed + Number.EPSILON >= duration) {
       this.#bounceElapsedSeconds = null;
       this.#fallSpeed = this.#config.startFallSpeed;
     }

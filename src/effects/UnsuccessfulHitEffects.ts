@@ -36,7 +36,8 @@ export class UnsuccessfulHitEffects
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playErrorReaction(platform: Pick<PlatformController, "mesh">): void {
+  public playErrorReaction(platform: Pick<PlatformController, "mesh"> & Partial<Pick<PlatformController, "playImpact">>): void {
+    platform.playImpact?.(1.4);
     this.#resetVisuals();
     this.#platform = platform.mesh;
     this.#platformBaseVisibility = platform.mesh.visibility;
@@ -71,6 +72,7 @@ export class UnsuccessfulHitEffects
     }
 
     this.#camera.position.copyFrom(this.#cameraBasePosition);
+    this.#camera.position.y -= Math.sin(progress * Math.PI) * this.#config.cameraImpulse * 1.8 * (1 - progress);
     this.#camera.position.x +=
       Math.sin(progress * Math.PI * 8) *
       this.#config.cameraImpulse *

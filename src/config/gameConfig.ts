@@ -327,7 +327,7 @@ export const gameConfig: GameConfig = Object.freeze({
   }),
   unsuccessfulHit: Object.freeze({
     bounceSpeed: 8,
-    bounceDurationSeconds: 0.45,
+    bounceDurationSeconds: 0.65,
     repeatProtectionSeconds: 0.5,
     feedbackSeconds: 0.45,
     ballSquash: 0.58,
