@@ -1,9 +1,11 @@
 
-export function calculateSpeedFeedback(speed: number): { duration: number; opacity: number } {
-  const safeSpeed = Math.max(0, speed);
+export function calculateSpeedFeedback(speed: number): { duration: number; opacity: number; power: number } {
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const power = Math.max(0, Math.min(1, Math.log2(Math.max(1, safeSpeed / 10)) / 5));
   return {
-    duration: Math.max(0.08, 18 / Math.max(1, safeSpeed)),
-    opacity: Math.min(0.55, safeSpeed / 100),
+    duration: 1.1 - .85 * Math.sqrt(power),
+    opacity: power === 0 ? 0 : .25 + .7 * Math.sqrt(power),
+    power,
   };
 }
 
@@ -22,6 +24,7 @@ export class SpeedFeedback {
     const feedback = calculateSpeedFeedback(speed);
     this.#root.style.setProperty("--streak-duration", `${String(feedback.duration)}s`);
     this.#root.style.setProperty("--streak-opacity", String(feedback.opacity));
+    this.#root.style.setProperty("--wind-power", String(feedback.power));
     this.#root.classList.toggle("speed-frozen", frozen);
     for (const animation of [this.#animation, this.#burst]) {
       if (frozen && animation?.playState === "running") animation.pause();
@@ -34,7 +37,7 @@ export class SpeedFeedback {
     this.#animation?.cancel();
     this.#burst?.cancel();
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      this.#burst = this.#root.querySelector(".speed-streaks")?.animate([{ opacity: .45 }, { opacity: .55, offset: .5 }, { opacity: 0 }], { duration: 450 }) ?? null;
+      this.#burst = this.#root.querySelector(".speed-streaks")?.animate([{ filter: "brightness(1)" }, { filter: "brightness(1.8)", offset: .2 }, { filter: "brightness(1)" }], { duration: 450 }) ?? null;
     }
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.#animation = this.#label.animate(

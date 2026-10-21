@@ -155,7 +155,7 @@ export class BallVisualController implements FixedSimulationSystem {
           this.#config.speedEffectRange,
       );
     const colorAmount = smoothFactor(this.#config.colorSharpness, fixedDeltaSeconds);
-    this.#stretchIntensity = lerp(this.#stretchIntensity, speedVisualPower(this.#motion.fallSpeed, this.#ballConfig.startFallSpeed), colorAmount);
+    this.#stretchIntensity = lerp(this.#stretchIntensity, speedVisualPower(this.#motion.fallSpeed, this.#ballConfig.startFallSpeed) ** 2.5, colorAmount);
     // Each doubling keeps adding visible weight instead of saturating after a few boosts.
     const trailTarget = clamp01(Math.log2(Math.max(1, this.#motion.fallSpeed / this.#ballConfig.startFallSpeed)) / 5);
     this.#trailIntensity = lerp(this.#trailIntensity, trailTarget, colorAmount);
@@ -216,7 +216,7 @@ export class BallVisualController implements FixedSimulationSystem {
     const progress = clamp01(elapsedSeconds / this.#config.boostDurationSeconds);
     const boostStretch = progress < .26
       ? -.38 * this.#boostStrength * Math.sin(progress / .26 * Math.PI / 2)
-      : this.#config.boostStretch * this.#boostStrength * (1 - (progress - .26) / .74) ** 2;
+      : this.#config.boostStretch * this.#boostStrength * (.4 + .6 * speedVisualPower(this.#motion.fallSpeed, this.#ballConfig.startFallSpeed)) * (1 - (progress - .26) / .74) ** 2;
     const nextElapsedSeconds = elapsedSeconds + fixedDeltaSeconds;
     this.#boostElapsedSeconds = nextElapsedSeconds;
     if (

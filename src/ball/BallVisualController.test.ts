@@ -39,11 +39,12 @@ describe("BallVisualController", () => {
     let height = 1;
     for (const speed of [20, 40, 80, 160, 320]) {
       motion.fallSpeed = speed; updateFor(controller, 1.5);
-      expect(ball.scaling.y).toBeGreaterThan(height + .3);
+      expect(ball.scaling.y).toBeGreaterThan(height + .015);
       expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 8);
+      if (speed <= 40) expect(ball.scaling.y).toBeLessThan(1.13);
       height = ball.scaling.y;
     }
-    expect(height).toBeGreaterThan(2.9);
+    expect(height).toBeCloseTo(2.2, 3);
     motion.fallSpeed = gameConfig.ball.startFallSpeed; updateFor(controller, 2);
     expect(ball.scaling.y).toBeCloseTo(1, 3);
     controller.dispose(); scene.dispose(); engine.dispose();
@@ -56,7 +57,8 @@ describe("BallVisualController", () => {
     for (let step = 0; step < 40; step++) {
       controller.fixedUpdate(1 / 60);
       if (step < 6 && ball.scaling.y < .85) compressed = true;
-      if (step >= 6 && ball.scaling.y > 1.15) stretched = true;
+      if (step >= 6 && ball.scaling.y > 1.05) stretched = true;
+      expect(ball.scaling.y).toBeLessThan(1.35);
       expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 10);
     }
     expect(compressed).toBe(true); expect(stretched).toBe(true);
