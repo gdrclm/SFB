@@ -20,6 +20,7 @@ export class DepthBackdrop {
   #elapsed = 0;
   #blend = 0;
   #travel = 0;
+  #steeringX = 0;
   #previousCameraY: number;
   readonly #reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -33,7 +34,7 @@ export class DepthBackdrop {
     if (this.#next === null) return this.#currentLocation === "crystal" ? 1 : 0;
     return (this.#currentLocation === "crystal" ? 1 - this.#blend : 0) + (this.#location === "crystal" ? this.#blend : 0);
   }
-  public update(depth: number, realSeconds: number): void {
+  public update(depth: number, realSeconds: number, playerX = 0): void {
     const location = this.#locations.observe(depth);
     // Finish an in-flight page before starting the next, including very fast runs.
     if (location !== this.#location && this.#next === null) {
@@ -44,7 +45,10 @@ export class DepthBackdrop {
     const camera = this.#scene.activeCamera;
     const width = (camera?.orthoRight ?? 14) - (camera?.orthoLeft ?? -14);
     const height = (camera?.orthoTop ?? 21) - (camera?.orthoBottom ?? -21);
-    if (realSeconds > 0) this.#travel += (this.#previousCameraY - this.#rig.position.y) * 42 / height;
+    if (realSeconds > 0) {
+      this.#travel += (this.#previousCameraY - this.#rig.position.y) * 42 / height;
+      this.#steeringX += (playerX - this.#steeringX) * (1 - Math.exp(-5 * realSeconds));
+    }
     this.#previousCameraY = this.#rig.position.y;
     const ready = this.#next !== null && this.#isReady(this.#next);
     if (ready && this.#next !== null) {
@@ -71,7 +75,7 @@ export class DepthBackdrop {
   #place(mesh: Mesh, width: number, height: number, offset: number): void {
     mesh.scaling.set(width / 28, height / 42, 1);
     mesh.position.y = offset;
-    this.#scenery(mesh)?.update(this.#travel, this.#rig.position.x, this.#rig.position.y + offset, height, this.#reduced);
+    this.#scenery(mesh)?.update(this.#travel, this.#steeringX, this.#rig.position.y + offset, height, this.#reduced);
   }
   public dispose(): void { this.#next?.dispose(false, true); this.#current.dispose(false, true); }
 }

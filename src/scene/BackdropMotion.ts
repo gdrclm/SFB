@@ -9,5 +9,5 @@ export function sceneryY(anchor: number, cameraTravel: number, rate: number): nu
 }
 export function sceneryRate(index: number): number {
   // Stagger depth on both sides: neighbouring cards never move as a flat wall.
-  return [.075, .16, .11, .25, .19, .095, .22, .135, .28, .175][index % 10] ?? .1;
+  return [.10, .43, .18, .82, .58, .14, .68, .27, 1.05, .36][index % 10] ?? .1;
 }

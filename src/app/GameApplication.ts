@@ -671,7 +671,7 @@ export class GameApplication {
     const hideNotices = isPaused || this.#gameState.current === GameState.GameOver;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || !this.#boostCoach.visible;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
-    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds);
+    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#ballController?.position.x ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     if (!isPaused || updateHud) this.#scene?.render();
     if (nowMs - this.#lastOverlayTime >= 1000 / 30) {

@@ -12,7 +12,7 @@ const bands = {
   sky: [[0, 480, 735, 1020, 1230, 1672], [0, 550, 810, 1110, 1330, 1672]],
   crystal: [[0, 390, 700, 1010, 1330, 1672], [0, 350, 700, 1010, 1320, 1672]],
 } as const;
-interface Card { mesh: Mesh; anchor: number; x: number; rate: number; copy: number; material: StandardMaterial }
+interface Card { mesh: Mesh; anchor: number; x: number; edgeLimit: number; rate: number; copy: number; material: StandardMaterial }
 /** Baked scenery cards: no runtime canvas, image readback or texture uploads. */
 export class BackdropScenery {
   readonly #cards: Card[] = [];
@@ -34,12 +34,15 @@ export class BackdropScenery {
       material.specularColor = Color3.Black(); material.backFaceCulling = false;
       material.clipPlane = this.#top; material.clipPlane2 = this.#bottom;
       const rate = sceneryRate(side * 5 + i);
+      // Distant silhouettes recede; foreground cards have larger apparent size.
+      const apparentSize = 1.08 + Math.min(1, rate) * .22;
       // A second copy makes wrap continuous even when a card straddles the page edge.
       for (const copy of [0, 1]) {
         const mesh = MeshBuilder.CreatePlane(`${name}Scenery${String(side)}-${String(i)}-${String(copy)}`, { width: 28 * 410 / 941, height: 42 * (end - start) / 1672 }, scene);
+        mesh.scaling.setAll(apparentSize);
         mesh.parent = parent; mesh.material = material; mesh.isPickable = false;
         mesh.position.set((side === 0 ? -1 : 1) * (14 - 14 * 410 / 941), 0, -.04 - rate * .12);
-        this.#cards.push({ mesh, material, x: mesh.position.x, anchor: 21 - 42 * (start + end) / 2 / 1672, rate, copy });
+        this.#cards.push({ mesh, material, x: mesh.position.x, edgeLimit: 14.2 - 14 * 410 / 941 * apparentSize, anchor: 21 - 42 * (start + end) / 2 / 1672, rate, copy });
       }
     }
   }
@@ -48,9 +51,13 @@ export class BackdropScenery {
     this.#top.d = -(worldCenterY + height / 2);
     this.#bottom.d = worldCenterY - height / 2;
     for (const card of this.#cards) {
-      const y = sceneryY(card.anchor, reduced ? 0 : cameraTravel, card.rate);
+      const y = sceneryY(card.anchor, reduced ? cameraTravel * .2 : cameraTravel, card.rate);
       card.mesh.position.y = y + (card.copy === 0 ? 0 : y > 0 ? -42 : 42);
-      card.mesh.position.x = card.x - (reduced ? 0 : cameraX * card.rate * .3 / this.#parent.scaling.x);
+      const lateral = reduced ? 0 : cameraX * card.rate * .45 / this.#parent.scaling.x;
+      // Keep large foreground silhouettes outside the central play corridor.
+      const x = card.x - Math.max(-1.8, Math.min(1.8, lateral));
+      // Source art is cropped at the outer screen edge: keep that edge offscreen.
+      card.mesh.position.x = card.x < 0 ? Math.min(-card.edgeLimit, x) : Math.max(card.edgeLimit, x);
     }
   }
 }
