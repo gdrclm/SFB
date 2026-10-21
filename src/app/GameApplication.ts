@@ -1,3 +1,4 @@
+import { intersectsScreen } from "../powers/PowerArea";
 import { scannerDanger } from "../powers/DangerScanner";
 import { PowerUpController, ANNIHILATION_RADIUS } from "../powers/PowerUpController";
 import { PowerUpView } from "../powers/PowerUpView";
@@ -476,7 +477,7 @@ export class GameApplication {
           }
         }
         this.#haptics.request(kind === "annihilation" ? "heavyBreak" : "boost");
-      }, this.#sweepAnnihilation);
+      }, this.#sweepAnnihilation, this.#miniAnnihilation);
     this.#fixedStep.register(this.#powers);
     if (this.#config.powers.plasma) {
       this.#powerVisuals = new PowerVisuals(this.#scene, ballMesh, this.#powers, this.#reducedMotion);
@@ -735,11 +736,24 @@ export class GameApplication {
     const zone = this.#powers?.zone;
     if (zone === null || zone === undefined) return;
     this.#coinCollectionController?.collectWithin(zone, ANNIHILATION_RADIUS);
+    this.#clearAnnihilationPlatforms(platform => this.#powers?.covers(platform.mesh.position) ?? false);
+  };
+  readonly #miniAnnihilation = (): void => {
+    const camera = this.#scene?.activeCamera;
+    if (camera === null || camera === undefined) return;
+    const position = camera.globalPosition;
+    const bounds = { left: position.x + (camera.orthoLeft ?? -5), right: position.x + (camera.orthoRight ?? 5),
+      bottom: position.y + (camera.orthoBottom ?? -10), top: position.y + (camera.orthoTop ?? 10) };
+    this.#coinCollectionController?.collectInScreen(bounds);
+    this.#clearAnnihilationPlatforms(platform => intersectsScreen(platform.mesh.position.x, platform.mesh.position.y,
+      platform.width / 2, platform.size.height / 2, bounds));
+  };
+  #clearAnnihilationPlatforms(contains: (platform: PlatformController) => boolean): void {
     const pool = this.#platformPool;
     if (pool === null) return;
     let effects = 0;
     for (const platform of pool.platforms) {
-      if (!platform.isActive || !this.#powers?.covers(platform.mesh.position)) continue;
+      if (!platform.isActive || !contains(platform)) continue;
       this.#destroyedPlatformCount += 1;
       if (this.#successfulHitEffects !== null && this.#ballController !== null
         && Math.abs(platform.mesh.position.y - this.#ballController.position.y) < 12 && effects < 3
@@ -748,7 +762,7 @@ export class GameApplication {
         this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6);
       } else pool.release(platform);
     }
-  };
+  }
 
   readonly #handleCollision = (collision: PlatformCollision): void => {
     if (this.#lives.remainingLives === 0) return;

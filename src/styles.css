@@ -2408,3 +2408,5 @@ html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }
 [data-preview="plasma"] { color:#fff; text-shadow:0 0 14px #00eaff; }
 #slow-mode-button[data-active="true"]:disabled { filter:none; opacity:1; cursor:default; }
 #slow-mode-button[data-active="true"] .control-ring { border-color:#c8ffff; box-shadow:0 0 14px #10dfff,inset 0 0 8px #00cfff; }
+#slow-mode-button[data-power="annihilation"] { touch-action:none; -webkit-touch-callout:none; user-select:none; }
+#slow-mode-button[data-holding="true"]::after { content:""; position:absolute; inset:-7px; border-radius:50%; pointer-events:none; background:conic-gradient(#f3bdff var(--hold-angle,0deg),#63348366 0); mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 0); }

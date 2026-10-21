@@ -86,3 +86,16 @@ it("annihilation credits each coin in the actual circular radius once and immedi
   expect(listener).toHaveBeenCalledWith(coins[0], true);
   controller.dispose(); scene.dispose(); engine.dispose();
 });
+
+it("mini annihilation attracts visible coins while leaving offscreen coins for later pulses", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const coins = [new CoinController(scene, gameConfig, { x: 0, y: -5 }, 0), new CoinController(scene, gameConfig, { x: 0, y: -30 }, 1)];
+  const ball = { position: { x: 0, y: 0, z: 0 }, previousPosition: { x: 0, y: 0, z: 0 }, fallSpeed: 10 };
+  const wallet = new RunWallet(30, 2), controller = new CoinCollectionController(ball, coins, wallet, gameConfig);
+  const listener = vi.fn(); controller.onCollected(listener);
+  controller.collectInScreen({ left: -5, right: 5, bottom: -10, top: 2 });
+  expect(wallet.coins).toBe(1); expect(ball.fallSpeed).toBe(11);
+  expect(coins[1]?.isActive).toBe(true);
+  expect(listener).toHaveBeenCalledWith(coins[0], true);
+  controller.dispose(); scene.dispose(); engine.dispose();
+});

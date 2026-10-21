@@ -17,7 +17,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: "impact-retention", category: "upgrade", name: "Инерционный корпус", description: "Сохраняет 25 / 50 / 75% скорости сверх стартовой при потере жизни.", price: 150, maxLevel: 3, preview: "◈" },
   { id: "danger-scanner", category: "upgrade", name: "Сканер опасностей", description: "Подсвечивает непробиваемые сейчас препятствия в радиусе 3 м.", price: 250, maxLevel: 1, preview: "⌖" },
   { id: "slow", category: "ability", name: "Замедление", description: "Базовая способность: замедляет время за энергию.", price: 0, preview: "◷" },
-  { id: "annihilation", category: "ability", name: "Аннигиляция", description: "Очищает радиус 200 м, притягивает монеты и сразу повышает скорость. Одна активация за забег.", price: 1500, preview: "◉" },
+  { id: "annihilation", category: "ability", name: "Аннигиляция", description: "4 заряда: нажми — очистить экран и собрать монеты; держи 2 с — потратить все на радиус 200 м.", price: 1500, preview: "◉" },
   { id: "plasma", category: "ability", name: "Плазменный разгон", description: "Плазменная сфера раскручивает шар: сверхскорость и неуязвимость на 30 с. Одна активация за забег.", price: 2500, preview: "✺" },
   { id: "combo-charge", category: "upgrade", name: "Заряд BOOST", description: "Серия для заряда: 6 → 5 → 4 пробития. Ошибка по-прежнему сбрасывает прогресс.", price: 100, maxLevel: 2, preview: "×ϟ" },
   { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень.", price: 25, maxLevel: 5, preview: "ϟ" },

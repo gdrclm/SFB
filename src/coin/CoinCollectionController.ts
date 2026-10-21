@@ -1,3 +1,4 @@
+import { intersectsScreen, type ScreenBounds } from "../powers/PowerArea";
 import type { BallPosition } from "../ball/BallController";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
@@ -96,6 +97,11 @@ export class CoinCollectionController implements FixedSimulationSystem {
   public collectWithin(center: { x: number; y: number }, radius: number): void {
     for (const coin of this.#coins) {
       if (coin.isActive && Math.hypot(coin.mesh.position.x - center.x, coin.mesh.position.y - center.y) <= radius) this.#collect(coin, true);
+    }
+  }
+  public collectInScreen(bounds: ScreenBounds): void {
+    for (const coin of this.#coins) {
+      if (coin.isActive && intersectsScreen(coin.mesh.position.x, coin.mesh.position.y, coin.radius, coin.radius, bounds)) this.#collect(coin, true);
     }
   }
   #collect(coin: CoinController, attracted: boolean): void {

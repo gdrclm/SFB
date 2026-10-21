@@ -9,6 +9,8 @@ export class PowerUpController {
   readonly #ball: PowerBall;
   readonly #canActivate: () => boolean;
   readonly #activate: (kind: PowerKind) => void;
+  readonly #miniSweep: () => void;
+  #annihilationCharges = 4;
   readonly #sweep: () => void;
   readonly #used = new Set<PowerKind>();
   #zone: Point | null = null;
@@ -17,22 +19,32 @@ export class PowerUpController {
   #plasmaStart = 0;
   #plasmaTarget = 0;
   public constructor(config: GameConfig["powers"], ball: PowerBall, canActivate: () => boolean,
-    activate: (kind: PowerKind) => void, sweep: () => void) {
+    activate: (kind: PowerKind) => void, sweep: () => void, miniSweep: () => void = () => {}) {
     this.#config = config; this.#ball = ball; this.#canActivate = canActivate;
-    this.#activate = activate; this.#sweep = sweep;
+    this.#activate = activate; this.#sweep = sweep; this.#miniSweep = miniSweep;
   }
   public get plasmaRemaining(): number { return this.#plasmaRemaining; }
   public get invulnerable(): boolean { return this.#plasmaRemaining > 0; }
   public get zone(): Point | null { return this.#zone; }
   public unlocked(kind: PowerKind): boolean { return this.#config[kind]; }
-  public available(kind: PowerKind): boolean { return this.unlocked(kind) && !this.#used.has(kind); }
+  public get annihilationCharges(): number { return this.#config.annihilation ? this.#annihilationCharges : 0; }
+  public available(kind: PowerKind): boolean {
+    return this.unlocked(kind) && (kind === "annihilation" ? this.#annihilationCharges > 0 : !this.#used.has(kind));
+  }
+  public tryMiniAnnihilation(): boolean {
+    if (!this.available("annihilation") || !this.#canActivate()) return false;
+    this.#annihilationCharges -= 1;
+    this.#activate("annihilation"); this.#miniSweep();
+    return true;
+  }
   public covers(point: Point): boolean {
     return this.#zone !== null && Math.hypot(point.x - this.#zone.x, point.y - this.#zone.y) <= ANNIHILATION_RADIUS;
   }
   public tryActivate(kind: PowerKind): boolean {
     if (!this.available(kind) || !this.#canActivate()) return false;
+    if (kind === "annihilation" && this.#annihilationCharges < 4) return false;
     this.#used.add(kind);
-    if (kind === "annihilation") this.#zone = { ...this.#ball.position };
+    if (kind === "annihilation") { this.#annihilationCharges = 0; this.#zone = { x: this.#ball.position.x, y: this.#ball.position.y }; }
     else {
       this.#plasmaRemaining = PLASMA_SECONDS; this.#plasmaElapsed = 0;
       this.#plasmaStart = this.#ball.fallSpeed;

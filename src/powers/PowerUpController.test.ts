@@ -53,3 +53,41 @@ it("does not unlock shop powers in a run without their configuration", () => {
   expect(power.tryActivate("annihilation")).toBe(false);
   expect(power.tryActivate("plasma")).toBe(false);
 });
+
+it("shares four charges between four screen pulses and one full-radius blast", () => {
+  const activate = vi.fn(), sweep = vi.fn(), mini = vi.fn();
+  const ball = { position: { x: 0, y: 0 }, fallSpeed: 10 };
+  const power = new PowerUpController(options, ball, () => true, activate, sweep, mini);
+  expect(power.annihilationCharges).toBe(4);
+  expect(power.tryMiniAnnihilation()).toBe(true);
+  expect(power.annihilationCharges).toBe(3);
+  expect(power.zone).toBe(null);
+  expect(power.tryActivate("annihilation")).toBe(false);
+  expect(power.annihilationCharges).toBe(3);
+  for (let i = 0; i < 3; i++) expect(power.tryMiniAnnihilation()).toBe(true);
+  expect(power.tryMiniAnnihilation()).toBe(false);
+  expect(power.available("annihilation")).toBe(false);
+  expect(mini).toHaveBeenCalledTimes(4); expect(sweep).not.toHaveBeenCalled();
+  const fresh = new PowerUpController(options, ball, () => true, activate, sweep, mini);
+  expect(fresh.tryActivate("annihilation")).toBe(true);
+  expect(fresh.annihilationCharges).toBe(0);
+  expect(fresh.tryMiniAnnihilation()).toBe(false);
+});
+it("does not spend a mini charge when gameplay is paused or the ability is not equipped", () => {
+  const ball = { position: { x: 0, y: 0 }, fallSpeed: 10 };
+  const power = new PowerUpController(options, ball, () => false, vi.fn(), vi.fn(), vi.fn());
+  expect(power.tryMiniAnnihilation()).toBe(false);
+  expect(power.annihilationCharges).toBe(4);
+  const locked = new PowerUpController({ ...options, annihilation: false }, ball, () => true, vi.fn(), vi.fn(), vi.fn());
+  expect(locked.tryMiniAnnihilation()).toBe(false);
+});
+
+it("captures world coordinates from the engine's accessor-based vector rather than copying its internal fields", () => {
+  class EnginePoint { get x(): number { return 7; } get y(): number { return -20; } }
+  const power = new PowerUpController(options, { position: new EnginePoint(), fallSpeed: 10 }, () => true, vi.fn(), vi.fn());
+  expect(power.tryActivate("annihilation")).toBe(true);
+  expect(power.zone).toEqual({ x: 7, y: -20 });
+  expect(power.covers({ x: 7, y: -220 })).toBe(true);
+  power.fixedUpdate(.01);
+  expect(power.zone).not.toBe(null);
+});
