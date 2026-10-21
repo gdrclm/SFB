@@ -34,8 +34,8 @@ export class SuccessfulPlatformHitHandler {
     this.#radius = config.ball.radius;
   }
 
-  public handle(collision: PlatformCollision): boolean {
-    if (collision.assessment !== "sufficient" || !collision.platform.isActive) {
+  public handle(collision: PlatformCollision, powered = false): boolean {
+    if ((!powered && collision.assessment !== "sufficient") || !collision.platform.isActive) {
       return false;
     }
 
@@ -48,8 +48,8 @@ export class SuccessfulPlatformHitHandler {
       this.#platformPool.completeRelease(collision.platform);
     }, force);
 
-    this.#ball.fallSpeed = Math.max(0, collision.ballSpeed - this.#speedLoss);
-    this.#ball.startBreakImpact?.(collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
+    if (!powered) this.#ball.fallSpeed = Math.max(0, collision.ballSpeed - this.#speedLoss);
+    if (!powered) this.#ball.startBreakImpact?.(collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
       collision.platform.strength / Math.max(1, collision.ballSpeed));
     this.#feedback.playBallReaction();
     this.#feedback.playCameraReaction(force);

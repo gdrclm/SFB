@@ -73,3 +73,16 @@ describe("CoinCollectionController", () => {
     engine.dispose();
   });
 });
+
+it("annihilation credits each coin in the actual circular radius once and immediately increases speed", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const coins = [new CoinController(scene, gameConfig, { x: 0, y: -200 }, 0), new CoinController(scene, gameConfig, { x: 1, y: -200 }, 1)];
+  const ball = { position: { x: 0, y: 0, z: 0 }, previousPosition: { x: 0, y: 0, z: 0 }, fallSpeed: 10 };
+  const wallet = new RunWallet(30, 2), controller = new CoinCollectionController(ball, coins, wallet, gameConfig);
+  const listener = vi.fn(); controller.onCollected(listener);
+  controller.collectWithin(ball.position, 200); controller.collectWithin(ball.position, 200);
+  expect(wallet.coins).toBe(1); expect(ball.fallSpeed).toBe(11);
+  expect(coins[1]?.isActive).toBe(true);
+  expect(listener).toHaveBeenCalledWith(coins[0], true);
+  controller.dispose(); scene.dispose(); engine.dispose();
+});

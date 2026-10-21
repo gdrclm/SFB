@@ -59,10 +59,10 @@ export class PlatformController {
   public get isBreaking(): boolean { return this.#isBreaking; }
   public get approachState(): ApproachState | null { return this.#approachState; }
 
-  public setApproachFeedback(speed: number | null, elapsedSeconds = 0, boostAvailable = true, boostMultiplier = 1.5, secondsToImpact = Infinity): void {
+  public setApproachFeedback(speed: number | null, elapsedSeconds = 0, boostAvailable = true, boostMultiplier = 1.5, secondsToImpact = Infinity, scannerWarning = false): void {
     if (!this.#isActive) return;
     this.#elapsed = elapsedSeconds;
-    this.#approachState = speed === null ? null : approachState(speed, this.#strength, boostAvailable, boostMultiplier, secondsToImpact);
+    this.#approachState = scannerWarning ? "danger" : speed === null ? null : approachState(speed, this.#strength, boostAvailable, boostMultiplier, secondsToImpact);
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, this.#approachState), elapsedSeconds);
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.

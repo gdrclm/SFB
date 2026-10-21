@@ -216,3 +216,26 @@ it("buys a bounded combo-charge upgrade for the next run without granting a free
   expect(createPlayerConfig(gameConfig, new PlayerProfile(() => data)).boost.comboHitsRequired).toBe(4);
   expect(gameConfig.boost.comboHitsRequired).toBe(6);
 });
+
+it("persists passive upgrades and one selected ability, disables paid advantages in ranked runs", () => {
+  const data = storage(), profile = new PlayerProfile(() => data);
+  profile.creditRuns([result("powers", 10000)]);
+  expect(profile.activeAbility).toBe("slow");
+  expect(profile.equip("plasma")).toBe(false);
+  for (let i = 0; i < 3; i++) expect(profile.buy("impact-retention")).toBe(true);
+  expect(profile.buy("impact-retention")).toBe(false);
+  expect(profile.buy("danger-scanner")).toBe(true);
+  expect(profile.buy("annihilation")).toBe(true);
+  expect(profile.buy("plasma")).toBe(true);
+  expect(profile.buy("plasma")).toBe(false);
+  expect(profile.activeAbility).toBe("slow"); // Buying does not silently replace the selected ability.
+  expect(profile.equip("annihilation")).toBe(true);
+  expect(createPlayerConfig(gameConfig, profile).powers.annihilation).toBe(true);
+  expect(profile.equip("plasma")).toBe(true);
+  const restored = new PlayerProfile(() => data), config = createPlayerConfig(gameConfig, restored);
+  expect(restored.activeAbility).toBe("plasma");
+  expect(config.powers).toEqual({ impactRetention: .75, dangerRange: 3, annihilation: false, plasma: true });
+  expect(createPlayerConfig(gameConfig, restored, true).powers).toEqual(gameConfig.powers);
+  expect(restored.equip("slow")).toBe(true);
+  expect(createPlayerConfig(gameConfig, restored).powers.plasma).toBe(false);
+});

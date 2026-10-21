@@ -2,7 +2,7 @@ import { getBrowserRunHistory } from "../run/RunHistory";
 import { getPlayerProfile, SHOP_ITEMS, type ShopCategory } from "./PlayerProfile";
 
 const categories: readonly [ShopCategory, string][] = [
-  ["upgrade", "Улучшения"], ["ball", "Персонаж"], ["world", "Мир"], ["props", "Декорации"], ["vfx", "VFX"],
+  ["upgrade", "Улучшения"], ["ability", "Способности"], ["ball", "Персонаж"], ["world", "Мир"], ["props", "Декорации"], ["vfx", "VFX"],
 ];
 export class ShopController {
   readonly #dialog: HTMLDialogElement;
@@ -61,14 +61,15 @@ export class ShopController {
       preview.textContent = item.preview;
       const title = document.createElement("h2"); title.textContent = item.name;
       const description = document.createElement("p"); description.className = "shop-item-description"; description.textContent = item.description;
-      description.hidden = item.category !== "upgrade";
+      description.hidden = item.category !== "upgrade" && item.category !== "ability";
       card.title = item.description;
       const info = document.createElement("p"); info.className = "shop-item-state";
       const action = document.createElement("button"); action.type = "button";
       const level = this.#profile.level(item.id);
       const owned = this.#profile.owns(item.id);
       const maxed = item.maxLevel !== undefined && level >= item.maxLevel;
-      const equipped = item.category !== "upgrade" && this.#profile.equipment[item.category] === item.id;
+      const equipped = item.category === "ability" ? this.#profile.activeAbility === item.id
+        : item.category !== "upgrade" && this.#profile.equipment[item.category] === item.id;
       info.textContent = item.maxLevel === undefined ? owned ? "Куплено" : "Не куплено" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
       const price = this.#profile.price(item);
       action.textContent = maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
@@ -79,7 +80,7 @@ export class ShopController {
         const success = owned ? this.#profile.equip(item.id) : this.#profile.buy(item.id);
         this.#render();
         this.#element("#shop-message").textContent = success
-          ? owned ? `${item.name}: выбрано для следующего забега.`
+          ? owned ? `${item.name}: ${item.category === "ability" ? "кнопка слева внизу в следующем забеге" : "выбрано для следующего забега"}.`
             : item.category === "upgrade" ? "Улучшение куплено. Применится в следующем забеге." : "Предмет куплен. Нажмите «Выбрать», чтобы использовать."
           : "Не удалось выполнить покупку или сохранить выбор.";
         this.#dialog.querySelector<HTMLButtonElement>(`[data-item="${item.id}"] button`)?.focus();

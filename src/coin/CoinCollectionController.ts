@@ -10,7 +10,7 @@ interface CoinCollectionBall {
   fallSpeed: number;
 }
 
-export type CoinCollectedListener = (coin: CoinController) => void;
+export type CoinCollectedListener = (coin: CoinController, attracted?: boolean) => void;
 
 function distanceSquaredToSegment(
   pointX: number,
@@ -89,14 +89,19 @@ export class CoinCollectionController implements FixedSimulationSystem {
         continue;
       }
 
-      if (coin.collect()) {
-        this.#wallet.collectCoin();
-        this.#ball.fallSpeed += this.#speedPerCoin;
-        for (const listener of this.#listeners) {
-          listener(coin);
-        }
-      }
+      this.#collect(coin, false);
     }
+  }
+
+  public collectWithin(center: { x: number; y: number }, radius: number): void {
+    for (const coin of this.#coins) {
+      if (coin.isActive && Math.hypot(coin.mesh.position.x - center.x, coin.mesh.position.y - center.y) <= radius) this.#collect(coin, true);
+    }
+  }
+  #collect(coin: CoinController, attracted: boolean): void {
+    if (!coin.collect()) return;
+    this.#wallet.collectCoin(); this.#ball.fallSpeed += this.#speedPerCoin;
+    for (const listener of this.#listeners) listener(coin, attracted);
   }
 
   public dispose(): void {

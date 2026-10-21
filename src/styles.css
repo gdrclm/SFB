@@ -2394,3 +2394,17 @@ html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }
 #result-network-status:empty { display:none; }
 @media(max-height:620px){#start-screen .game-over-card{padding-top:10px;}#start-screen .bank-balance{margin-bottom:7px;}#start-screen .menu-tagline{display:none;}#start-screen .network-note{margin:3px 0 6px;}}
 @media(max-height:470px) and (orientation:landscape){#start-screen .player-badge,#start-screen .ranked-mode,#start-screen .network-note{grid-column:1;}#start-screen .main-menu-actions{grid-column:2;grid-row:1 / span 8;}#start-screen .menu-training{grid-column:1;grid-row:auto;}}
+
+/* One equipped ability replaces the original slow button. BOOST keeps its place. */
+#slow-mode-button[data-power] { box-shadow:0 0 16px #00caff99,inset 0 0 14px #2fdcff66; }
+#slow-mode-button[data-power="annihilation"] { border-color:#e49cff; color:#e6b4ff; box-shadow:0 0 12px #bc55ff88,inset 0 0 12px #ab4cff55; }
+#slow-mode-button[data-power] .slow-mode-value { color:inherit; text-shadow:0 0 10px currentColor; }
+#slow-mode-button[data-power] .slow-mode-state { display:block; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:10px; padding:2px 6px; }
+#slow-mode-button[data-spent="true"] { opacity:.4; box-shadow:none; }
+#slow-mode-button[data-active="true"] { border-color:#fff; color:#fff; box-shadow:0 0 20px #16e5ff,inset 0 0 15px #0dcfff; }
+.feel-annihilation { width:90px; height:90px; border:4px solid #e5b8ff; border-radius:50%; box-shadow:0 0 30px #a753ff,inset 0 0 30px #61eaff; background:radial-gradient(circle,transparent 50%,#ca8aff66); }
+[data-preview="impact-retention"], [data-preview="danger-scanner"] { color:#6affe8; text-shadow:0 0 10px #00dbff; }
+[data-preview="annihilation"] { color:#e6b4ff; text-shadow:0 0 12px #b631ff; }
+[data-preview="plasma"] { color:#fff; text-shadow:0 0 14px #00eaff; }
+#slow-mode-button[data-active="true"]:disabled { filter:none; opacity:1; cursor:default; }
+#slow-mode-button[data-active="true"] .control-ring { border-color:#c8ffff; box-shadow:0 0 14px #10dfff,inset 0 0 8px #00cfff; }

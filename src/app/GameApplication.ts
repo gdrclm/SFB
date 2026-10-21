@@ -1,3 +1,7 @@
+import { scannerDanger } from "../powers/DangerScanner";
+import { PowerUpController, ANNIHILATION_RADIUS } from "../powers/PowerUpController";
+import { PowerUpView } from "../powers/PowerUpView";
+import { PowerVisuals } from "../powers/PowerVisuals";
 import type { RunResult } from "../run/RunHistory";
 import type { AdaptiveQuality } from "../rendering/AdaptiveQuality";
 import { hudArt } from "../ui/HudArt";
@@ -125,6 +129,9 @@ export class GameApplication {
   #combo = new ComboController();
   #comboView: ComboView | null = null;
   #feel: GameFeel | null = null;
+  #powers: PowerUpController | null = null;
+  #powerView: PowerUpView | null = null;
+  #powerVisuals: PowerVisuals | null = null;
   #backdrop: DepthBackdrop | null = null;
   #elapsedPlatformSeconds = 0;
   #opening: StagedOpening | null = null;
@@ -456,6 +463,25 @@ export class GameApplication {
       requireMenuElement(notice, "span").textContent = challenge.text;
       this.#challengeRemaining = 7;
     });
+    this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
+      () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),
+      kind => {
+        this.#slowModeController?.cancelForBoost();
+        if (this.#ballController !== null) {
+          if (kind === "annihilation") this.#feel?.annihilation(this.#ballController.position);
+          else {
+            this.#feel?.boost(this.#ballController.position);
+            this.#ballVisualController?.react("combo");
+            this.#cameraController?.playBoostReaction(); this.#speedFeedback?.playBoost();
+          }
+        }
+        this.#haptics.request(kind === "annihilation" ? "heavyBreak" : "boost");
+      }, this.#sweepAnnihilation);
+    this.#fixedStep.register(this.#powers);
+    if (this.#config.powers.plasma) {
+      this.#powerVisuals = new PowerVisuals(this.#scene, ballMesh, this.#powers, this.#reducedMotion);
+      this.#fixedStep.register(this.#powerVisuals);
+    }
     this.#collisionResolver = new CollisionResolver(
       this.#ballController,
       new HavokPlatformSweep(
@@ -502,10 +528,9 @@ export class GameApplication {
       this.#config,
       (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); this.#ballVisualController?.setSlow(active); if (active) this.#ballVisualController?.react("slow"); },
     );
-    this.#slowModeButton = new SlowModeButtonController(
-      this.#slowModeButtonElement,
-      this.#slowModeController,
-    );
+    if (this.#config.powers.annihilation || this.#config.powers.plasma) {
+      this.#powerView = new PowerUpView(this.#slowModeButtonElement, this.#powers, this.#config.powers.plasma ? "plasma" : "annihilation");
+    } else this.#slowModeButton = new SlowModeButtonController(this.#slowModeButtonElement, this.#slowModeController);
     this.#boostController = new BoostController(
       this.#ballController,
       this.#gameState,
@@ -560,6 +585,8 @@ export class GameApplication {
     this.#contextGuide?.dispose();
     document.body.dataset.guideStage = "off";
     this.#platformLabels?.dispose();
+    this.#powerView?.dispose(); this.#powerView = null;
+    this.#powerVisuals?.dispose(); this.#powerVisuals = null; this.#powers = null;
     this.#comboView?.dispose();
     this.#backdrop?.dispose();
     this.#backdrop = null;
@@ -602,7 +629,7 @@ export class GameApplication {
     this.#ballVisualController?.dispose();
     this.#platformPool?.dispose();
     this.#boostButton?.dispose();
-    this.#slowModeButton?.dispose();
+    this.#slowModeButton?.dispose(); this.#slowModeButton = null;
     this.#horizontalInput?.dispose();
     this.#runResources?.clear();
     if (!keepScene) {
@@ -644,6 +671,7 @@ export class GameApplication {
     const realDeltaSeconds = (nowMs - this.#lastFrameTimeMs) / 1_000;
     if (document.hidden) { this.#lastFrameTimeMs = nowMs; this.#quality?.update(0, false); this.#feel?.setPaused(true); return; }
     let isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
+    if (this.#powers?.invulnerable) this.#slowModeController?.cancelForBoost();
     const timeScale = isPaused
       ? 1
       : (this.#slowModeController?.update(realDeltaSeconds) ?? 1);
@@ -661,6 +689,8 @@ export class GameApplication {
         this.#boostButton?.render(); this.#slowModeButton?.render();
         this.#renderCurrency(); this.#renderTelemetry();
       }
+      this.#powerView?.render(isPaused || this.#gameState.current !== GameState.Playing && this.#gameState.current !== GameState.SlowMode);
+      if (this.#powers?.invulnerable) this.#slowModeButtonElement.disabled = true;
       this.#speedFeedback?.render(this.#ballController?.fallSpeed ?? 0, isPaused || this.#gameState.current === GameState.GameOver);
     }
     const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
@@ -701,17 +731,44 @@ export class GameApplication {
     this.#status.textContent = `Сцена готова · ${renderer.toUpperCase()} · ${this.#gameState.current}`;
   }
 
+  readonly #sweepAnnihilation = (): void => {
+    const zone = this.#powers?.zone;
+    if (zone === null || zone === undefined) return;
+    this.#coinCollectionController?.collectWithin(zone, ANNIHILATION_RADIUS);
+    const pool = this.#platformPool;
+    if (pool === null) return;
+    let effects = 0;
+    for (const platform of pool.platforms) {
+      if (!platform.isActive || !this.#powers?.covers(platform.mesh.position)) continue;
+      this.#destroyedPlatformCount += 1;
+      if (this.#successfulHitEffects !== null && this.#ballController !== null
+        && Math.abs(platform.mesh.position.y - this.#ballController.position.y) < 12 && effects < 3
+        && pool.beginRelease(platform)) {
+        effects += 1;
+        this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6);
+      } else pool.release(platform);
+    }
+  };
+
   readonly #handleCollision = (collision: PlatformCollision): void => {
     if (this.#lives.remainingLives === 0) return;
     const boostWasAvailable = this.#boostController?.canBoost ?? false;
-    const destroyed = this.#successfulHitHandler?.handle(collision) ?? false;
+    if (this.#powers?.covers(collision.platform.mesh.position)) { this.#sweepAnnihilation(); return; }
+    const powered = this.#powers?.invulnerable ?? false;
+    const destroyed = this.#successfulHitHandler?.handle(collision, powered) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
       this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
-      if (!this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .04 : .02;
+      if (!powered && !this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .04 : .02;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
+      // Invulnerable hits destroy scenery but do not masquerade as skill hits or recharge BOOST.
+      if (powered) {
+        this.#applyDestroyedPlatformEffect(collision.platform);
+        this.#haptics.request("powerfulBreak");
+        return;
+      }
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
       if (hit.tierIncreased) this.#ballVisualController?.react("combo");
       if (this.#boostController?.recordSuccessfulHit()) this.#boostButton?.playCharged();
@@ -760,10 +817,11 @@ export class GameApplication {
     this.#status.textContent = `Столкновение · скорость ${collision.ballSpeed.toFixed(1)} · прочность ${strength} · недостаточно`;
   };
 
-  readonly #handleCoinCollected = (coin: CoinController): void => {
+  readonly #handleCoinCollected = (coin: CoinController, attracted = false): void => {
     this.#ballVisualController?.react("coin");
     this.#contextGuide?.completed("coin");
-    this.#feel?.coin(coin.mesh.position);
+    if (attracted && this.#ballController !== null) this.#feel?.magnetCoin(coin.mesh.position, this.#ballController.position);
+    else this.#feel?.coin(coin.mesh.position);
     this.#updateMission({ type: "coin" });
     this.#runProgress.observeSpeed(this.#ballController?.fallSpeed ?? 0);
     this.#haptics.request(coin.chain !== null && coin.chain.remaining === 0 && !coin.chain.cancelled ? "richChain" : "coin");
@@ -788,7 +846,7 @@ export class GameApplication {
       return ` · зелёная: ${lifeStatus}, +${String(this.#config.platformEffects.vitalityEnergy)} энергии`;
     }
 
-    if (platform.kind === "time-slow") {
+    if (platform.kind === "time-slow" && !this.#powers?.invulnerable) {
       this.#slowModeController?.forceStart(
         this.#config.platformEffects.forcedSlowDurationRealSeconds,
       );
@@ -1117,7 +1175,12 @@ export class GameApplication {
     const closingSpeed = ball.fallSpeed * (this.#slowModeController?.timeScale ?? 1);
     const secondsToImpact = nearest === null ? Infinity : Math.max(0, ball.position.y - this.#config.ball.radius - nearest.mesh.position.y - nearest.size.height / 2) / Math.max(.001, closingSpeed);
     const decisionVisible = secondsToImpact <= 1.6 && this.#gameState.current !== GameState.BounceRecovery;
-    for (const platform of platforms) platform.setApproachFeedback(platform === nearest && decisionVisible ? ball.fallSpeed : null, elapsed, this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact);
+    for (const platform of platforms) {
+      const scanned = !this.#powers?.invulnerable && scannerDanger(ball, platform, this.#config.ball.radius, this.#config.powers.dangerRange);
+      platform.setApproachFeedback(platform === nearest && decisionVisible
+        ? this.#powers?.invulnerable ? Math.max(ball.fallSpeed, platform.strength) : ball.fallSpeed : null, elapsed,
+        this.#boostController?.canBoost ?? false, this.#config.boost.speedMultiplier, secondsToImpact, scanned);
+    }
     this.#ballVisualController?.setDanger(nearest?.approachState === "danger");
     if (!updateHud) return;
     requireMenuElement(this.#interfaceLayerElement, "#speed-panel").dataset.warning = String(nearest?.approachState === "danger");

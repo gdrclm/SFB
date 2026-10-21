@@ -51,6 +51,17 @@ export class GameFeel {
       : [{ transform: "scale(1.12)", borderColor: "#ffe66a", boxShadow: "0 0 15px #ffd12b, inset 0 0 8px #ffde7366" },
         { transform: "scale(1)", borderColor: "#1ee4ff", boxShadow: "0 0 8px #00baff88, inset 0 0 8px #008cff44" }], 320, false);
   }
+  public magnetCoin(position: { x: number; y: number; z: number }, target: { x: number; y: number; z: number }): void {
+    getGameSounds().play("coin");
+    const from = this.screenPoint(position), to = this.screenPoint(target);
+    this.#particle(from, "coin", [{ transform: "translate(-50%, -50%) scale(1.3)", opacity: 1 },
+      { transform: `translate(${String(to.x - from.x)}px, ${String(to.y - from.y)}px) scale(.2)`, opacity: 0 }], this.#reduced ? 100 : 350);
+  }
+  public annihilation(position: { x: number; y: number; z: number }): void {
+    getGameSounds().play("boost");
+    this.#particle(this.screenPoint(position), "annihilation", [{ transform: "translate(-50%, -50%) scale(.2)", opacity: 1 },
+      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : "18"})`, opacity: 0 }], 650);
+  }
   public depth(): void {
     const panel = document.querySelector<HTMLElement>("#run-panel");
     if (panel !== null) this.#animate(panel, [{ borderColor: "#e9ffff", boxShadow: "0 0 18px #19dfff, inset 0 0 10px #27dcff99" },

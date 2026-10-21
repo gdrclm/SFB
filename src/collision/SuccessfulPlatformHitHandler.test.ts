@@ -78,3 +78,14 @@ describe("SuccessfulPlatformHitHandler", () => {
     expect(feedback.playCameraReaction).not.toHaveBeenCalled();
   });
 });
+
+it("plasma breaks an otherwise impossible platform without impact braking or speed loss", () => {
+  const ball = { fallSpeed: 180, startBreakImpact: vi.fn() };
+  const platform = { isActive: true, strength: 1000 } as PlatformController;
+  const pool = { beginRelease: vi.fn(() => true), completeRelease: vi.fn(() => true) };
+  const feedback = createFeedback();
+  const handler = new SuccessfulPlatformHitHandler(ball, pool, feedback.feedback, gameConfig);
+  expect(handler.handle({ platform, ballSpeed: 180, assessment: "insufficient" }, true)).toBe(true);
+  expect(pool.completeRelease).toHaveBeenCalledWith(platform);
+  expect(ball.fallSpeed).toBe(180); expect(ball.startBreakImpact).not.toHaveBeenCalled();
+});

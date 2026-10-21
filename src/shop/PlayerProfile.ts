@@ -3,7 +3,7 @@ import type { GameConfig } from "../config/gameConfig";
 import type { RunResult } from "../run/RunHistory";
 import { migrateMissionBoard, parseMissionBoard, type MissionBoard } from "../run/MissionBoard";
 
-export type ShopCategory = "upgrade" | "ball" | "world" | "props" | "vfx";
+export type ShopCategory = "upgrade" | "ability" | "ball" | "world" | "props" | "vfx";
 export interface ShopItem {
   readonly id: string;
   readonly category: ShopCategory;
@@ -14,6 +14,11 @@ export interface ShopItem {
   readonly preview: string;
 }
 export const SHOP_ITEMS: readonly ShopItem[] = [
+  { id: "impact-retention", category: "upgrade", name: "Инерционный корпус", description: "Сохраняет 25 / 50 / 75% скорости сверх стартовой при потере жизни.", price: 150, maxLevel: 3, preview: "◈" },
+  { id: "danger-scanner", category: "upgrade", name: "Сканер опасностей", description: "Подсвечивает непробиваемые сейчас препятствия в радиусе 3 м.", price: 250, maxLevel: 1, preview: "⌖" },
+  { id: "slow", category: "ability", name: "Замедление", description: "Базовая способность: замедляет время за энергию.", price: 0, preview: "◷" },
+  { id: "annihilation", category: "ability", name: "Аннигиляция", description: "Очищает радиус 200 м, притягивает монеты и сразу повышает скорость. Одна активация за забег.", price: 1500, preview: "◉" },
+  { id: "plasma", category: "ability", name: "Плазменный разгон", description: "Плазменная сфера раскручивает шар: сверхскорость и неуязвимость на 30 с. Одна активация за забег.", price: 2500, preview: "✺" },
   { id: "combo-charge", category: "upgrade", name: "Заряд BOOST", description: "Серия для заряда: 6 → 5 → 4 пробития. Ошибка по-прежнему сбрасывает прогресс.", price: 100, maxLevel: 2, preview: "×ϟ" },
   { id: "energy", category: "upgrade", name: "Запас энергии", description: "+5 стартовой энергии за уровень.", price: 25, maxLevel: 5, preview: "ϟ" },
   { id: "coin-energy", category: "upgrade", name: "Энергия монет", description: "+1 энергии за монету за уровень.", price: 40, maxLevel: 3, preview: "★ϟ" },
@@ -29,12 +34,13 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: "vfx-sparkles", category: "vfx", name: "Золотые искры", description: "Мягкие золотые частицы.", price: 60, preview: "✦" },
 ];
 
-type Equipment = Record<Exclude<ShopCategory, "upgrade">, string>;
+type Equipment = Record<Exclude<ShopCategory, "upgrade" | "ability">, string>;
 interface ProfileState {
   coins: number;
   owned: string[];
   levels: Record<string, number>;
   equipped: Equipment;
+  activeAbility: "slow" | "annihilation" | "plasma";
   creditedRuns: string[];
   firstSuccessAt: string | null;
   mission: MissionState;
@@ -46,6 +52,7 @@ const defaults = (): ProfileState => ({
   owned: SHOP_ITEMS.filter((item) => item.price === 0).map((item) => item.id),
   levels: { energy: 0, "coin-energy": 0, "combo-charge": 0 },
   equipped: { ball: "ball-classic", world: "world-sky", props: "props-none", vfx: "vfx-none" },
+  activeAbility: "slow",
   creditedRuns: [],
   firstSuccessAt: null,
   mission: { index: 0, progress: 0 },
@@ -90,6 +97,7 @@ function parseProfile(raw: string | null): ProfileState {
       if (typeof id === "string" && state.owned.includes(id) && SHOP_ITEMS.some((item) => item.id === id && item.category === slot)) state.equipped[slot] = id;
     }
   }
+  if ((data.activeAbility === "annihilation" || data.activeAbility === "plasma") && state.owned.includes(data.activeAbility)) state.activeAbility = data.activeAbility;
   return state;
 }
 
@@ -107,6 +115,7 @@ export class PlayerProfile {
   public get coins(): number { return this.#state.coins; }
   public get storageAvailable(): boolean { return this.#storageAvailable; }
   public get equipment(): Readonly<Equipment> { return { ...this.#state.equipped }; }
+  public get activeAbility(): "slow" | "annihilation" | "plasma" { return this.#state.activeAbility; }
   public level(id: string): number { return this.#state.levels[id] ?? 0; }
   public owns(id: string): boolean { return this.#state.owned.includes(id); }
   public price(item: ShopItem): number { return item.price * (this.level(item.id) + 1); }
@@ -194,6 +203,10 @@ export class PlayerProfile {
   public equip(id: string): boolean {
     const item = SHOP_ITEMS.find((entry) => entry.id === id);
     if (item === undefined || item.category === "upgrade" || !this.owns(id)) return false;
+    if (item.category === "ability") {
+      if (id !== "slow" && id !== "annihilation" && id !== "plasma") return false;
+      return this.#commit({ ...this.#state, activeAbility: id });
+    }
     return this.#commit({ ...this.#state, equipped: { ...this.#state.equipped, [item.category]: id } });
   }
 }
@@ -202,6 +215,10 @@ export function createPlayerConfig(config: GameConfig, profile: PlayerProfile, r
   const color = profile.equipment.ball === "ball-gold" ? { r: 1, g: 0.72, b: 0.18 }
     : profile.equipment.ball === "ball-mint" ? { r: 0.22, g: 1, b: 0.68 } : null;
   return { ...config,
+    powers: { impactRetention: ranked ? 0 : profile.level("impact-retention") * .25,
+      dangerRange: !ranked && profile.level("danger-scanner") > 0 ? 3 : 0,
+      annihilation: !ranked && profile.activeAbility === "annihilation" && profile.owns("annihilation"),
+      plasma: !ranked && profile.activeAbility === "plasma" && profile.owns("plasma") },
     boost: { ...config.boost, comboHitsRequired: Math.max(4, config.boost.comboHitsRequired - (ranked ? 0 : profile.level("combo-charge"))) },
     economy: { ...config.economy,
       initialEnergy: config.economy.initialEnergy + (ranked ? 0 : profile.level("energy")) * 5,

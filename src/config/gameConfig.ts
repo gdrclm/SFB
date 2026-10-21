@@ -120,6 +120,7 @@ export interface GameConfig {
     readonly cameraEffectSeconds: number;
     readonly cameraImpulse: number;
   };
+  readonly powers: { readonly impactRetention: number; readonly dangerRange: number; readonly annihilation: boolean; readonly plasma: boolean; };
   readonly unsuccessfulHit: {
     readonly bounceSpeed: number;
     readonly bounceDurationSeconds: number;
@@ -325,6 +326,7 @@ export const gameConfig: GameConfig = Object.freeze({
     cameraEffectSeconds: 0.14,
     cameraImpulse: 0.14,
   }),
+  powers: Object.freeze({ impactRetention: 0, dangerRange: 0, annihilation: false, plasma: false }),
   unsuccessfulHit: Object.freeze({
     bounceSpeed: 8,
     bounceDurationSeconds: 0.65,

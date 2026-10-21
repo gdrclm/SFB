@@ -36,6 +36,8 @@ export class BallController implements FixedSimulationSystem {
   #bounceElapsedSeconds: number | null = null;
   #bounceContactY = 0;
   #bounceLaunchSpeed = 0;
+  #bounceRecoverySpeed = 0;
+  readonly #impactRetention: number;
   #breakElapsed: number | null = null;
   #breakHold = .04;
   #verticalVelocity = 0;
@@ -63,6 +65,7 @@ export class BallController implements FixedSimulationSystem {
     this.#input = input;
     this.#config = config.ball;
     this.#bounceConfig = config.unsuccessfulHit;
+    this.#impactRetention = config.powers.impactRetention;
     this.#fallSpeed = config.ball.startFallSpeed;
     this.#horizontalLimit = Math.max(0, config.playSpace.halfWidth - config.ball.radius);
 
@@ -111,7 +114,8 @@ export class BallController implements FixedSimulationSystem {
     this.#verticalVelocity = 0;
     this.#transform.position.y = contactY;
     this.#copyCurrentPositionToPrevious();
-    this.#fallSpeed = this.#config.startFallSpeed;
+    this.#bounceRecoverySpeed = this.#config.startFallSpeed + Math.max(0, this.#fallSpeed - this.#config.startFallSpeed) * this.#impactRetention;
+    this.#fallSpeed = this.#bounceRecoverySpeed;
     this.#bounceElapsedSeconds = 0;
     return true;
   }
@@ -161,12 +165,12 @@ export class BallController implements FixedSimulationSystem {
     this.#bounceElapsedSeconds = nextElapsed;
     const flight = Math.max(0, nextElapsed - hold);
     // Match the downward velocity to ordinary falling at the end of recovery.
-    const gravity = (this.#bounceLaunchSpeed + this.#config.startFallSpeed * this.#config.movementScale) / (duration - hold);
+    const gravity = (this.#bounceLaunchSpeed + this.#bounceRecoverySpeed * this.#config.movementScale) / (duration - hold);
     this.#transform.position.y = this.#bounceContactY + this.#bounceLaunchSpeed * flight - .5 * gravity * flight * flight;
     this.#verticalVelocity = flight === 0 ? 0 : this.#bounceLaunchSpeed - gravity * flight;
     if (nextElapsed + Number.EPSILON >= duration) {
       this.#bounceElapsedSeconds = null;
-      this.#fallSpeed = this.#config.startFallSpeed;
+      this.#fallSpeed = this.#bounceRecoverySpeed;
     }
   }
 

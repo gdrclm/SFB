@@ -205,3 +205,15 @@ describe("BallController", () => {
     expect(transform.position.y).toBeLessThan(bounceTop);
   });
 });
+
+it("preserves purchased impact speed through the entire bounce, while the base game still resets it", () => {
+  for (const retention of [0, .25, .5, .75]) {
+    const ball = new BallController(createTransform(), createInput(), { ...gameConfig, powers: { ...gameConfig.powers, impactRetention: retention } });
+    ball.fallSpeed = 100;
+    expect(ball.startBounce(0)).toBe(true);
+    expect(ball.fallSpeed).toBe(10 + 90 * retention);
+    simulate(ball, gameConfig.unsuccessfulHit.bounceDurationSeconds, 60);
+    expect(ball.fallSpeed).toBeCloseTo(10 + 90 * retention);
+    expect(ball.isBouncing).toBe(false);
+  }
+});
