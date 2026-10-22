@@ -39,3 +39,17 @@ it("uses real visible time rather than stretching the defeat on slow devices", (
   effect.render(1.5, false); expect(effect.defeatReady).toBe(false);
   effect.render(.5, false); expect(effect.defeatReady).toBe(true);
 });
+
+it.each([30, 60, 120])("keeps a forceful impact and a visible tail at %s FPS", fps => {
+  const { effect, camera } = setup(); effect.hit();
+  let peak = 0, tailPeak = 0;
+  for (let frame = 0; frame < fps; frame++) {
+    effect.render(1 / fps, false);
+    const strength = Math.hypot(camera.position.x, camera.position.y - 10) / 12;
+    peak = Math.max(peak, strength);
+    if (frame / fps >= .3 && frame / fps < .55) tailPeak = Math.max(tailPeak, strength);
+  }
+  expect(peak).toBeGreaterThan(.09);
+  expect(tailPeak).toBeGreaterThan(.04);
+  expect(camera.position.x).toBeCloseTo(0); expect(camera.position.y).toBeCloseTo(10);
+});
