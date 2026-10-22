@@ -164,6 +164,9 @@ if (!(settingsDialog instanceof HTMLDialogElement)) throw new TypeError("#game-s
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-settings]")) {
   button.addEventListener("click", () => {
     requireElement("#interface-toggle").hidden = !startScreen.hidden;
+    const developerModeInput = requireInput("#developer-mode");
+    developerModeInput.disabled = startScreen.hidden;
+    developerModeInput.title = startScreen.hidden ? "Режим можно менять в главном меню" : "";
     settingsDialog.showModal();
   });
 }
@@ -223,6 +226,9 @@ try {
   developerDepth.value = String(parseStartDepth(localStorage.getItem(DEVELOPER_DEPTH_KEY) ?? "0") ?? 0);
 } catch { /* Settings remain usable without storage. */ }
 function renderDeveloperMode(): void {
+  getPlayerProfile().setDeveloperMode(developerToggle.checked);
+  shop.refreshBalance();
+  renderMissionBoard(missionsDialog, getPlayerProfile());
   requireElement("#developer-start").hidden = !developerToggle.checked;
   requireElement("#guided-run-button").hidden = developerToggle.checked;
   document.body.dataset.developerMode = String(developerToggle.checked);

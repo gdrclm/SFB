@@ -1,3 +1,4 @@
+import { DEVELOPER_MODE_KEY } from "../dev/DeveloperMode";
 import { advanceMission, currentMission, MISSION_REWARD, type MissionEvent, type MissionState } from "../run/Missions";
 import type { GameConfig } from "../config/gameConfig";
 import type { RunResult } from "../run/RunHistory";
@@ -103,7 +104,34 @@ function parseProfile(raw: string | null): ProfileState {
 
 export class PlayerProfile {
   readonly #storage: () => Pick<Storage, "getItem" | "setItem">;
-  #state: ProfileState = defaults();
+  #realState: ProfileState = defaults();
+  #developerState: ProfileState | null = null;
+  get #state(): ProfileState { return this.#developerState ?? this.#realState; }
+  set #state(state: ProfileState) {
+    if (this.#developerState !== null) this.#developerState = state;
+    else this.#realState = state;
+  }
+  public get developerMode(): boolean { return this.#developerState !== null; }
+  /** The real profile stays untouched; every fresh enable starts an empty sandbox. */
+  public setDeveloperMode(enabled: boolean): void {
+    if (enabled === this.developerMode) return;
+    this.#developerState = enabled ? defaults() : null;
+  }
+  public toggleDeveloperItem(id: string): boolean {
+    if (!this.developerMode) return false;
+    const item = SHOP_ITEMS.find(entry => entry.id === id);
+    if (item === undefined || item.price === 0) return false;
+    if (item.category === "upgrade") {
+      return this.#commit({ ...this.#state, levels: { ...this.#state.levels, [id]: this.level(id) > 0 ? 0 : item.maxLevel ?? 1 } });
+    }
+    if (!this.owns(id)) return this.buy(id) && this.equip(id);
+    const base = defaults();
+    return this.#commit({ ...this.#state, owned: this.#state.owned.filter(owned => owned !== id),
+      activeAbility: this.#state.activeAbility === id ? "slow" : this.#state.activeAbility,
+      equipped: item.category !== "ability" && this.#state.equipped[item.category] === id
+        ? { ...this.#state.equipped, [item.category]: base.equipped[item.category] } : this.#state.equipped,
+    });
+  }
   #storageAvailable = true;
   #readFailed = false;
 
@@ -113,14 +141,15 @@ export class PlayerProfile {
     catch { this.#storageAvailable = false; this.#readFailed = true; }
   }
   public get coins(): number { return this.#state.coins; }
-  public get storageAvailable(): boolean { return this.#storageAvailable; }
+  public get storageAvailable(): boolean { return this.developerMode || this.#storageAvailable; }
   public get equipment(): Readonly<Equipment> { return { ...this.#state.equipped }; }
   public get activeAbility(): "slow" | "annihilation" | "plasma" { return this.#state.activeAbility; }
   public level(id: string): number { return this.#state.levels[id] ?? 0; }
   public owns(id: string): boolean { return this.#state.owned.includes(id); }
-  public price(item: ShopItem): number { return item.price * (this.level(item.id) + 1); }
+  public price(item: ShopItem): number { return this.developerMode ? 0 : item.price * (this.level(item.id) + 1); }
 
   #commit(next: ProfileState): boolean {
+    if (this.developerMode) { this.#developerState = next; return true; }
     if (this.#readFailed) return false;
     try {
       this.#storage().setItem(PROFILE_KEY, JSON.stringify(next));
@@ -131,6 +160,7 @@ export class PlayerProfile {
   }
 
   public creditRuns(runs: readonly RunResult[]): boolean {
+    if (this.developerMode) return true;
     const credited = new Set(this.#state.creditedRuns);
     let coins = this.#state.coins;
     for (const run of runs) {
@@ -229,5 +259,9 @@ export function createPlayerConfig(config: GameConfig, profile: PlayerProfile, r
 }
 let browserProfile: PlayerProfile | null = null;
 export function getPlayerProfile(): PlayerProfile {
-  return browserProfile ??= new PlayerProfile(() => window.localStorage);
+  if (browserProfile === null) {
+    browserProfile = new PlayerProfile(() => window.localStorage);
+    try { browserProfile.setDeveloperMode(window.localStorage.getItem(DEVELOPER_MODE_KEY) === "true"); } catch { /* Normal profile remains available. */ }
+  }
+  return browserProfile;
 }

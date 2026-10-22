@@ -49,6 +49,7 @@ export class ShopController {
     for (const button of this.#dialog.querySelectorAll<HTMLButtonElement>("[data-category]")) {
       button.setAttribute("aria-pressed", String(button.dataset.category === this.#category));
     }
+    this.#element("#shop-test-note").hidden = !this.#profile.developerMode;
     const grid = this.#element("#shop-items");
     grid.replaceChildren();
     for (const item of SHOP_ITEMS.filter((entry) => entry.category === this.#category)) {
@@ -73,15 +74,17 @@ export class ShopController {
         : item.category !== "upgrade" && this.#profile.equipment[item.category] === item.id;
       info.textContent = item.maxLevel === undefined ? owned ? "Куплено" : "Не куплено" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
       const price = this.#profile.price(item);
-      action.textContent = maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
+      const testItem = this.#profile.developerMode && item.price > 0;
+      const testOwned = item.category === "upgrade" ? level > 0 : owned;
+      action.textContent = testItem ? testOwned ? "Отменить покупку" : item.category === "upgrade" ? "Включить максимум · бесплатно" : "Купить и выбрать · бесплатно" : maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
         : `${item.category === "upgrade" ? "Улучшить" : "Купить"} · ${String(price)} ★`;
-      action.disabled = maxed || equipped || !this.#profile.storageAvailable || !owned && this.#profile.coins < price;
+      action.disabled = !testItem && (maxed || equipped || !this.#profile.storageAvailable || !owned && this.#profile.coins < price);
       if (!owned && !maxed && this.#profile.coins < price) action.title = `Не хватает ${String(price - this.#profile.coins)} монет`;
       action.addEventListener("click", () => {
-        const success = owned ? this.#profile.equip(item.id) : this.#profile.buy(item.id);
+        const success = testItem ? this.#profile.toggleDeveloperItem(item.id) : owned ? this.#profile.equip(item.id) : this.#profile.buy(item.id);
         this.#render();
         this.#element("#shop-message").textContent = success
-          ? owned ? `${item.name}: ${item.category === "ability" ? "кнопка слева внизу в следующем забеге" : "выбрано для следующего забега"}.`
+          ? testItem ? testOwned ? "Тестовая покупка отменена." : "Включено для следующего тестового забега." : owned ? `${item.name}: ${item.category === "ability" ? "кнопка слева внизу в следующем забеге" : "выбрано для следующего забега"}.`
             : item.category === "upgrade" ? "Улучшение куплено. Применится в следующем забеге." : "Предмет куплен. Нажмите «Выбрать», чтобы использовать."
           : "Не удалось выполнить покупку или сохранить выбор.";
         this.#dialog.querySelector<HTMLButtonElement>(`[data-item="${item.id}"] button`)?.focus();
