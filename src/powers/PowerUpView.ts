@@ -69,15 +69,24 @@ export class PowerUpView {
     else this.#powers.tryActivate("plasma");
     this.render(this.#blocked);
   };
+  public keyboardDown(): void {
+    if (this.#blocked || this.#button.disabled) return;
+    if (this.#kind === "annihilation") this.#beginPress();
+    else this.#onClick();
+  }
+  public keyboardUp(): void {
+    if (this.#kind !== "annihilation" || !this.#pressing) return;
+    this.#endPress(); this.#onClick();
+  }
+  public cancelKeyboard(): void { this.#cancelPress(); }
   readonly #onKeyDown = (event: KeyboardEvent): void => {
-    if (this.#kind !== "annihilation" || event.code !== "Space") return;
-    event.preventDefault(); if (!event.repeat) this.#beginPress();
+    if (event.code !== "Space") return;
+    event.preventDefault(); event.stopPropagation();
+    if (!event.repeat) this.keyboardDown();
   };
   readonly #onKeyUp = (event: KeyboardEvent): void => {
-    if (this.#kind !== "annihilation" || event.code !== "Space") return;
-    event.preventDefault();
-    if (!this.#pressing) return;
-    this.#endPress(); this.#onClick();
+    if (event.code !== "Space") return;
+    event.preventDefault(); event.stopPropagation(); this.keyboardUp();
   };
   readonly #onContextMenu = (event: Event): void => { if (this.#kind === "annihilation") event.preventDefault(); };
   public render(blocked: boolean): void {

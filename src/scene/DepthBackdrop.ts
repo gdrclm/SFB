@@ -35,7 +35,7 @@ export class DepthBackdrop {
     if (this.#next === null) return this.#currentLocation === "crystal" ? 1 : 0;
     return (this.#currentLocation === "crystal" ? 1 - this.#blend : 0) + (this.#location === "crystal" ? this.#blend : 0);
   }
-  public update(depth: number, realSeconds: number, playerX = 0): void {
+  public update(depth: number, realSeconds: number, cameraX = 0): void {
     const location = this.#locations.observe(depth);
     // Finish an in-flight page before starting the next, including very fast runs.
     if (location !== this.#location && this.#next === null) {
@@ -48,7 +48,7 @@ export class DepthBackdrop {
     const height = (camera?.orthoTop ?? 21) - (camera?.orthoBottom ?? -21);
     if (realSeconds > 0) {
       this.#travel += (this.#previousCameraY - this.#rig.position.y) * 42 / height;
-      this.#steeringX += (playerX - this.#steeringX) * (1 - Math.exp(-5 * realSeconds));
+      this.#steeringX += (cameraX - this.#steeringX) * (1 - Math.exp(-5 * realSeconds));
     }
     this.#previousCameraY = this.#rig.position.y;
     const ready = this.#next !== null && this.#isReady(this.#next);

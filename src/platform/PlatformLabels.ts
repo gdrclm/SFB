@@ -46,8 +46,7 @@ export class PlatformLabels {
       const state = platform.approachState;
       label.textContent = numbers ? String(platform.strength) : approachSymbol(state);
       label.dataset.kind = platform.kind;
-      label.style.left = `${String(point.x / width * bounds.width)}px`;
-      label.style.top = `${String(point.y / height * bounds.height)}px`;
+      label.style.transform = `translate3d(${String(point.x / width * bounds.width)}px,${String(point.y / height * bounds.height)}px,0) translate(-50%,-50%)`;
       label.dataset.approach = platform.approachState ?? "none";
     }
   }

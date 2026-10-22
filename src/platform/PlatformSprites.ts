@@ -112,11 +112,13 @@ export class PlatformSprite {
   #row: PlatformSpriteRow = 0;
   #frame = -1;
   #width = 0;
+  #previousRow: PlatformSpriteRow = 0;
+  #rowChangedAt = -Infinity;
   #destroying = false;
   #impactAt = -Infinity;
   #impactForce = 1;
   public impact(elapsed: number, force: number): void { this.#impactAt = elapsed; this.#impactForce = Math.max(.7, Math.min(1.8, force)); }
-  public resetImpact(): void { this.#impactAt = -Infinity; this.mesh.position.y = 0; this.mesh.rotation.z = 0; }
+  public resetImpact(): void { this.#rowChangedAt = -Infinity; this.#frame = -1; this.#impactAt = -Infinity; this.mesh.position.y = 0; this.mesh.rotation.z = 0; }
   #updateImpact(elapsed: number): void {
     if (this.#impactAt === -Infinity) return;
     const t = Math.max(0, elapsed - this.#impactAt);
@@ -138,9 +140,12 @@ export class PlatformSprite {
       this.mesh.material = atlasMaterial(this.mesh.getScene(), "idle");
       this.mesh.visibility = 1;
     }
+    if (row !== this.#row && this.#frame >= 0) { this.#previousRow = this.#row; this.#rowChangedAt = elapsed; }
+    const transition = Math.max(0, Math.min(1, (elapsed - this.#rowChangedAt) / .18));
+    const rowBlend = transition * transition * (3 - 2 * transition);
     const { frame, nextFrame, blend } = idleSample(elapsed, this.#phase);
     if (frame === this.#frame && row === this.#row && width === this.#width) {
-      (this.mesh.metadata as { blend: number }).blend = blend;
+      Object.assign(this.mesh.metadata, { blend, rowBlend });
       return;
     }
     const rebuild = width !== this.#width || this.#frame < 0;
@@ -150,7 +155,7 @@ export class PlatformSprite {
     // The bright top rim coincides with the top of the unchanged collision box.
     const top = this.#height / 2 + .94;
     applySlices(this.mesh, platformSpriteSlices(width + .6, rect), top, top - 2.4, IDLE_ATLAS_SIZE, rebuild);
-    this.mesh.metadata = { spriteAtlas: "neon-rocks", row, frame, nextFrame, blend, idleFrames: 12 };
+    this.mesh.metadata = { spriteAtlas: "neon-rocks", row, previousRow: this.#previousRow, rowBlend, frame, nextFrame, blend, idleFrames: 12 };
   }
 
   public renderBreak(width: number, progress: number): void {

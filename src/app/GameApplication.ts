@@ -1,3 +1,5 @@
+import { renderBankBalance } from "../shop/renderBankBalance";
+import { DesktopGameControls } from "../input/DesktopGameControls";
 import { atStartDepth } from "../dev/DeveloperMode";
 import { intersectsScreen } from "../powers/PowerArea";
 import { scannerDanger } from "../powers/DangerScanner";
@@ -142,6 +144,7 @@ export class GameApplication {
   #contextGuide: ContextGuide | null = null;
   readonly #reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   #runStarted = false;
+  #desktopControls: DesktopGameControls | null = null;
   #challengeDirector: ChallengeDirector | null = null;
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
@@ -573,6 +576,18 @@ export class GameApplication {
       this.#boostController,
       () => { this.#haptics.request("boostUnavailable"); },
     );
+    this.#desktopControls = new DesktopGameControls({
+      active: () => this.#runStarted && this.#pauseMenuElement.hidden && this.#gameState.current !== GameState.Tutorial && this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Results,
+      boost: () => { this.#boostButton?.activate(); },
+      abilityDown: () => {
+        if (this.#powerView !== null) this.#powerView.keyboardDown();
+        else this.#slowModeButtonElement.click();
+      },
+      abilityUp: () => { this.#powerView?.keyboardUp(); },
+      cancelAbility: () => { this.#powerView?.cancelKeyboard(); },
+    });
+    this.#boostButtonElement.title = "BOOST · правая кнопка мыши";
+    this.#slowModeButtonElement.setAttribute("aria-keyshortcuts", "Space");
     this.#fixedStep.register(this.#boostController);
     this.#setStatus(this.#renderer);
     if (guided) this.#prepareOpening(coins);
@@ -601,6 +616,7 @@ export class GameApplication {
     this.#contextGuide?.dispose();
     document.body.dataset.guideStage = "off";
     this.#platformLabels?.dispose();
+    this.#desktopControls?.dispose(); this.#desktopControls = null;
     this.#powerView?.dispose(); this.#powerView = null;
     this.#powerVisuals?.dispose(); this.#powerVisuals = null; this.#powers = null;
     this.#comboView?.dispose();
@@ -718,13 +734,13 @@ export class GameApplication {
     const hideNotices = isPaused || this.#gameState.current === GameState.GameOver;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || !this.#boostCoach.visible;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
-    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#ballController?.position.x ?? 0);
+    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     if (!isPaused || updateHud) this.#scene?.render();
+    this.#platformLabels?.render();
     if (nowMs - this.#lastOverlayTime >= 1000 / 30) {
       this.#lastOverlayTime = nowMs;
       this.#contextGuide?.layout();
-      this.#platformLabels?.render();
     }
     if (updateHud && this.#opening !== null) for (const platform of this.#platformLabels?.visiblePlatforms ?? []) {
       this.#guideStrengths = [platform.strength];
@@ -1259,6 +1275,7 @@ export class GameApplication {
     );
     if (this.#actions.developerStartDepth !== undefined) return result;
     this.#profile.creditRuns([result]);
+    renderBankBalance(this.#profile.coins);
     if (outcome === "completed" && this.#sentResult !== result.id) {
       this.#sentResult = result.id;
       this.#actions.onFinished?.(result, Math.round(this.#runSeconds * 1000));
@@ -1280,6 +1297,7 @@ export class GameApplication {
     if (!result.rewarded && event.type !== "run-start" && event.type !== "life-lost" && this.#profile.mission.progress !== beforeProgress) this.#missionIntroRemaining = 1.2;
     this.#missionSaveFailed = !result.saved || !this.#profile.storageAvailable;
     if (result.rewarded) {
+      renderBankBalance(this.#profile.coins);
       this.#missionRewardRemaining = 2;
       this.#missionIntroRemaining = 0;
       const panel = requireMenuElement(this.#interfaceLayerElement, "#first-success");

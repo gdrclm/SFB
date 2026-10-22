@@ -27,9 +27,16 @@ export class PlatformCrystalSkin extends MaterialPluginBase {
     return { ubo: [{ name: "platformCrystalTint", size: 4, type: "vec4" }] };
   }
   public override hardBindForSubMesh(buffer: UniformBuffer, scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
-    const row = (subMesh.getMesh().metadata as { row?: number } | null)?.row ?? 0;
-    const tint = tints[row] ?? [.58, .18, 1];
-    buffer.updateFloat4("platformCrystalTint", tint[0], tint[1], tint[2], crystalWeights.get(scene) ?? 0);
+    const sample = subMesh.getMesh().metadata as { row?: number; previousRow?: number; rowBlend?: number } | null;
+    const row = sample?.row ?? 0;
+    const tint = tints[row] ?? tints[0];
+    const oldTint = tints[sample?.previousRow ?? row] ?? tint;
+    const blend = sample?.rowBlend ?? 1;
+    if (tint === undefined || oldTint === undefined) return;
+    buffer.updateFloat4("platformCrystalTint",
+      oldTint[0] + (tint[0] - oldTint[0]) * blend,
+      oldTint[1] + (tint[1] - oldTint[1]) * blend,
+      oldTint[2] + (tint[2] - oldTint[2]) * blend, crystalWeights.get(scene) ?? 0);
   }
   public override getCustomCode(shaderType: string, language = ShaderLanguage.GLSL): Record<string, string> | null {
     if (shaderType !== "fragment") return null;

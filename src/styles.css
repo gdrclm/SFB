@@ -2418,3 +2418,5 @@ html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }
 .developer-start input { width: 100%; min-width: 0; box-sizing: border-box; padding: .4rem; border: 1px solid #32cfff; border-radius: 8px; background: #061c36; color: white; font: inherit; }
 .developer-start small { grid-column: 1 / -1; font-size: .7rem; opacity: .8; }
 body[data-developer-mode="true"] .ranked-mode { display: none; }
+
+.platform-strength-label { left: 0; top: 0; will-change: transform; transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease; }

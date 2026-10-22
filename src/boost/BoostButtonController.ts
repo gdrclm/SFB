@@ -65,15 +65,17 @@ export class BoostButtonController {
 
   public playCharged(): void { this.render(); this.#animateSuccess(); }
 
-  readonly #onClick = (event: MouseEvent): void => {
+  readonly #onClick = (event: MouseEvent): void => { this.activate(event.isTrusted); };
+
+  public activate(feedbackOnReject = true): void {
     const result = this.#boost.tryBoost();
     if (result.success) {
       this.#animateSuccess();
-    } else if (event.isTrusted) {
+    } else if (feedbackOnReject) {
       this.#onRejected();
     }
     this.render();
-  };
+  }
 
   #animateSuccess(): void {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

@@ -1,3 +1,4 @@
+import { renderBankBalance } from "./renderBankBalance";
 import { getBrowserRunHistory } from "../run/RunHistory";
 import { getPlayerProfile, SHOP_ITEMS, type ShopCategory } from "./PlayerProfile";
 
@@ -25,7 +26,7 @@ export class ShopController {
 
   public refreshBalance(): void {
     this.#profile.creditRuns(getBrowserRunHistory().all());
-    for (const label of document.querySelectorAll<HTMLElement>("[data-bank-coins]")) label.textContent = String(this.#profile.coins);
+    renderBankBalance(this.#profile.coins);
   }
 
   public open(): void {
