@@ -1,3 +1,4 @@
+import { acquireGameScene } from "../scene/GameSceneSession";
 import { LifeFeedback } from "../feedback/LifeFeedback";
 import { renderBankBalance } from "../shop/renderBankBalance";
 import { DesktopGameControls } from "../input/DesktopGameControls";
@@ -22,7 +23,7 @@ import { renderPinnedMission } from "../run/renderMissionBoard";
 import { waitForPlatformSprites } from "../platform/PlatformSprites";
 import { advanceIdleTime } from "../platform/PlatformIdle";
 import { setPlatformCrystalBlend } from "../platform/PlatformCrystalSkin";
-import { RunSceneResources } from "../scene/RunSceneResources";
+import type { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { ContextGuide } from "../tutorial/ContextGuide";
@@ -58,12 +59,12 @@ import { nearestInCurrentLane } from "../platform/PlatformReadability";
 import { PlatformGenerator } from "../platform/PlatformGenerator";
 import type { PlatformController } from "../platform/PlatformController";
 import { createStaticPlatformPool, type PlatformPool } from "../platform/PlatformPool";
-import { createEngine, type RendererKind } from "../rendering/createEngine";
+import type { RendererKind } from "../rendering/createEngine";
 import "../rendering/registerStandardMaterialShaders";
 import { PhaseOneController } from "../progression/PhaseOneController";
 import { calculateScore, getBrowserRunHistory, RunProgress } from "../run/RunHistory";
 import { LifeCounter } from "../run/LifeCounter";
-import { createMainScene } from "../scene/createMainScene";
+import type { MainScene } from "../scene/createMainScene";
 import { SlowModeButtonController } from "../slow-mode/SlowModeButtonController";
 import { SlowModeController } from "../slow-mode/SlowModeController";
 
@@ -160,7 +161,7 @@ export class GameApplication {
   #lastLifeCount = this.#config.run.initialLives;
   #missionRewardRemaining = 0;
   #missionSaveFailed = false;
-  #mainScene: Awaited<ReturnType<typeof createMainScene>> | null = null;
+  #mainScene: MainScene | null = null;
   #runResources: RunSceneResources | null = null;
   #renderer: RendererKind = "webgl2";
   readonly #canvas: HTMLCanvasElement;
@@ -340,24 +341,23 @@ export class GameApplication {
     this.#renderLives();
     this.#renderCurrency();
     if (this.#mainScene === null) {
-      const { engine, renderer, quality } = await createEngine(this.#canvas);
-      if (this.#hasBeenDisposed()) { engine.dispose(); return; }
-      this.#engine = engine;
-      this.#quality = quality;
-      this.#renderer = renderer;
-      const mainScene = await createMainScene(engine, this.#config, {
+      const session = await acquireGameScene(this.#canvas, this.#config, {
         theme: this.#profile.equipment.world,
         lanterns: this.#profile.equipment.props === "props-lanterns",
       });
-      if (this.#hasBeenDisposed()) { mainScene.scene.dispose(); engine.dispose(); return; }
-      this.#mainScene = mainScene;
-      this.#scene = mainScene.scene;
-      this.#runResources = new RunSceneResources(mainScene.scene);
+      if (this.#hasBeenDisposed()) return;
+      this.#engine = session.engine; this.#renderer = session.renderer; this.#quality = session.quality;
+      this.#mainScene = session.mainScene; this.#scene = session.mainScene.scene;
+      this.#runResources = session.resources;
     }
     const mainScene = this.#mainScene;
     const engine = this.#engine;
     if (engine === null) throw new Error("Engine is unavailable");
     this.#scene = mainScene.scene;
+    const theme = this.#profile.equipment.world;
+    if (theme === "world-night") this.#scene.clearColor.set(.02, .04, .16, 1);
+    else if (theme === "world-sunset") this.#scene.clearColor.set(.2, .12, .36, 1);
+    else this.#scene.clearColor.set(.03, .55, .91, 1);
     this.#feel = new GameFeel(this.#scene, this.#canvas);
     this.#defeatPending = false;
     this.#lifeFeedback = new LifeFeedback(mainScene.camera, requireMenuElement(document.body, "#life-feedback"), this.#reducedMotion);
@@ -673,8 +673,6 @@ export class GameApplication {
     this.#horizontalInput?.dispose();
     this.#runResources?.clear();
     if (!keepScene) {
-      this.#scene?.dispose();
-      this.#engine?.dispose();
       this.#scene = null;
       this.#engine = null;
       this.#mainScene = null;

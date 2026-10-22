@@ -56,6 +56,11 @@ export function createAtlasSprite(name: string, scene: Scene, kind: AtlasKind = 
   return mesh;
 }
 
+/** Create once, before the run-resource snapshot, so retry keeps the GPU atlases. */
+export function preparePlatformSprites(scene: Scene): void {
+  for (const kind of ["idle", "destroy", "debris"] as const) atlasMaterial(scene, kind);
+}
+
 /** Begin falling only after the collision surfaces have visible artwork. */
 export async function waitForPlatformSprites(scene: Scene): Promise<void> {
   await Promise.all([waitForAtlas(atlasMaterial(scene, "idle")), waitForAtlas(atlasMaterial(scene, "destroy"))]);

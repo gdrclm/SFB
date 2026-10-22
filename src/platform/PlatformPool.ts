@@ -94,10 +94,8 @@ export function createStaticPlatformPool(scene: Scene, config: GameConfig): Plat
             ...template,
             id: `platform-pooled-${String(index)}`,
           },
+      index < config.platforms.length,
     );
-    if (index >= config.platforms.length) {
-      controller.deactivate();
-    }
     platforms.push(controller);
   }
 

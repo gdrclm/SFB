@@ -37,7 +37,7 @@ export class PlatformController {
   #approachState: ApproachState | null = null;
   #elapsed = 0;
 
-  public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig) {
+  public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
     this.#strength = requiredSpeed(platform.strength); this.#strengthLevel = platform.strengthLevel;
     this.#startPosition = new Vector3(platform.position.x, platform.position.y, config.playSpace.depth);
@@ -47,7 +47,9 @@ export class PlatformController {
     this.mesh.isVisible = false; this.mesh.isPickable = false;
     this.#sprite = new PlatformSprite(this.mesh, this.size.height, this.size.depth, scene);
     this.#applyActivationProperties({ strength: platform.strength, strengthLevel: platform.strengthLevel });
-    this.#createPhysicsResources();
+    this.#isActive = active;
+    this.mesh.setEnabled(active);
+    if (active) this.#createPhysicsResources();
   }
   public get isActive(): boolean { return this.#isActive; }
   public get strength(): number { return this.#strength; }

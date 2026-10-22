@@ -1,3 +1,4 @@
+import { sceneryTexture } from "./SceneTextures";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -31,7 +32,7 @@ export class BackdropScenery {
       const material = new StandardMaterial(`${name}Scenery${String(side)}-${String(i)}`, scene);
       const url = cards[`../assets/worlds/${name}-card-${String(side)}-${String(i)}.webp`];
       if (url === undefined) throw new Error("Missing backdrop scenery card");
-      const texture = new Texture(url, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+      const texture = sceneryTexture(url, scene);
       texture.hasAlpha = true; texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
       material.diffuseTexture = texture; material.useAlphaFromDiffuseTexture = true;
       material.disableLighting = true; material.emissiveColor.copyFrom((parent.material as StandardMaterial).emissiveColor);
@@ -51,7 +52,7 @@ export class BackdropScenery {
     }
   }
   #crystalMaterial(scene: Scene, parent: Mesh, name: string, url: string): StandardMaterial {
-    const texture = new Texture(url, scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+    const texture = sceneryTexture(url, scene);
     texture.hasAlpha = true; texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
     const material = new StandardMaterial(name, scene);
     material.diffuseTexture = texture; material.useAlphaFromDiffuseTexture = true;

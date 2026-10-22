@@ -1,3 +1,4 @@
+import { sceneryTexture } from "./SceneTextures";
 import crystalObjectUrl from "../assets/worlds/neon-crystal-object-atlas.webp";
 import crystalCloudUrl from "../assets/worlds/neon-crystal-clouds.webp";
 import crystalUrl from "../assets/worlds/neon-crystal-distance.webp";
@@ -35,7 +36,7 @@ export function createIllustratedBackdrop(
   material.emissiveColor = appearance.theme === "world-night" ? new Color3(.72, .8, 1)
     : appearance.theme === "world-sunset" ? new Color3(1, .82, .94) : Color3.White();
   let texture: Texture | null = null;
-  texture = new Texture(url, scene, true, true, Texture.BILINEAR_SAMPLINGMODE, undefined, () => {
+  texture = sceneryTexture(url, scene, () => {
     // Keep the run playable even if the illustration fails to load.
     material.diffuseTexture = null;
     texture?.dispose();

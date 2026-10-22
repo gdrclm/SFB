@@ -1,3 +1,6 @@
+import { gameConfig } from "./config/gameConfig";
+import { waitForPlatformSprites } from "./platform/PlatformSprites";
+import { acquireGameScene, disposeGameScene } from "./scene/GameSceneSession";
 import { DEVELOPER_MODE_KEY, DEVELOPER_DEPTH_KEY, parseStartDepth } from "./dev/DeveloperMode";
 import { NetworkView } from "./network/NetworkView";
 import type { RunTicket } from "./network/types";
@@ -102,6 +105,7 @@ const lifecycle = new ApplicationLifecycle(
 
 function showStartupError(error: unknown): void {
   lifecycle.dispose();
+  disposeGameScene(canvas);
   const message = error instanceof Error ? error.message : "Unknown startup error";
   status.textContent = `Ошибка запуска: ${message}`;
   requireElement("#start-error").textContent = status.textContent;
@@ -277,6 +281,7 @@ startButton.focus({ preventScroll: true });
 
 window.addEventListener("pagehide", () => {
   lifecycle.dispose();
+  disposeGameScene(canvas);
 });
 
 window.addEventListener("pageshow", (event) => {
@@ -299,3 +304,15 @@ numbersToggle?.addEventListener("click", () => {
   applyPlatformNumbers();
 });
 applyPlatformNumbers();
+
+// Prepare only the reusable renderer/physics/assets while the menu is idle.
+// No run entities, animation loop or rewards are started here.
+const warmScene = (): void => {
+  if (document.hidden || startScreen.hidden) return;
+  const profile = getPlayerProfile();
+  void acquireGameScene(canvas, gameConfig, { theme: profile.equipment.world }).then(
+    session => waitForPlatformSprites(session.mainScene.scene),
+  ).catch(() => { /* A foreground start retries and reports any actual failure. */ });
+};
+if ("requestIdleCallback" in window) window.requestIdleCallback(warmScene, { timeout: 1500 });
+else setTimeout(warmScene, 300);
