@@ -2420,3 +2420,10 @@ html[data-quality="low"] dialog::backdrop { backdrop-filter: none; }
 body[data-developer-mode="true"] .ranked-mode { display: none; }
 
 .platform-strength-label { left: 0; top: 0; will-change: transform; transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease; }
+
+.shop-item-actions { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 5px; position: relative; z-index: 2; }
+#shop .shop-item-actions button { width: 100%; min-height: 36px; }
+#shop .shop-item { position: relative; }
+#shop .shop-item[data-equipped="true"] { border-color: #39ebd2; box-shadow: inset 0 0 12px #20e5ce22; }
+#shop .shop-item[data-ability-card="true"][tabindex="0"] { cursor: pointer; }
+#shop .shop-item[data-ability-card="true"]:focus-visible { outline: 2px solid #39ebd2; outline-offset: 2px; }

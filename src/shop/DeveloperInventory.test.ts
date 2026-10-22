@@ -50,3 +50,17 @@ it("a reload reads only the untouched real profile, and starts a clean developer
   expect(reloaded.coins).toBe(balance); expect(reloaded.owns("plasma")).toBe(false);
   reloaded.setDeveloperMode(true); expect(reloaded.coins).toBe(0); expect(reloaded.owns("plasma")).toBe(false);
 });
+it("keeps both abilities owned while equipping exactly one for the next run", () => {
+  const { profile } = setup(); profile.setDeveloperMode(true);
+  profile.toggleDeveloperItem("annihilation"); profile.toggleDeveloperItem("plasma");
+  expect(profile.activeAbility).toBe("slow");
+  expect(profile.equip("annihilation")).toBe(true);
+  let config = createPlayerConfig(gameConfig, profile);
+  expect(config.powers.annihilation).toBe(true); expect(config.powers.plasma).toBe(false);
+  expect(profile.owns("plasma")).toBe(true);
+  profile.equip("plasma"); config = createPlayerConfig(gameConfig, profile);
+  expect(config.powers.annihilation).toBe(false); expect(config.powers.plasma).toBe(true);
+  profile.equip("slow"); config = createPlayerConfig(gameConfig, profile);
+  expect(config.powers.annihilation).toBe(false); expect(config.powers.plasma).toBe(false);
+  expect(profile.owns("annihilation")).toBe(true); expect(profile.owns("plasma")).toBe(true);
+});

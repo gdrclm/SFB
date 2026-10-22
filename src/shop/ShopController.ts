@@ -50,6 +50,10 @@ export class ShopController {
       button.setAttribute("aria-pressed", String(button.dataset.category === this.#category));
     }
     this.#element("#shop-test-note").hidden = !this.#profile.developerMode;
+    const abilityStatus = this.#element("#shop-active-ability");
+    abilityStatus.hidden = this.#category !== "ability";
+    const activeAbility = SHOP_ITEMS.find(item => item.id === this.#profile.activeAbility);
+    abilityStatus.textContent = `В забеге слева: ${activeAbility?.preview ?? "◷"} ${activeAbility?.name ?? "Замедление"}`;
     const grid = this.#element("#shop-items");
     grid.replaceChildren();
     for (const item of SHOP_ITEMS.filter((entry) => entry.category === this.#category)) {
@@ -72,24 +76,52 @@ export class ShopController {
       const maxed = item.maxLevel !== undefined && level >= item.maxLevel;
       const equipped = item.category === "ability" ? this.#profile.activeAbility === item.id
         : item.category !== "upgrade" && this.#profile.equipment[item.category] === item.id;
-      info.textContent = item.maxLevel === undefined ? owned ? "Куплено" : "Не куплено" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
+      card.dataset.equipped = String(equipped);
+      info.textContent = item.category === "ability" && equipped ? "✓ Выбрано для забега" : item.maxLevel === undefined ? owned ? "Куплено" : "Не куплено" : `Уровень ${String(level)} / ${String(item.maxLevel)}`;
       const price = this.#profile.price(item);
       const testItem = this.#profile.developerMode && item.price > 0;
       const testOwned = item.category === "upgrade" ? level > 0 : owned;
-      action.textContent = testItem ? testOwned ? "Отменить покупку" : item.category === "upgrade" ? "Включить максимум · бесплатно" : "Купить и выбрать · бесплатно" : maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
+      action.textContent = testItem ? testOwned ? "Отменить покупку" : item.category === "upgrade" ? "Включить максимум · бесплатно" : item.category === "ability" ? "Купить · бесплатно" : "Купить и выбрать · бесплатно" : item.category === "ability" && owned ? "Куплено" : maxed ? "Максимум" : equipped ? "Выбрано" : owned ? "Выбрать"
         : `${item.category === "upgrade" ? "Улучшить" : "Купить"} · ${String(price)} ★`;
-      action.disabled = !testItem && (maxed || equipped || !this.#profile.storageAvailable || !owned && this.#profile.coins < price);
+      action.disabled = !testItem && (item.category === "ability" && owned || maxed || equipped || !this.#profile.storageAvailable || !owned && this.#profile.coins < price);
       if (!owned && !maxed && this.#profile.coins < price) action.title = `Не хватает ${String(price - this.#profile.coins)} монет`;
+      action.dataset.shopAction = "purchase";
       action.addEventListener("click", () => {
-        const success = testItem ? this.#profile.toggleDeveloperItem(item.id) : owned ? this.#profile.equip(item.id) : this.#profile.buy(item.id);
+        const success = testItem ? this.#profile.toggleDeveloperItem(item.id) : owned ? this.#profile.equip(item.id)
+          : this.#profile.buy(item.id);
         this.#render();
         this.#element("#shop-message").textContent = success
-          ? testItem ? testOwned ? "Тестовая покупка отменена." : "Включено для следующего тестового забега." : owned ? `${item.name}: ${item.category === "ability" ? "кнопка слева внизу в следующем забеге" : "выбрано для следующего забега"}.`
-            : item.category === "upgrade" ? "Улучшение куплено. Применится в следующем забеге." : "Предмет куплен. Нажмите «Выбрать», чтобы использовать."
+          ? testItem ? testOwned ? "Тестовая покупка отменена." : item.category === "ability" ? "Куплено. Нажми карточку, чтобы выбрать." : "Включено для следующего тестового забега." : owned ? `${item.name}: ${item.category === "ability" ? "кнопка слева внизу в следующем забеге" : "выбрано для следующего забега"}.`
+            : item.category === "ability" ? "Куплено. Нажми карточку, чтобы выбрать." : item.category === "upgrade" ? "Улучшение куплено. Применится в следующем забеге." : "Предмет куплен. Нажмите «Выбрать», чтобы использовать."
           : "Не удалось выполнить покупку или сохранить выбор.";
         this.#dialog.querySelector<HTMLButtonElement>(`[data-item="${item.id}"] button`)?.focus();
       });
-      card.append(preview, title, description, info, action);
+      const actions = document.createElement("div");
+      actions.className = "shop-item-actions";
+      actions.append(action);
+      card.append(preview, title, description, info, actions);
+      if (item.category === "ability") {
+        card.dataset.abilityCard = "true";
+        card.tabIndex = owned ? 0 : -1;
+        card.setAttribute("role", "group");
+        card.setAttribute("aria-label", `${item.name}${equipped ? ": выбрано" : owned ? ": нажми, чтобы выбрать" : ": сначала купи"}`);
+        const selectCard = (): void => {
+          if (!owned) return;
+          const cancel = testItem && equipped;
+          const saved = cancel ? this.#profile.toggleDeveloperItem(item.id) : this.#profile.equip(item.id);
+          this.#render();
+          this.#element("#shop-message").textContent = saved ? cancel ? "Тестовая покупка отменена. Слева — замедление." : `${item.name}: кнопка слева в следующем забеге.` : "Не удалось сохранить выбор.";
+          this.#dialog.querySelector<HTMLElement>(`[data-item="${item.id}"]`)?.focus();
+        };
+        card.addEventListener("click", (event) => {
+          if (event.target instanceof Element && event.target.closest("button") !== null) return;
+          selectCard();
+        });
+        card.addEventListener("keydown", (event) => {
+          if (event.target !== card || event.code !== "Enter" && event.code !== "Space") return;
+          event.preventDefault(); if (!event.repeat) selectCard();
+        });
+      }
       grid.append(card);
     }
   }

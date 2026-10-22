@@ -124,7 +124,7 @@ export class PlayerProfile {
     if (item.category === "upgrade") {
       return this.#commit({ ...this.#state, levels: { ...this.#state.levels, [id]: this.level(id) > 0 ? 0 : item.maxLevel ?? 1 } });
     }
-    if (!this.owns(id)) return this.buy(id) && this.equip(id);
+    if (!this.owns(id)) return this.buy(id) && (item.category === "ability" || this.equip(id));
     const base = defaults();
     return this.#commit({ ...this.#state, owned: this.#state.owned.filter(owned => owned !== id),
       activeAbility: this.#state.activeAbility === id ? "slow" : this.#state.activeAbility,
