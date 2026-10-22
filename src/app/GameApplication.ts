@@ -1,3 +1,4 @@
+import { LifeFeedback } from "../feedback/LifeFeedback";
 import { renderBankBalance } from "../shop/renderBankBalance";
 import { DesktopGameControls } from "../input/DesktopGameControls";
 import { atStartDepth } from "../dev/DeveloperMode";
@@ -145,6 +146,8 @@ export class GameApplication {
   readonly #reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   #runStarted = false;
   #desktopControls: DesktopGameControls | null = null;
+  #lifeFeedback: LifeFeedback | null = null;
+  #defeatPending = false;
   #challengeDirector: ChallengeDirector | null = null;
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
@@ -356,6 +359,9 @@ export class GameApplication {
     if (engine === null) throw new Error("Engine is unavailable");
     this.#scene = mainScene.scene;
     this.#feel = new GameFeel(this.#scene, this.#canvas);
+    this.#defeatPending = false;
+    this.#lifeFeedback = new LifeFeedback(mainScene.camera, requireMenuElement(document.body, "#life-feedback"), this.#reducedMotion);
+    this.#lifeFeedback.setLives(this.#lives.remainingLives);
     this.#backdrop = new DepthBackdrop(this.#scene, mainScene.cameraRig, {
       theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
     }, this.#actions.developerStartDepth ?? 0);
@@ -610,7 +616,9 @@ export class GameApplication {
   }
 
   #clearRun(keepScene: boolean): void {
-    if (this.#runStarted) this.#finishRun("interrupted");
+    if (this.#runStarted) this.#finishRun(this.#lives.remainingLives === 0 ? "completed" : "interrupted");
+    this.#defeatPending = false;
+    this.#lifeFeedback?.dispose(); this.#lifeFeedback = null;
     if (this.#recordHapticTimer !== null) clearTimeout(this.#recordHapticTimer);
     this.#haptics.cancel();
     this.#contextGuide?.dispose();
@@ -699,6 +707,7 @@ export class GameApplication {
   }
 
   readonly #renderFrame = (): void => {
+    this.#lifeFeedback?.removeShake();
     const nowMs = performance.now();
     const realDeltaSeconds = (nowMs - this.#lastFrameTimeMs) / 1_000;
     if (document.hidden) { this.#lastFrameTimeMs = nowMs; this.#quality?.update(0, false); this.#feel?.setPaused(true); return; }
@@ -736,6 +745,11 @@ export class GameApplication {
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
     this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
+    this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
+    if (this.#defeatPending && !isPaused) {
+      this.#ballVisualController?.renderDefeat(realDeltaSeconds, this.#lifeFeedback?.deathAge ?? 0);
+      if (this.#lifeFeedback?.defeatReady) { this.#defeatPending = false; this.#showRunResults(); }
+    }
     if (!isPaused || updateHud) this.#scene?.render();
     this.#platformLabels?.render();
     if (nowMs - this.#lastOverlayTime >= 1000 / 30) {
@@ -835,6 +849,7 @@ export class GameApplication {
 
     const bounced = this.#unsuccessfulHitHandler?.handle(collision) ?? false;
     if (bounced) {
+      this.#lifeFeedback?.hit();
       this.#ballVisualController?.react("hurt");
       this.#boostCoach.failedImpact();
       this.#updateMission({ type: "life-lost" });
@@ -850,7 +865,8 @@ export class GameApplication {
         requireMenuElement(this.#gameOverElement, "#death-reason").textContent = describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
         requireMenuElement(this.#gameOverElement, "#death-hint").textContent = boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
-        this.#showRunResults();
+        this.#defeatPending = true;
+        this.#lifeFeedback?.beginDefeat();
         return;
       }
 
@@ -917,6 +933,8 @@ export class GameApplication {
   };
 
   #showRunResults(): void {
+    this.#defeatPending = false;
+    this.#lifeFeedback?.hide();
     this.#gameState.transitionTo(GameState.GameOver);
     this.#pauseButtonElement.disabled = true;
     const previousBest = this.#history.top(1)[0]?.score ?? 0;
@@ -945,6 +963,7 @@ export class GameApplication {
 
   #renderLives(): void {
     const remainingLives = this.#lives.remainingLives;
+    this.#lifeFeedback?.setLives(remainingLives);
     const hearts: HTMLSpanElement[] = [];
     for (let index = 0; index < this.#config.run.initialLives; index += 1) {
       const heart = document.createElement("span");

@@ -135,6 +135,19 @@ export class BallVisualController implements FixedSimulationSystem {
     getBallFace(this.#ball)?.update(this.#expression.current, event === "defeat" ? .2 : .025, 0, event === "boost");
   }
 
+  public renderDefeat(seconds: number, age: number): void {
+    const dt = Math.max(0, Math.min(.1, seconds));
+    getBallFace(this.#ball)?.update("defeat", dt, 0);
+    const pulse = Math.exp(-age * 3) * Math.sin(age * 16);
+    const amount = 1 - Math.exp(-12 * dt);
+    const sy = .9 + pulse * .12;
+    this.#ball.scaling.x += (this.#baseScale.x / Math.sqrt(sy) - this.#ball.scaling.x) * amount;
+    this.#ball.scaling.y += (this.#baseScale.y * sy - this.#ball.scaling.y) * amount;
+    this.#ball.scaling.z += (this.#baseScale.z / Math.sqrt(sy) - this.#ball.scaling.z) * amount;
+    this.#ball.rotation.z += (.18 + Math.sin(age * 8) * .05 * Math.exp(-age * 2) - this.#ball.rotation.z) * amount;
+    this.#fx.update(dt, { speed: 0, look: 0, boost: 0, anticipating: false, slow: false, danger: false });
+  }
+
   public setSlow(active: boolean): void { this.#slowActive = active; }
 
   public setDanger(danger: boolean): void { this.#danger = danger; }

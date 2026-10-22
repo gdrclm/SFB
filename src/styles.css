@@ -2427,3 +2427,7 @@ body[data-developer-mode="true"] .ranked-mode { display: none; }
 #shop .shop-item[data-equipped="true"] { border-color: #39ebd2; box-shadow: inset 0 0 12px #20e5ce22; }
 #shop .shop-item[data-ability-card="true"][tabindex="0"] { cursor: pointer; }
 #shop .shop-item[data-ability-card="true"]:focus-visible { outline: 2px solid #39ebd2; outline-offset: 2px; }
+
+#life-feedback { position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: 0; transition: opacity 450ms ease; background: linear-gradient(180deg, rgba(196,0,27,.78) 0%, rgba(127,0,20,.4) 25%, rgba(74,0,15,.08) 62%, transparent 100%), radial-gradient(ellipse at 50% 43%, transparent 22%, rgba(8,0,5,.5) 64%, rgba(5,0,3,.94) 100%); }
+#life-feedback[data-critical="true"] { opacity: 1; }
+#life-feedback[hidden] { display: none; }

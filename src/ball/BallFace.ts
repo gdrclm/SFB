@@ -20,6 +20,9 @@ class BallFace {
   readonly #mouths = new Map<string, Mesh>();
   readonly #radius: number;
   #blinkTime = 0;
+  #defeatAge = 0;
+  readonly #crossEyes: Mesh[] = [];
+  readonly #defeatTongue: Mesh;
   public constructor(ball: Mesh, r: number, dark: StandardMaterial, scene: Scene) {
     this.#radius = r;
     const white = new StandardMaterial("BallEyeWhite", scene);
@@ -42,6 +45,14 @@ class BallFace {
         star.parent = eye; star.position.z = -r * .30; star.scaling.set(axis === 0 ? .85 : 1.45, axis === 0 ? 1.5 : .35, .13);
         star.material = white; star.isPickable = false; star.setEnabled(false); this.#stars.push(star);
       }
+      for (const diagonal of [-1, 1]) {
+        const cross = MeshBuilder.CreateTube(`BallDefeatEye-${String(side)}-${String(diagonal)}`, {
+          path: [new Vector3(-r * .12, -r * .14 * diagonal, 0), new Vector3(r * .12, r * .14 * diagonal, 0)],
+          radius: r * .047, tessellation: 6,
+        }, scene);
+        cross.parent = ball; cross.position.set(side * r * .32, r * .04, -r * 1.10);
+        cross.material = dark; cross.isPickable = false; cross.setEnabled(false); this.#crossEyes.push(cross);
+      }
       this.#eyes.push(eye); this.#pupils.push(pupil); this.#brows.push(brow);
     }
     for (const shape of ["smile", "flat", "wince", "frown"]) {
@@ -57,6 +68,15 @@ class BallFace {
     const open = MeshBuilder.CreateSphere("BallMouth-open", { diameter: r * .33, segments: 16 }, scene);
     open.parent = ball; open.position.set(0, -r * .26, -r * 1.02); open.scaling.set(1, 1.3, .3); open.material = dark; open.isPickable = false;
     this.#mouths.set("open", open);
+    const defeatMouth = MeshBuilder.CreateSphere("BallMouth-defeat", { diameter: r * .35, segments: 12 }, scene);
+    defeatMouth.parent = ball; defeatMouth.position.set(.04 * r, -.28 * r, -r * 1.06);
+    defeatMouth.scaling.set(1, .75, .25); defeatMouth.material = dark; defeatMouth.isPickable = false;
+    this.#mouths.set("defeat", defeatMouth);
+    const pink = new StandardMaterial("BallDefeatTongueMaterial", scene);
+    pink.diffuseColor = new Color3(1, .22, .43); pink.emissiveColor = new Color3(.35, .04, .09);
+    this.#defeatTongue = MeshBuilder.CreateSphere("BallDefeatTongue", { diameter: r * .27, segments: 16 }, scene);
+    this.#defeatTongue.parent = ball; this.#defeatTongue.material = pink; this.#defeatTongue.isPickable = false;
+    this.#defeatTongue.position.set(.07 * r, -.43 * r, -r * 1.14); this.#defeatTongue.setEnabled(false);
     const smileShape = Array.from({ length: 13 }, (_, i) => {
       const u = i / 6 - 1;
       return new Vector3(u * r * .24, r * (-.25 + .025 * (1 - u * u)), 0);
@@ -78,6 +98,15 @@ class BallFace {
   }
   public update(expression: BallExpression, delta: number, look: number, anticipation = false): boolean {
     this.#blinkTime += delta;
+    const defeated = expression === "defeat";
+    this.#defeatAge = defeated ? this.#defeatAge + delta : 0;
+    for (const cross of this.#crossEyes) cross.setEnabled(defeated);
+    this.#defeatTongue.setEnabled(defeated);
+    if (defeated) {
+      const stretch = 1 - Math.exp(-14 * this.#defeatAge);
+      this.#defeatTongue.scaling.set(.7, .3 + stretch + Math.sin(this.#defeatAge * 12) * .08, .35);
+      this.#defeatTongue.rotation.z = -.22 + Math.sin(this.#defeatAge * 7) * .08;
+    }
     const blink = expression === "neutral" && this.#blinkTime % 3.8 > 3.68;
     const hurt = expression === "hurt" || expression === "defeat";
     const focus = expression === "focus" || expression === "boost" || expression === "break";
@@ -85,10 +114,12 @@ class BallFace {
     const eyeHeight = hurt ? .16 : blink || expression === "slow" || expression === "combo" ? .12 : expression === "danger" ? 1.45 : focus ? .85 : 1.0;
     const amount = 1 - Math.exp(-24 * delta);
     this.#eyes.forEach((eye, index) => {
+      eye.setEnabled(!defeated);
       eye.scaling.y += (eyeHeight - eye.scaling.y) * amount;
       const pupil = this.#pupils[index], brow = this.#brows[index];
       if (pupil) { pupil.position.x += (look * this.#radius * .065 - pupil.position.x) * amount; pupil.setEnabled(expression !== "coin" && eyeHeight > .2); }
       if (brow) {
+        brow.setEnabled(!defeated);
         brow.visibility += ((focus || hurt || expression === "danger" ? 1 : 0) - brow.visibility) * amount;
         const side = index === 0 ? -1 : 1;
         brow.rotation.z += ((focus ? side * .38 : hurt ? -side * .3 : 0) - brow.rotation.z) * amount;
@@ -96,7 +127,7 @@ class BallFace {
       }
     });
     for (const star of this.#stars) star.setEnabled(expression === "coin");
-    const shape = expression === "defeat" || ((expression === "boost" || expression === "break") && anticipation) ? "frown" : hurt ? "wince"
+    const shape = defeated ? "defeat" : ((expression === "boost" || expression === "break") && anticipation) ? "frown" : hurt ? "wince"
       : expression === "coin" || expression === "combo" ? "laugh"
       : expression === "danger" || expression === "fall" ? "open" : expression === "slow" ? "flat" : "smile";
     for (const [name, mesh] of this.#mouths) mesh.setEnabled(name === shape);
