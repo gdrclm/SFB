@@ -1503,6 +1503,9 @@ input {
   --streak-opacity: 0;
   --streak-duration: 1.1s;
   --wind-power: 0;
+  --streak-width: 1.4px;
+  --streak-length: 8vh;
+  --streak-lanes: 0;
 }
 
 .speed-streaks {
@@ -1510,20 +1513,26 @@ input {
   inset: 0;
   opacity: var(--streak-opacity);
   /* Keep the decision area clear; edge flow stays readable as the camera widens. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
 }
 .speed-streaks i {
   position: absolute;
   top: 110%;
   left: calc(1.5% + var(--lane) * 1%);
-  width: calc(3px + var(--wind-power) * 2px);
-  height: calc(12vh + var(--lane) * .6vh + var(--wind-power) * 18vh);
-  opacity: clamp(0, calc(1.6 + var(--wind-power) * 10 - var(--lane)), 1);
+  width: var(--streak-width);
+  height: var(--streak-length);
+  opacity: clamp(0, calc(var(--streak-lanes) - var(--lane)), 1);
   border-radius: 50%;
-  background: linear-gradient(transparent, #b5f4ff 36%, #fff 55%, #b5f4ff 65%, transparent);
+  background: linear-gradient(transparent 0%, #158dff 13%, #a3f5ff 27%, #fff 38% 70%, #69deff 84%, #127ce4 94%, transparent);
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px #00a8ed);
   animation: speed-streak var(--streak-duration) linear infinite;
   animation-delay: calc(var(--lane) * -.173s);
+}
+.speed-streaks i::before {
+  content: ""; position: absolute; inset: 0 -9px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #b8ffff88 0%, #1cbaff66 24%, #0c65b933 48%, transparent 72%);
 }
 .speed-streaks i::after {
   content: "";
@@ -1542,7 +1551,7 @@ input {
   animation-delay: calc(var(--lane) * -.193s - .3s);
 }
 .speed-frozen .speed-streaks i { animation-play-state: paused; }
-@keyframes speed-streak { to { transform: translateY(-175vh); } }
+@keyframes speed-streak { to { transform: translate3d(0, -175vh, 0); } }
 
 #boost-feedback {
   position: absolute;
@@ -1607,7 +1616,8 @@ input {
   #tutorial p { font-size: 0.9rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .speed-streaks { display: none; }
+  .speed-streaks { display: block; opacity: calc(var(--streak-opacity) * .55); }
+  .speed-streaks i { animation: none; top: calc(12% + var(--lane) * 6%); height: min(18vh, var(--streak-length)); transform: none; }
 }
 
 .menu-eyebrow { letter-spacing: 0.16em; font-size: 0.75rem; color: #95dbff; }
@@ -1964,7 +1974,7 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 .feel-spark { width: 9px; height: 5px; border-radius: 2px; background: #ffe199; box-shadow: 0 0 7px #ffd372; }
 #boost-coach { width: 240px; font-size: 14px; bottom: 155px; }
 #boost-coach-art { display: none; }
-@media (prefers-reduced-motion: reduce) { .speed-streaks { display: none; } }
+
 #context-picture svg text { display: none; }
 #slow-mode-button .slow-mode-value { font-size: 28px; line-height: 1; }
 #boost-button[aria-disabled="true"] { filter: saturate(.4) brightness(.7); }
@@ -2371,7 +2381,10 @@ html[data-quality="medium"] .speed-streaks i,
 html[data-quality="medium"] .speed-streaks i::after,
 html[data-quality="low"] .speed-streaks i,
 html[data-quality="low"] .speed-streaks i::after { filter: none; }
-html[data-quality="low"] .speed-streaks i:nth-child(n+13),
+/* Keep alternate PAIRS across the full intensity range, so mobile still gains
+   rays all the way to maximum speed instead of losing every high-speed lane. */
+html[data-quality="low"] .speed-streaks i:nth-child(4n+3),
+html[data-quality="low"] .speed-streaks i:nth-child(4n+4),
 html[data-quality="low"] .atmosphere-particles { display: none; }
 html[data-quality="low"] #pause-menu,
 html[data-quality="low"] #game-over,
