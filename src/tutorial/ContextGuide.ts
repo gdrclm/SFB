@@ -1,7 +1,7 @@
 import type { GuideTip } from "./StagedOpening";
 export interface HintPoint { x: number; y: number; }
 const tips = {
-  platform: { text: "Веди пальцем ↔", target: "world", seconds: 6 },
+  platform: { text: "Свайпай ↔", target: "world", seconds: 6 },
   coin: { text: "Собирай", target: "world", seconds: 5 },
   boost: { text: "Ускорься!", target: "#boost-button", seconds: 7 },
 } as const;

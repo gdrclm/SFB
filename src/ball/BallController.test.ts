@@ -217,3 +217,22 @@ it("preserves purchased impact speed through the entire bounce, while the base g
     expect(ball.isBouncing).toBe(false);
   }
 });
+
+it("applies direct pointer movement before the simulation tick and preserves the swept collision origin", () => {
+  const transform = createTransform();
+  const input = { isActive: true, normalizedPosition: 1, isImmediate: true };
+  const ball = new BallController(transform, input, gameConfig);
+  ball.applyImmediateInput();
+  expect(ball.position.x).toBe(4.5);
+  ball.fixedUpdate(1 / 240);
+  expect(ball.position.x).toBe(4.5);
+  expect(ball.previousPosition.x).toBe(0);
+  input.normalizedPosition = -1; ball.applyImmediateInput();
+  expect(ball.position.x).toBe(-4.5);
+  ball.fixedUpdate(1 / 240);
+  expect(ball.previousPosition.x).toBe(4.5);
+  input.isActive = false;
+  for (let i = 0; i < 10; i++) ball.fixedUpdate(1 / 60);
+  expect(ball.position.x).toBe(-4.5);
+  expect(ball.horizontalVelocity).toBe(0);
+});

@@ -4,7 +4,7 @@ import type { StandardMaterial } from "@babylonjs/core/Materials/standardMateria
 import type { Scene } from "@babylonjs/core/scene";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { BackdropScenery } from "./BackdropScenery";
-import { pageProgress } from "./BackdropMotion";
+import { advancePageTime, pageProgress } from "./BackdropMotion";
 import { DepthLocations, type DepthLocation } from "./DepthLocations";
 import { createPhaseOneBackdrop, type WorldAppearance } from "./createPhaseOneBackdrop";
 
@@ -53,8 +53,10 @@ export class DepthBackdrop {
     const ready = this.#next !== null && this.#isReady(this.#next);
     if (ready && this.#next !== null) {
       this.#next.setEnabled(true);
-      this.#elapsed += Math.max(0, realSeconds);
-      this.#blend = this.#reduced ? 1 : pageProgress(this.#elapsed);
+      this.#elapsed = advancePageTime(this.#elapsed, realSeconds);
+      // Sliding between locations is a requested gameplay cue, including reduced-motion mode.
+      // That preference still reduces scenery parallax, without skipping the location animation.
+      this.#blend = pageProgress(this.#elapsed);
     }
     this.#place(this.#current, width, height, this.#blend * height);
     if (this.#next !== null) this.#place(this.#next, width, height, (this.#blend - 1) * height);

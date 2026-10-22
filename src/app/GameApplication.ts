@@ -359,7 +359,19 @@ export class GameApplication {
     this.#runProgress.observeSpeed(this.#config.ball.startFallSpeed);
     this.#updateMission({ type: "run-start" });
 
-    this.#horizontalInput = new PointerHorizontalInput(this.#canvas);
+    const horizontalLimit = Math.max(.001, this.#config.playSpace.halfWidth - this.#config.ball.radius);
+    this.#horizontalInput = new PointerHorizontalInput(this.#canvas, {
+      getPosition: () => (this.#ballController?.position.x ?? this.#config.ball.startPosition.x) / horizontalLimit,
+      mapPosition: screen => {
+        const camera = mainScene.camera;
+        const left = camera.orthoLeft ?? -horizontalLimit, right = camera.orthoRight ?? horizontalLimit;
+        return (camera.globalPosition.x + left + (screen + 1) / 2 * (right - left)) / horizontalLimit;
+      },
+      onChange: () => {
+        if (this.#runStarted && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial
+          && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
+      },
+    });
     const ballMesh = createBallMesh(this.#scene, this.#config);
     this.#ballController = new BallController(ballMesh, this.#horizontalInput, this.#config);
     document.body.dataset.atmosphere = this.#profile.equipment.vfx;
@@ -694,6 +706,7 @@ export class GameApplication {
       if (this.#powers?.invulnerable) this.#slowModeButtonElement.disabled = true;
       this.#speedFeedback?.render(this.#ballController?.fallSpeed ?? 0, isPaused || this.#gameState.current === GameState.GameOver);
     }
+    if (!isPaused && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
     const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
     this.#elapsedPlatformSeconds = advanceIdleTime(this.#elapsedPlatformSeconds, realDeltaSeconds, platformAnimationPaused, this.#reducedMotion);
     if (isPaused) this.#comboView?.setPaused(true);

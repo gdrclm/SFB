@@ -33,6 +33,7 @@ export class BallController implements FixedSimulationSystem {
   readonly #previousPosition = { x: 0, y: 0, z: 0 };
   #fallSpeed: number;
   #horizontalVelocity = 0;
+  #previewStartX: number | null = null;
   #bounceElapsedSeconds: number | null = null;
   #bounceContactY = 0;
   #bounceLaunchSpeed = 0;
@@ -120,22 +121,33 @@ export class BallController implements FixedSimulationSystem {
     return true;
   }
 
+  /** Update the rendered pose on the input event, without waiting for a physics tick. */
+  public applyImmediateInput(): void {
+    if (!this.#input.isImmediate || !this.#input.isActive) return;
+    const x = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
+    if (x === this.#transform.position.x) return;
+    this.#previewStartX ??= this.#transform.position.x;
+    this.#transform.position.x = x;
+  }
+
   public fixedUpdate(
     fixedDeltaSeconds: number,
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
+    const previewStart = this.#previewStartX;
     this.#copyCurrentPositionToPrevious();
-    this.#updateHorizontalVelocity(realFixedDeltaSeconds);
-
-    const nextX =
-      this.#transform.position.x +
-      this.#horizontalVelocity * realFixedDeltaSeconds;
-    const clampedX = Math.max(-this.#horizontalLimit, Math.min(this.#horizontalLimit, nextX));
-    if (clampedX !== nextX) {
-      this.#horizontalVelocity = 0;
+    if (previewStart !== null) this.#previousPosition.x = previewStart;
+    this.#previewStartX = null;
+    if (this.#input.isImmediate) {
+      if (this.#input.isActive) this.#transform.position.x = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
+      this.#horizontalVelocity = (this.#transform.position.x - this.#previousPosition.x) / Math.max(.0001, realFixedDeltaSeconds);
+    } else {
+      this.#updateHorizontalVelocity(realFixedDeltaSeconds);
+      const nextX = this.#transform.position.x + this.#horizontalVelocity * realFixedDeltaSeconds;
+      const clampedX = Math.max(-this.#horizontalLimit, Math.min(this.#horizontalLimit, nextX));
+      if (clampedX !== nextX) this.#horizontalVelocity = 0;
+      this.#transform.position.x = clampedX;
     }
-
-    this.#transform.position.x = clampedX;
     if (this.#bounceElapsedSeconds !== null) {
       this.#updateBounce(fixedDeltaSeconds);
       return;

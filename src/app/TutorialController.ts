@@ -20,7 +20,7 @@ const steps = [
   {
     title: "Управление и цель",
     content: `<div class="tutorial-control-demo" aria-hidden="true"><span>←</span><span class="tutorial-ball">●</span><span>→</span></div>
-      <p>Ведите пальцем или мышью влево-вправо. Шар падает сам.</p>
+      <p>Свайпай в любом месте ↔. На ПК — веди курсор. Шар падает сам.</p>
       <p>${coin} Собирайте монеты, разбивайте платформы и спускайтесь глубже.</p>`,
   },
   {
