@@ -1,3 +1,4 @@
+import { atStartDepth } from "../dev/DeveloperMode";
 import { intersectsScreen } from "../powers/PowerArea";
 import { scannerDanger } from "../powers/DangerScanner";
 import { PowerUpController, ANNIHILATION_RADIUS } from "../powers/PowerUpController";
@@ -77,6 +78,7 @@ export interface PauseMenuElements {
 
 export interface GameApplicationActions {
   readonly guided?: boolean;
+  readonly developerStartDepth?: number | undefined;
   readonly ranked?: boolean;
   readonly onFinished?: (result: RunResult, durationMs: number) => void;
   readonly restart: () => Promise<void>;
@@ -252,6 +254,7 @@ export class GameApplication {
       this.#wallet = new RunWallet(this.#config.economy.initialEnergy, this.#config.economy.energyPerCoin);
       this.#energyHighWater = this.#config.economy.initialEnergy;
     }
+    this.#config = atStartDepth(this.#config, actions.developerStartDepth ?? 0);
     this.#canvas = canvas;
     this.#status = status;
     this.#boostButtonElement = boostButton;
@@ -352,7 +355,7 @@ export class GameApplication {
     this.#feel = new GameFeel(this.#scene, this.#canvas);
     this.#backdrop = new DepthBackdrop(this.#scene, mainScene.cameraRig, {
       theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
-    });
+    }, this.#actions.developerStartDepth ?? 0);
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
@@ -902,9 +905,9 @@ export class GameApplication {
     this.#pauseButtonElement.disabled = true;
     const previousBest = this.#history.top(1)[0]?.score ?? 0;
     const result = this.#finishRun("completed");
-    const newRecord = result.score > previousBest;
+    const newRecord = this.#actions.developerStartDepth === undefined && result.score > previousBest;
     this.#gameOverElement.dataset.newRecord = String(newRecord);
-    requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = newRecord ? "Новый рекорд!" : "Твой результат";
+    requireMenuElement(this.#gameOverElement, "#result-highlight").textContent = this.#actions.developerStartDepth !== undefined ? "Тестовый забег" : newRecord ? "Новый рекорд!" : "Твой результат";
     this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("open");
     requireMenuElement(this.#gameOverElement, "#run-result").textContent = result.score.toLocaleString("ru-RU");
     const stats: Record<string, string> = {
@@ -915,7 +918,7 @@ export class GameApplication {
     };
     for (const [name, value] of Object.entries(stats)) requireMenuElement(this.#gameOverElement, `[data-result="${name}"]`).textContent = value;
     requireMenuElement(this.#gameOverElement, "#result-save-status").textContent =
-      this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
+      this.#actions.developerStartDepth !== undefined ? "Режим разработчика · результат и награды не сохраняются" : this.#history.storageAvailable && this.#profile.storageAvailable ? "" : "Хранилище недоступно: результат может не сохраниться после закрытия";
     this.#gameOverElement.hidden = false;
     document.querySelector<HTMLButtonElement>("#restart-button")?.focus({ preventScroll: true });
   }
@@ -1251,9 +1254,10 @@ export class GameApplication {
   #finishRun(outcome: "completed" | "interrupted") {
     const previousBest = this.#history.top(1)[0]?.score ?? 0;
     const result = this.#runProgress.finish(
-      this.#history, this.#wallet.coins, this.#destroyedPlatformCount, outcome,
+      this.#actions.developerStartDepth === undefined ? this.#history : null, this.#wallet.coins, this.#destroyedPlatformCount, outcome,
       { best: this.#combo.best, bonus: this.#combo.bonus },
     );
+    if (this.#actions.developerStartDepth !== undefined) return result;
     this.#profile.creditRuns([result]);
     if (outcome === "completed" && this.#sentResult !== result.id) {
       this.#sentResult = result.id;
@@ -1270,6 +1274,7 @@ export class GameApplication {
   }
 
   #updateMission(event: MissionEvent): void {
+    if (this.#actions.developerStartDepth !== undefined) return;
     const beforeProgress = this.#profile.mission.progress;
     const result = this.#profile.applyMissionEvent(event);
     if (!result.rewarded && event.type !== "run-start" && event.type !== "life-lost" && this.#profile.mission.progress !== beforeProgress) this.#missionIntroRemaining = 1.2;
@@ -1291,7 +1296,7 @@ export class GameApplication {
     const state = this.#profile.mission;
     const mission = currentMission(state);
     panel.dataset.complete = String(this.#missionRewardRemaining > 0);
-    panel.hidden = this.#missionRewardRemaining <= 0 && (this.#profile.activeMission === null || this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
+    panel.hidden = this.#actions.developerStartDepth !== undefined || this.#missionRewardRemaining <= 0 && (this.#profile.activeMission === null || this.#missionIntroRemaining <= 0 || this.#opening?.isScripted === true);
     renderPinnedMission(this.#pauseMenuElement, this.#profile);
     panel.dataset.mode = this.#missionRewardRemaining > 0 ? "reward" : "intro";
     panel.dataset.mission = String(state.index);
@@ -1308,6 +1313,6 @@ export class GameApplication {
     const ball = this.#ballController;
     return ball === null
       ? 0
-      : Math.max(0, this.#config.ball.startPosition.y - ball.position.y);
+      : Math.max(0, (this.#actions.developerStartDepth ?? 0) + this.#config.ball.startPosition.y - ball.position.y);
   }
 }

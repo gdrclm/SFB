@@ -18,7 +18,7 @@ vi.mock("./createPhaseOneBackdrop", async () => {
   } };
 });
 afterEach(() => { vi.unstubAllGlobals(); });
-function setup(reduced: boolean) {
+function setup(reduced: boolean, startDepth = 0) {
   vi.stubGlobal("matchMedia", () => ({ matches: reduced }));
   const engine = new NullEngine(); const scene = new Scene(engine);
   const rig = new TransformNode("rig", scene);
@@ -26,7 +26,7 @@ function setup(reduced: boolean) {
   camera.orthoTop = 21; camera.orthoBottom = -21;
   camera.orthoLeft = -14; camera.orthoRight = 14;
   scene.activeCamera = camera;
-  const backdrop = new DepthBackdrop(scene, rig, {});
+  const backdrop = new DepthBackdrop(scene, rig, {}, startDepth);
   const root = (name: string): Mesh => {
     const mesh = scene.getMeshByName(name);
     if (mesh === null) throw new Error("Missing backdrop");
@@ -61,5 +61,16 @@ it("does not turn a delayed frame into an instant switch and keeps pages touchin
     world.camera.orthoTop = 40; world.camera.orthoBottom = -40;
     world.backdrop.update(500, 0);
     expect(world.root("sky").position.y - world.root("crystal").position.y).toBeCloseTo(80);
+  } finally { world.dispose(); }
+});
+
+it.each([[500, "crystal"], [1500, "lava"], [4000, "abyss"]] as const)("opens the correct backdrop immediately at %s metres", (depth, name) => {
+  const world = setup(false, depth);
+  try {
+    expect(world.scene.getMeshByName("sky")).toBeNull();
+    expect(world.root(name).position.y).toBe(0);
+    world.backdrop.update(depth, 1 / 60);
+    expect(world.scene.meshes).toHaveLength(1);
+    expect(world.backdrop.crystalBlend).toBe(name === "crystal" ? 1 : 0);
   } finally { world.dispose(); }
 });

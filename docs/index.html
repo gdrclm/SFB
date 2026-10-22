@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-55cMq34I.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BsxChlfJ.css">
+    <script type="module" crossorigin src="./assets/index-DtX6akpl.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BEqLj9fW.css">
   </head>
   <body>
     <main id="app">
@@ -177,6 +177,11 @@
             <button class="menu-tile" type="button" data-open-settings><span aria-hidden="true">⚙︎</span> Настройки<span aria-hidden="true">›</span></button>
           </div>
           <button id="guided-run-button" type="button" class="menu-training">↔ Обучающий забег</button>
+          <div id="developer-start" class="developer-start" hidden>
+            <label for="developer-depth">Старт с глубины, м</label>
+            <input id="developer-depth" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="developer-note">
+            <small id="developer-note">Тест · без рекордов и наград</small>
+          </div>
           <p id="start-error" role="alert"></p>
 
         </div>
@@ -204,6 +209,7 @@
           <button id="interface-toggle" class="pause-setting" type="button" aria-pressed="true"><span aria-hidden="true">▣</span><span>Интерфейс</span><strong class="setting-state">ВКЛ</strong></button>
           <button id="platform-numbers-toggle" type="button" aria-pressed="false">Числа прочности: выкл.</button>
         </div>
+        <label class="developer-toggle"><input id="developer-mode" type="checkbox"> Режим разработчика</label>
         <p class="vibration-support" data-vibration-support></p>
         <button id="reset-data-button" class="reset-data-action" type="button">Сбросить данные</button>
       </dialog>

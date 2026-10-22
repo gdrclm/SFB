@@ -24,10 +24,11 @@ export class DepthBackdrop {
   #previousCameraY: number;
   readonly #reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  public constructor(scene: Scene, rig: TransformNode, appearance: WorldAppearance) {
+  public constructor(scene: Scene, rig: TransformNode, appearance: WorldAppearance, startDepth = 0) {
     this.#scene = scene; this.#rig = rig; this.#appearance = appearance;
     this.#previousCameraY = rig.position.y;
-    this.#current = createPhaseOneBackdrop(scene, rig, appearance);
+    this.#location = this.#currentLocation = this.#locations.observe(startDepth);
+    this.#current = createPhaseOneBackdrop(scene, rig, appearance, this.#location);
     preloadCrystalBackdrop();
   }
   public get crystalBlend(): number {

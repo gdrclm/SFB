@@ -1,3 +1,4 @@
+import { DEVELOPER_MODE_KEY, DEVELOPER_DEPTH_KEY, parseStartDepth } from "./dev/DeveloperMode";
 import { NetworkView } from "./network/NetworkView";
 import type { RunTicket } from "./network/types";
 import { initializeHudArt } from "./ui/HudArt";
@@ -65,6 +66,7 @@ getGameSounds();
 const network = new NetworkView();
 let requestedGuidedRun = false;
 let requestedRanked = false;
+let requestedDeveloperDepth: number | undefined;
 let activeTicket: RunTicket | null = null;
 const lifecycle = new ApplicationLifecycle(
   () => { return new GameApplication(
@@ -88,7 +90,8 @@ const lifecycle = new ApplicationLifecycle(
       menu: pauseMenu,
     },
     {
-      guided: !requestedRanked && (requestedGuidedRun || !hasFinishedOpening()),
+      guided: requestedDeveloperDepth === undefined && !requestedRanked && (requestedGuidedRun || !hasFinishedOpening()),
+      developerStartDepth: requestedDeveloperDepth,
       ranked: requestedRanked,
       onFinished: (result, durationMs) => { const ticket = activeTicket; if (ticket !== null) network.online.enqueue({ticket,result,durationMs}); },
       restart: restartApplication,
@@ -208,10 +211,43 @@ const tutorial = new TutorialController(tutorialDialog);
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-tutorial]")) {
   button.addEventListener("click", () => { tutorial.open(); });
 }
+function requireInput(selector: string): HTMLInputElement {
+  const input = requireElement(selector);
+  if (!(input instanceof HTMLInputElement)) throw new TypeError(`${selector} must be an input.`);
+  return input;
+}
+const developerToggle = requireInput("#developer-mode");
+const developerDepth = requireInput("#developer-depth");
+try {
+  developerToggle.checked = localStorage.getItem(DEVELOPER_MODE_KEY) === "true";
+  developerDepth.value = String(parseStartDepth(localStorage.getItem(DEVELOPER_DEPTH_KEY) ?? "0") ?? 0);
+} catch { /* Settings remain usable without storage. */ }
+function renderDeveloperMode(): void {
+  requireElement("#developer-start").hidden = !developerToggle.checked;
+  requireElement("#guided-run-button").hidden = developerToggle.checked;
+  document.body.dataset.developerMode = String(developerToggle.checked);
+}
+developerToggle.addEventListener("change", () => {
+  try { localStorage.setItem(DEVELOPER_MODE_KEY, String(developerToggle.checked)); } catch { /* Session setting. */ }
+  renderDeveloperMode();
+});
+developerDepth.addEventListener("input", () => { developerDepth.setCustomValidity(""); });
+renderDeveloperMode();
+
 const startRun = (guided = !network.wantsRanked && !hasFinishedOpening()): void => {
   if (startButton.disabled) return;
-  requestedGuidedRun = guided;
-  requestedRanked = network.wantsRanked && !guided;
+  const depth = parseStartDepth(developerDepth.value);
+  if (developerToggle.checked && depth === null) {
+    developerDepth.setCustomValidity("Введи целое число от 0 до 1 000 000.");
+    developerDepth.reportValidity();
+    return;
+  }
+  requestedDeveloperDepth = developerToggle.checked ? depth ?? 0 : undefined;
+  if (requestedDeveloperDepth !== undefined) {
+    try { localStorage.setItem(DEVELOPER_DEPTH_KEY, String(requestedDeveloperDepth)); } catch { /* Session setting. */ }
+  }
+  requestedGuidedRun = requestedDeveloperDepth === undefined && guided;
+  requestedRanked = requestedDeveloperDepth === undefined && network.wantsRanked && !guided;
   startButton.disabled = true;
   requireElement("#start-error").textContent = "Загрузка…";
   void (async () => {

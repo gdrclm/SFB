@@ -95,7 +95,7 @@ export class RunProgress {
   }
 
   public finish(
-    history: RunHistory,
+    history: RunHistory | null,
     coins: number,
     platforms: number,
     outcome: RunResult["outcome"],
@@ -115,7 +115,7 @@ export class RunProgress {
         comboBonus: combo.bonus,
         outcome,
       };
-      history.save(this.#result);
+      history?.save(this.#result);
     }
     return this.#result;
   }
