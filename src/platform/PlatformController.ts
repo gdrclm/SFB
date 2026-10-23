@@ -17,6 +17,7 @@ export interface PlatformActivationProperties {
   readonly widthScale?: number;
   readonly encounterTheme?: PlatformEncounterTheme;
   readonly isTrap?: boolean;
+  readonly tutorialDanger?: boolean;
   readonly kind?: PlatformKind;
 }
 
@@ -39,6 +40,7 @@ export class PlatformController {
   #encounterTheme: PlatformEncounterTheme = "chaos";
   #approachState: ApproachState | null = null;
   #elapsed = 0;
+  #tutorialDanger = false;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
@@ -68,7 +70,7 @@ export class PlatformController {
   public setApproachFeedback(speed: number | null, elapsedSeconds = 0, boostAvailable = true, boostMultiplier = 1.5, secondsToImpact = Infinity, scannerWarning = false): void {
     if (!this.#isActive) return;
     this.#elapsed = elapsedSeconds;
-    this.#approachState = scannerWarning ? "danger" : speed === null ? null : approachState(speed, this.#strength, boostAvailable, boostMultiplier, secondsToImpact);
+    this.#approachState = scannerWarning || this.#tutorialDanger ? "danger" : speed === null ? null : approachState(speed, this.#strength, boostAvailable, boostMultiplier, secondsToImpact);
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, this.#approachState), elapsedSeconds);
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.
@@ -126,6 +128,7 @@ export class PlatformController {
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
+    this.#tutorialDanger = properties.tutorialDanger === true;
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);

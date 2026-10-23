@@ -19,7 +19,7 @@ export class DesktopGameControls {
     document.addEventListener("visibilitychange", this.#cancel);
   }
   #allowed(target: EventTarget | null): boolean {
-    return this.#actions.active() && document.querySelector("dialog[open]") === null
+    return this.#actions.active() && document.querySelector("dialog[open]:not(#context-guide)") === null
       && !(target instanceof Element && target.closest("input,textarea,select,[contenteditable='true']"));
   }
   readonly #pointerDown = (event: PointerEvent): void => {

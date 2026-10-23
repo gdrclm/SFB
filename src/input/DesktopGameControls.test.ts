@@ -1,6 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { DesktopGameControls } from "./DesktopGameControls";
-class Target extends EventTarget { public querySelector(): null { return null; } }
+class Target extends EventTarget {
+  public dialog: "context-guide" | "settings" | null = null;
+  public querySelector(selector: string): object | null {
+    return this.dialog && !(this.dialog === "context-guide" && selector.includes(":not(#context-guide)")) ? {} : null;
+  }
+}
 class TestElement extends EventTarget { public closest(): null { return null; } }
 class Key extends Event {
   public constructor(type: string, readonly code = "Space", readonly repeat = false) { super(type, { cancelable: true }); }
@@ -32,4 +37,17 @@ it("ignores space repeats, releases once and cancels a hold on blur or pause", (
   doc.dispatchEvent(new Key("keydown")); pause(); doc.dispatchEvent(new Key("keyup"));
   expect(actions.cancelAbility).toHaveBeenCalledTimes(2);
   controls.dispose(); doc.dispatchEvent(new Key("keydown")); expect(actions.abilityDown).toHaveBeenCalledTimes(3);
+});
+
+it("allows gameplay shortcuts under teaching arrows while other dialogs block them", () => {
+  const { doc, actions, controls } = setup();
+  doc.dialog = "context-guide";
+  doc.dispatchEvent(Object.assign(new Event("pointerdown", { cancelable: true }), { pointerType: "mouse", button: 2 }));
+  doc.dispatchEvent(new Key("keydown")); doc.dispatchEvent(new Key("keyup"));
+  expect(actions.boost).toHaveBeenCalledOnce(); expect(actions.abilityDown).toHaveBeenCalledOnce();
+  doc.dialog = "settings";
+  doc.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "mouse", button: 2 }));
+  doc.dispatchEvent(new Key("keydown"));
+  expect(actions.boost).toHaveBeenCalledOnce(); expect(actions.abilityDown).toHaveBeenCalledOnce();
+  controls.dispose();
 });

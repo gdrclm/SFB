@@ -148,31 +148,31 @@ optional numeric badges. Players do not need numbers for the default cues.
 
 ## Contextual first-run opening
 
-The first run now starts gameplay immediately. Random platform and coin
-production is disabled during the first 30 active simulation seconds. A simple
-platform appears first, then practice at seconds 2/5/7/9/11 and the first
-coin at second 4. The boost gate appears at second 16, only when BOOST has
-actually been earned and is available. Otherwise practice continues and the
-remaining sequence waits. A two-lane fork follows seven simulation seconds
-after the gate. Familiar platforms at seconds 26/28 complete the lesson. Positions are placed ahead of the current ball,
-so boosting does not reveal the whole lesson at once. The fork offers a safe
-ordinary platform and a strong dark platform, without a free central corridor.
-Only three short arrows appear: «Веди пальцем», «Собирай», «Ускорься!».
-They point at the ball, first world coin and BOOST. Gameplay keeps running;
-there is no modal, Continue action or reading stop. Dragging, collecting the
-coin and successfully boosting dismiss the matching hint. Ignored hints time
-out. The fork uses the actual platform cues; lives animate on loss and combo
-shows its multiplier, without extra teaching text. Full rules remain in pause.
+The guided run teaches one action at a time while play continues. Desktop arrows
+explain cursor steering, right mouse BOOST and Space for the left ability;
+touch arrows explain relative swipes and the two buttons. The actual platform,
+coin and heart art accompanies the short hints. Full rules remain in How to Play.
 
-Slow platforms are suppressed until the first successful BOOST. Once introduced,
-a ready BOOST can exit manual or forced slow mode and immediately accelerate;
-rejected attempts do not cancel slow mode or consume energy.
+Random generation stays disabled throughout staging. Practice platforms build
+the real six-hit BOOST charge before the boost gate; a missed charge extends
+practice rather than granting free energy. Coins explicitly teach acceleration,
+the fork shows a red dangerous platform, and a green platform teaches healing.
+At second 36, a temporary annihilation trial replaces the left ability. Its
+charges and any existing annihilation zone are restored when the lesson ends;
+the trial never buys or equips an item in the saved profile.
 
-At second 30, random generation restarts from the current ball position. This
-avoids replaying rows from the original starting altitude. Completion is saved
-under `speed-fall-ball.guided-opening.v1`; interrupted lessons can be retried.
-**Обучающий забег** replays the opening from the main menu. Skip immediately
+After all stages (at least 44 active seconds) and an actual trial activation,
+physics and camera following stop. The hero spins rapidly, stretches and flies
+above the camera in a 1.7-second finale. A compact “Обучение завершено” screen
+then offers only “Начать заново” (replay the lesson) and “Главное меню”. There is
+no automatic random run or ordinary defeat summary. Reduced-motion settings
+soften the spin, and a hidden/unfocused tab does not advance the finale.
+
+Completion is saved under `speed-fall-ball.guided-opening.v1`.
+**Обучающий забег** replays the lesson from the main menu. Skip immediately
 switches to random play and stops contextual prompts for the rest of the run.
+Normal runs never display tutorial arrows or the corrective BOOST coach.
+Desktop gameplay shortcuts remain active beneath the nonmodal teaching arrows.
 
 ## Haptics and independent feedback settings
 
@@ -225,8 +225,9 @@ npm run dev
 
 Что проверить:
 
-- Первый обучающий забег: простая платформа, монета, BOOST, развилка и
-  короткие стрелки без остановок на чтение. Пауза останавливает симуляцию.
+- Обучение на ПК и телефоне: управление, ускоряющие монеты, BOOST, красная
+  опасная и зелёная целебная платформы, пробная аннигиляция. Затем вращение,
+  вылет героя и отдельный экран завершения с повтором или выходом в меню.
 - Жизни: одна активация платформы снимает не больше одной жизни.
 - Последовательные BOOST, отдаление камеры, эффекты скорости и комбо.
 - Подсветка прочности только ближайшей платформы под шаром.
@@ -234,7 +235,7 @@ npm run dev
   комбо. Каждое выполнение даёт 10 монет и сразу открывает следующую цель.
 - Именованные испытания через 20–40 секунд игрового времени после обучения,
   богатые дорожки с BOOST и более простой альтернативой.
-- Подсказка BOOST после повторных ошибок, причина смерти и кнопка «Ещё раз».
+- Подсказка BOOST после повторных ошибок только в обучении; причина смерти и «Ещё раз».
   Повтор использует прежние Babylon, сцену и Havok, сбрасывая забег.
 - Рекорды очков, глубины, максимальной скорости и этапа после перезагрузки.
 - Отдельные главное меню и пауза, магазин, покупка и применение предметов.

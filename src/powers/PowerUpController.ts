@@ -11,6 +11,8 @@ export class PowerUpController {
   readonly #activate: (kind: PowerKind) => void;
   readonly #miniSweep: () => void;
   #annihilationCharges = 4;
+  #tutorialCharges: number | null = null;
+  #tutorialZone: Point | null = null;
   readonly #sweep: () => void;
   readonly #used = new Set<PowerKind>();
   #zone: Point | null = null;
@@ -26,8 +28,17 @@ export class PowerUpController {
   public get plasmaRemaining(): number { return this.#plasmaRemaining; }
   public get invulnerable(): boolean { return this.#plasmaRemaining > 0; }
   public get zone(): Point | null { return this.#zone; }
-  public unlocked(kind: PowerKind): boolean { return this.#config[kind]; }
-  public get annihilationCharges(): number { return this.#config.annihilation ? this.#annihilationCharges : 0; }
+  public setTutorialAnnihilation(enabled: boolean): void {
+    if (enabled && this.#tutorialCharges === null) {
+      this.#tutorialCharges = this.#annihilationCharges; this.#tutorialZone = this.#zone;
+      this.#annihilationCharges = 4; this.#zone = null;
+    } else if (!enabled && this.#tutorialCharges !== null) {
+      this.#annihilationCharges = this.#tutorialCharges; this.#zone = this.#tutorialZone;
+      this.#tutorialCharges = null; this.#tutorialZone = null;
+    }
+  }
+  public unlocked(kind: PowerKind): boolean { return this.#config[kind] || kind === "annihilation" && this.#tutorialCharges !== null; }
+  public get annihilationCharges(): number { return this.unlocked("annihilation") ? this.#annihilationCharges : 0; }
   public available(kind: PowerKind): boolean {
     return this.unlocked(kind) && (kind === "annihilation" ? this.#annihilationCharges > 0 : !this.#used.has(kind));
   }

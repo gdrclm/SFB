@@ -14,7 +14,7 @@ function fixture() {
 }
 
 describe("staged opening", () => {
-  it("reveals platform, coin, boost gate, then fork before random challenges", () => {
+  it("reveals the controls, coins, BOOST, danger, healing and trial ability before completion", () => {
     const { opening, events, random, complete } = fixture();
     opening.fixedUpdate(0);
     expect(events).toEqual(["spawn:platform", "tip:platform"]);
@@ -22,13 +22,14 @@ describe("staged opening", () => {
     opening.fixedUpdate(0.1); expect(events.slice(-2)).toEqual(["spawn:coin", "tip:coin"]);
     opening.fixedUpdate(12); expect(events.slice(-2)).toEqual(["spawn:boost", "tip:boost"]);
     opening.fixedUpdate(7); expect(events.slice(-2)).toEqual(["spawn:fork", "tip:fork"]);
-    opening.fixedUpdate(6.9); expect(random).not.toHaveBeenCalled();
-    opening.fixedUpdate(0.1);
-    expect(events.slice(-2)).toEqual(["random", "tip:free"]);
-    expect(events.filter((event) => event === "spawn:practice")).toHaveLength(7);
+    opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:vitality", "tip:vitality"]);
+    opening.fixedUpdate(7); expect(events.slice(-2)).toEqual(["spawn:annihilation", "tip:annihilation"]);
+    opening.fixedUpdate(8);
+    expect(random).not.toHaveBeenCalled();
+    expect(events.filter((event) => event === "spawn:practice")).toHaveLength(6);
     expect(complete).toHaveBeenCalledOnce();
     opening.fixedUpdate(100);
-    expect(random).toHaveBeenCalledOnce();
+    expect(random).not.toHaveBeenCalled();
   });
 
   it("stops catch-up simulation immediately for an explanation and resumes without jumping", () => {
@@ -50,21 +51,18 @@ describe("staged opening", () => {
     expect(opening.elapsed).toBe(0.04);
   });
 
-  it("explains loss of life only on a real event and new types only when they appear", () => {
+  it("explains real life loss and visible types once, and never prompts after lessons end", () => {
     const { opening, events } = fixture();
-    opening.fixedUpdate(0); opening.platformAppeared("vitality");
+    opening.fixedUpdate(0);
     expect(events).not.toContain("tip:life");
-    expect(events).not.toContain("tip:vitality");
     opening.discover("life"); opening.discover("life");
-    expect(events.filter((event) => event === "tip:life")).toHaveLength(1);
-    opening.fixedUpdate(4); opening.fixedUpdate(12); opening.fixedUpdate(7); opening.fixedUpdate(7);
-    for (const kind of ["vitality", "time-slow"] as const) {
-      opening.platformAppeared(kind); opening.platformAppeared(kind);
-      expect(events.filter((event) => event === `tip:${kind}`)).toHaveLength(1);
-    }
-    opening.platformAppeared("super-heavy");
-    expect(events).toContain("tip:fork");
-    expect(events).not.toContain("tip:super-heavy");
+    expect(events.filter(event => event === "tip:life")).toHaveLength(1);
+    opening.platformAppeared("vitality"); opening.platformAppeared("vitality");
+    expect(events.filter(event => event === "tip:vitality")).toHaveLength(1);
+    for (let i = 0; i < 2500; i++) opening.fixedUpdate(.02);
+    const count = events.length;
+    opening.platformAppeared("time-slow"); opening.discover("combo");
+    expect(events).toHaveLength(count);
   });
 
   it("skips staging once and stops all later contextual prompts", () => {
@@ -92,4 +90,18 @@ it("waits for a legitimately earned BOOST and offers practice instead of an impo
   expect(events.at(-1)).toBe("boost");
   opening.fixedUpdate(6); expect(events).not.toContain("fork");
   opening.fixedUpdate(1); expect(events).toContain("fork");
+});
+
+
+it("waits for the trial ability to be used, then completes once without starting random gameplay", () => {
+  let used = false;
+  const explain = vi.fn(), complete = vi.fn(), random = vi.fn();
+  const opening = new StagedOpening({ spawn: vi.fn(), explain, complete, random, abilityUsed: () => used });
+  for (let i = 0; i < 2500; i++) opening.fixedUpdate(.02);
+  expect(opening.isScripted).toBe(true);
+  expect(complete).not.toHaveBeenCalled();
+  expect(explain).toHaveBeenCalledWith("annihilation");
+  used = true; opening.fixedUpdate(.02); opening.fixedUpdate(10);
+  expect(complete).toHaveBeenCalledOnce(); expect(random).not.toHaveBeenCalled();
+  expect(opening.isScripted).toBe(false);
 });

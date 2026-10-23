@@ -1,3 +1,4 @@
+import { tutorialInput } from "../tutorial/GuideHints";
 import type { PlatformKind } from "../config/gameConfig";
 import { platformPreviewMarkup } from "../platform/PlatformSprites";
 import { platformSpriteRow } from "../platform/PlatformSpriteLayout";
@@ -11,7 +12,7 @@ const slow = '<span class="tutorial-key" aria-hidden="true">ϟ ЗАМЕДЛЕН�
 const clock = '<svg class="tutorial-icon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#d5f7ff" stroke="#16799f" stroke-width="3"/><path d="M16 6V16L23 19" fill="none" stroke="#16799f" stroke-width="3"/></svg>';
 
 function platform(kind: PlatformKind, strength: number): string {
-  return platformPreviewMarkup(platformSpriteRow(kind, null), `Платформа, прочность ${String(strength)}`);
+  return platformPreviewMarkup(platformSpriteRow(kind, kind === "super-heavy" ? "danger" : null), `Платформа, прочность ${String(strength)}`);
 }
 
 export const tutorialVisuals = { heart, coin, energy, boost, slow, clock, platform };
@@ -43,6 +44,10 @@ const steps = [
       <article>${platform("vitality", 10)}<div><h2>Восстановление</h2><p>${heart} +1 жизнь, ${energy} +10 энергии.</p></div></article>
       <article>${platform("time-slow", 12)}<div><h2>Замедление</h2><p>${clock} Замедляет на 3 секунды.</p></div></article>
       </div>`,
+  },
+  {
+    title: "Способности",
+    content: '<p><span class="tutorial-key">◉ Аннигиляция</span> Нажми — очистить экран. Держи 2 секунды — взрыв на 200 м за все 4 заряда.</p><p><span class="tutorial-key">✺ Плазма</span> 30 секунд разгона и неуязвимости.</p><p>Одну способность выбираешь в магазине. В забеге она слева внизу.</p>',
   },
   {
     title: "Комбо и рекорды",
@@ -107,7 +112,11 @@ export class TutorialController {
     const progress = this.#dialog.querySelector<HTMLElement>("#tutorial-step");
     if (title === null || content === null || progress === null) throw new Error("Missing tutorial content");
     title.textContent = step.title;
-    content.innerHTML = step.content;
+    content.innerHTML = tutorialInput() === "desktop" ? step.content
+      .replace("Свайпай в любом месте ↔. На ПК — веди курсор.", "Веди курсор ↔.")
+      .replace("Нажми: +50% скорости.", "ПКМ: +50% скорости.")
+      .replace("Замедляет время, тратит энергию.", "Пробел: замедлить время, тратит энергию.")
+      .replace("Нажми — очистить экран.", "Пробел — очистить экран.") : step.content;
     progress.textContent = `${String(this.#step + 1)} / ${String(steps.length)}`;
     this.#button("#tutorial-back").disabled = this.#step === 0;
     this.#button("#tutorial-next").textContent = this.#step === steps.length - 1

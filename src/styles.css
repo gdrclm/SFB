@@ -2467,3 +2467,17 @@ body[data-developer-mode="true"] .ranked-mode { display: none; }
 @keyframes encounter-reward { 50% { opacity: .95; transform: translateY(-12px) scale(1.2); } }
 @keyframes encounter-shard { 50% { opacity: .85; transform: rotate(30deg) scale(.75); } }
 @media (prefers-reduced-motion: reduce) { .encounter-rail i { animation: none !important; opacity: .65; } }
+
+/* Context hints stay short, with the same symbols and platforms as the game. */
+#context-guide #context-picture:not(:empty) { display: block; }
+#context-guide #context-picture .tutorial-platform { width: 48px; height: 30px; object-fit: contain; }
+#context-guide #context-picture .tutorial-icon { vertical-align: middle; }
+.tutorial-finale > :not(#tutorial-finish) { visibility: hidden; }
+#tutorial-finish { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; pointer-events: auto; background: #00152b99; }
+#tutorial-finish[hidden] { display: none; }
+#tutorial-finish .game-over-card { width: min(350px, 100%); padding: 28px 22px; text-align: center; border: 2px solid #77eaff; border-radius: 28px; background: linear-gradient(#104e83, #051c3b); box-shadow: 0 0 28px #00cfff66, inset 0 0 16px #1faaff44; }
+#tutorial-finish h1 { font-size: 1.6rem; margin: 8px 0 24px; color: white; }
+.tutorial-finish-star { font-size: 60px; color: #ffe171; text-shadow: 0 0 20px #ffb600; }
+#tutorial-finish button { display: block; width: 100%; padding: 15px 12px; margin-top: 12px; border-radius: 24px; border: 2px solid #96eaff; background: linear-gradient(#238bcc, #114173); color: white; font: inherit; font-weight: 900; cursor: pointer; }
+#tutorial-finish #tutorial-again { background: linear-gradient(#73e80d, #209200); border-color: #ceff8c; }
+#tutorial-finish button:focus-visible { outline: 3px solid #ffe171; outline-offset: 4px; }

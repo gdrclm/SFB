@@ -91,3 +91,20 @@ it("captures world coordinates from the engine's accessor-based vector rather th
   power.fixedUpdate(.01);
   expect(power.zone).not.toBe(null);
 });
+
+it("lends annihilation for a lesson without unlocking it or changing real charges", () => {
+  const config = { ...options, annihilation: false };
+  const mini = vi.fn();
+  const power = new PowerUpController(config, { position: { x: 0, y: 0 }, fallSpeed: 10 }, () => true, vi.fn(), vi.fn(), mini);
+  power.setTutorialAnnihilation(true);
+  expect(power.annihilationCharges).toBe(4);
+  expect(power.tryMiniAnnihilation()).toBe(true); expect(mini).toHaveBeenCalledOnce();
+  expect(config.annihilation).toBe(false);
+  power.setTutorialAnnihilation(false);
+  expect(power.annihilationCharges).toBe(0); expect(power.available("annihilation")).toBe(false);
+  const owned = new PowerUpController(options, { position: { x: 0, y: 0 }, fallSpeed: 10 }, () => true, vi.fn(), vi.fn(), mini);
+  owned.tryMiniAnnihilation(); expect(owned.annihilationCharges).toBe(3);
+  owned.setTutorialAnnihilation(true); owned.tryActivate("annihilation");
+  owned.setTutorialAnnihilation(false);
+  expect(owned.annihilationCharges).toBe(3); expect(owned.zone).toBe(null);
+});

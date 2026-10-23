@@ -1,4 +1,4 @@
-/** Explain BOOST once per run after repeated mistakes, unless the player is already using it. */
+/** Explain BOOST once during an explicitly enabled lesson after repeated mistakes. */
 export class BoostCoach {
   #failures = 0;
   #shown = false;
@@ -8,8 +8,9 @@ export class BoostCoach {
   public boosted(): void { this.#failures = 0; this.dismiss(); }
   public dismiss(): void { this.#remaining = 0; }
   public fixedUpdate(delta: number, canExplain: boolean): void {
+    if (!canExplain) { this.dismiss(); return; }
     this.#remaining = Math.max(0, this.#remaining - delta);
-    if (!this.#shown && this.#failures >= 2 && canExplain) {
+    if (!this.#shown && this.#failures >= 2) {
       this.#shown = true;
       this.#remaining = 10;
     }

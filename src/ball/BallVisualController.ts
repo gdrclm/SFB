@@ -70,6 +70,7 @@ export class BallVisualController implements FixedSimulationSystem {
   #contactAnchored = false;
   #impactKind: "hurt" | "break" = "break";
   #danger = false;
+  #tutorialLaunchStart: Vector3 | null = null;
 
   public constructor(ball: Mesh, motion: BallMotion, config: GameConfig) {
     const material = ball.material;
@@ -157,6 +158,21 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#ball.scaling.z += (this.#baseScale.z / Math.sqrt(sy) - this.#ball.scaling.z) * amount;
     this.#ball.rotation.z += (.18 + Math.sin(age * 8) * .05 * Math.exp(-age * 2) - this.#ball.rotation.z) * amount;
     this.#fx.update(dt, { speed: 0, look: 0, boost: 0, anticipating: false, slow: false, danger: false });
+  }
+
+  public renderTutorialFinish(seconds: number, age: number, viewHeight: number, reducedMotion: boolean): void {
+    this.#tutorialLaunchStart ??= this.#ball.position.clone();
+    const launch = clamp01((age - .8) / .75);
+    this.#anchorContact(false);
+    this.#ball.rotation.z = age * (reducedMotion ? 4 : 10 + age * 22);
+    this.#ball.rotation.x = Math.sin(age * 10) * .2;
+    this.#ball.position.y = this.#tutorialLaunchStart.y + viewHeight * 1.5 * launch * launch;
+    this.#ball.position.x = this.#tutorialLaunchStart.x + Math.sin(launch * Math.PI) * viewHeight * .1;
+    const stretch = 1 + launch * 2;
+    this.#ball.scaling.set(this.#baseScale.x / Math.sqrt(stretch), this.#baseScale.y * stretch, this.#baseScale.z / Math.sqrt(stretch));
+    getBallFace(this.#ball)?.update("combo", Math.min(.1, seconds), 0);
+    getBallLimbs(this.#ball)?.update(Math.min(.1, seconds), 80);
+    this.#fx.update(Math.min(.1, seconds), { speed: 120, look: 0, boost: 1, anticipating: false, slow: false, danger: false });
   }
 
   public setCrystalBlend(blend: number): void {

@@ -1,19 +1,21 @@
 import type { PlatformKind } from "../config/gameConfig";
 
 export const GUIDED_OPENING_KEY = "speed-fall-ball.guided-opening.v1";
-export type GuideTip = "platform" | "coin" | "boost" | "fork" | "free" | "life" | "combo" | "vitality" | "time-slow" | "super-heavy";
+export type GuideTip = "platform" | "coin" | "boost" | "fork" | "free" | "life" | "combo" | "vitality" | "time-slow" | "super-heavy" | "annihilation";
 export interface OpeningActions {
-  spawn(kind: "platform" | "coin" | "boost" | "fork" | "practice"): void;
+  spawn(kind: "platform" | "coin" | "boost" | "fork" | "practice" | "vitality" | "annihilation"): void;
   explain(tip: GuideTip): void;
   random(): void;
   complete(): void;
   readyForBoost?(): boolean;
+  abilityUsed?(): boolean;
 }
 const sequence = [
   { at: 0, kind: "platform" }, { at: 2, kind: "practice" }, { at: 4, kind: "coin" },
   { at: 5, kind: "practice" }, { at: 7, kind: "practice" }, { at: 9, kind: "practice" }, { at: 11, kind: "practice" },
   { at: 16, kind: "boost" }, { at: 23, kind: "fork" },
-  { at: 26, kind: "practice" }, { at: 28, kind: "practice" },
+  { at: 26, kind: "practice" }, { at: 29, kind: "vitality" },
+  { at: 36, kind: "annihilation" },
 ] as const;
 
 export class StagedOpening {
@@ -28,6 +30,7 @@ export class StagedOpening {
 
   public constructor(actions: OpeningActions) { this.#actions = actions; }
   public get isScripted(): boolean { return this.#scripted; }
+  public get wasSkipped(): boolean { return this.#skipped; }
   public get elapsed(): number { return this.#elapsed; }
 
   public fixedUpdate(delta: number): void {
@@ -52,25 +55,31 @@ export class StagedOpening {
       }
       event = sequence[this.#next];
     }
-    if (this.#elapsed - this.#delay + 1e-9 >= 30) {
+    if (this.#elapsed - this.#delay + 1e-9 >= 44) {
+      if (this.#actions.abilityUsed?.() === false) {
+        if (this.#elapsed - this.#lastPractice >= 6) {
+          this.#lastPractice = this.#elapsed;
+          this.#actions.explain("annihilation");
+        }
+        return;
+      }
       this.#finish();
-      this.discover("free");
     }
   }
 
   public discover(tip: GuideTip): void {
-    if (this.#skipped || this.#seen.has(tip)) return;
+    if (this.#skipped || !this.#scripted || this.#seen.has(tip)) return;
     this.#seen.add(tip);
     this.#actions.explain(tip);
   }
   public platformAppeared(kind: PlatformKind): void {
-    if (!this.#scripted && kind !== "standard") this.discover(kind);
+    if (this.#scripted && kind !== "standard") this.discover(kind);
   }
   public skip(): void { this.#skipped = true; this.#finish(); }
   #finish(): void {
     if (!this.#scripted) return;
     this.#scripted = false;
-    this.#actions.random();
+    if (this.#skipped) this.#actions.random();
     this.#actions.complete();
   }
 }

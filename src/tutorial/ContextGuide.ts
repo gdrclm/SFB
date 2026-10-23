@@ -1,21 +1,18 @@
+import { guideHint, tutorialInput, type TutorialInput } from "./GuideHints";
+import { tutorialVisuals } from "../app/TutorialController";
 import type { GuideTip } from "./StagedOpening";
 export interface HintPoint { x: number; y: number; }
-const tips = {
-  platform: { text: "Свайпай ↔", target: "world", seconds: 6 },
-  coin: { text: "Собирай", target: "world", seconds: 5 },
-  boost: { text: "Ускорься!", target: "#boost-button", seconds: 7 },
-} as const;
-type ActionTip = keyof typeof tips;
-
 /** Never stops play or intercepts input. Real actions dismiss the corresponding arrow. */
 export class ContextGuide {
   readonly #dialog: HTMLDialogElement;
   readonly #skip: () => void;
   readonly #arrow: SVGSVGElement;
-  #tip: ActionTip | null = null;
+  #tip: GuideTip | null = null;
   #remaining = 0;
   #anchor: (() => HintPoint | null) | undefined;
   #startX: number | null = null;
+  #input: TutorialInput = tutorialInput();
+  #paused = false;
   public constructor(dialog: HTMLDialogElement, skip: () => void) {
     this.#dialog = dialog; this.#skip = skip;
     this.#arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -27,26 +24,37 @@ export class ContextGuide {
     document.addEventListener("pointermove", this.#move, true);
     document.addEventListener("pointerup", this.#release, true);
   }
+  public get visible(): boolean { return this.#tip !== null; }
   public show(tip: GuideTip, anchor?: () => HintPoint | null): void {
-    if (!(tip in tips)) return;
-    const action = tip as ActionTip, data = tips[action];
-    this.#tip = action; this.#remaining = data.seconds; this.#anchor = anchor;
+    const data = guideHint(tip, this.#input);
+    if (!data) return;
+    this.#tip = tip; this.#remaining = data.seconds; this.#anchor = anchor;
     this.#dialog.dataset.tip = tip;
     const text = this.#dialog.querySelector("#context-text");
     if (text === null) throw new Error("Missing hint text");
     text.textContent = data.text;
+    const picture = this.#dialog.querySelector("#context-picture");
+    if (picture) picture.innerHTML = tip === "fork" || tip === "super-heavy" ? tutorialVisuals.platform("super-heavy", 25)
+      : tip === "vitality" ? tutorialVisuals.platform("vitality", 7) + tutorialVisuals.heart
+      : tip === "life" ? tutorialVisuals.heart : tip === "coin" ? tutorialVisuals.coin
+      : tip === "annihilation" ? '<span class="tutorial-icon" aria-hidden="true">◉</span>' : "";
     if (!this.#dialog.open) this.#dialog.setAttribute("open", "");
     this.#arrow.style.display = "block"; this.layout();
   }
-  public completed(tip: ActionTip): void { if (this.#tip === tip) this.#close(); }
+  public completed(tip: GuideTip): void { if (this.#tip === tip) this.#close(); }
+  public setPaused(paused: boolean): void {
+    this.#paused = paused; this.#dialog.hidden = paused;
+    this.#arrow.style.display = paused || this.#tip === null ? "none" : "block";
+  }
   public fixedUpdate(realDeltaSeconds: number): void {
-    if (this.#tip === null) return;
+    if (this.#tip === null || this.#paused) return;
     this.#remaining -= realDeltaSeconds;
     if (this.#remaining <= 0) this.#close();
   }
   public layout(): void {
-    if (this.#tip === null) return;
-    const width = window.innerWidth, height = window.innerHeight, data = tips[this.#tip];
+    if (this.#tip === null || this.#paused) return;
+    const width = window.innerWidth, height = window.innerHeight, data = guideHint(this.#tip, this.#input);
+    if (!data) return;
     const target = data.target === "world" ? null : document.querySelector(data.target)?.getBoundingClientRect();
     const point = this.#anchor?.() ?? (target ? { x: target.x + target.width / 2, y: target.y } : { x: width / 2, y: height * .52 });
     const x = Math.max(20, Math.min(width - 20, point.x)), y = Math.max(70, Math.min(height - 30, point.y));
@@ -59,7 +67,18 @@ export class ContextGuide {
     this.#arrow.querySelector(".guide-line")?.setAttribute("d", `M${String(startX)} ${String(box.bottom + 4)} Q${String(startX + 18)} ${String((box.bottom + y) / 2)} ${String(x)} ${String(y - 7)}`);
   }
   readonly #touch = (event: PointerEvent): void => { if (event.target instanceof Element && event.target.closest("#game-canvas")) this.#startX = event.clientX; };
-  readonly #move = (event: PointerEvent): void => { if (this.#startX !== null && Math.abs(event.clientX - this.#startX) >= 12) this.completed("platform"); };
+  readonly #move = (event: PointerEvent): void => {
+    if (!(event.target instanceof Element) || !event.target.closest("#game-canvas")) return;
+    const input = event.pointerType === "mouse" ? "desktop" : "touch";
+    if (input !== this.#input) {
+      this.#input = input;
+      const data = this.#tip === null ? null : guideHint(this.#tip, input);
+      const text = this.#dialog.querySelector("#context-text");
+      if (data && text) text.textContent = data.text;
+    }
+    if (input === "desktop" && this.#startX === null) this.#startX = event.clientX;
+    if (this.#startX !== null && Math.abs(event.clientX - this.#startX) >= 12) this.completed("platform");
+  };
   readonly #release = (): void => { this.#startX = null; };
   readonly #skipAll = (): void => { this.#close(); this.#skip(); };
   #close(): void { this.#tip = null; this.#dialog.removeAttribute("open"); this.#arrow.style.display = "none"; }

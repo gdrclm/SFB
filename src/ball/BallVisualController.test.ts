@@ -293,3 +293,15 @@ it("blends crystal light with the location, preserves the face and reuses its ha
   expect(scene.getMaterialByName("BallCrystalHaloMaterial")).toBeNull();
   scene.dispose(); engine.dispose();
 });
+
+it("spins in place before the tutorial launch and flies beyond the camera without allocating meshes", () => {
+  const { engine, scene, ball, controller } = createFixture();
+  const start = ball.position.clone(), count = scene.meshes.length;
+  controller.renderTutorialFinish(1 / 60, .5, 20, false);
+  expect(ball.position.y).toBe(start.y); expect(Math.abs(ball.rotation.z)).toBeGreaterThan(8);
+  controller.renderTutorialFinish(1 / 60, 1.6, 20, false);
+  expect(ball.position.y).toBeGreaterThan(start.y + 20);
+  expect(ball.scaling.x * ball.scaling.y * ball.scaling.z).toBeCloseTo(1, 8);
+  expect(scene.meshes.length).toBe(count);
+  controller.dispose(); scene.dispose(); engine.dispose();
+});
