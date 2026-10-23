@@ -17,7 +17,8 @@ it("flies horizontally at fixed screen altitudes regardless of fall, pan and zoo
     if (!initial) throw new Error("Expected initial visible flock");
     expect((initial.position.x + 10) / 20).toBeGreaterThan(.03);
     expect((initial.position.x + 10) / 20).toBeLessThan(.97);
-    expect(initial.scaling.x / 20 * engine.getRenderWidth() * 1.28).toBeGreaterThan(30);
+    expect(initial.scaling.x / 20 * engine.getRenderWidth() * 1.28).toBeGreaterThan(18);
+    expect(initial.scaling.x / 20 * engine.getRenderWidth() * 1.28).toBeLessThan(36);
   }
   const initialX = bird.position.x;
   const altitude = (bird.position.y + 20) / 40;
@@ -55,7 +56,7 @@ it("has solid wings and articulated depth motion with delayed tips, banking and 
   }
   expect(Math.max(...beats) - Math.min(...beats)).toBeGreaterThan(1.5);
   expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(.4);
-  expect(Math.max(...banks) - Math.min(...banks)).toBeGreaterThan(.1);
+  expect(Math.max(...banks) - Math.min(...banks)).toBeGreaterThan(.04);
   const frozen = [...shoulder.rotation.asArray(), ...tip.rotation.asArray(), ...bird.position.asArray()];
   birds.update(0, 1);
   expect([...shoulder.rotation.asArray(), ...tip.rotation.asArray(), ...bird.position.asArray()]).toEqual(frozen);
@@ -63,15 +64,32 @@ it("has solid wings and articulated depth motion with delayed tips, banking and 
   birds.dispose(); scene.dispose(); engine.dispose();
 });
 
-it("keeps the reduced-motion pose steady while continuing horizontal flight", () => {
+it("keeps a softer wingbeat in reduced motion while continuing horizontal flight", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const birds = new BackdropBirds(scene, true); birds.update(0, 1);
   const shoulder = scene.getTransformNodeByName("BackdropBirdShoulder-1-1");
   const bird = scene.getTransformNodeByName("BackdropBird-1");
   if (!shoulder || !bird) throw new Error("Expected bird");
-  const pose = shoulder.rotation.asArray(), x = bird.position.x, y = bird.position.y;
-  for (let i = 0; i < 60; i++) birds.update(1 / 60, 1);
-  expect(shoulder.rotation.asArray()).toEqual(pose);
+  const x = bird.position.x, y = bird.position.y, beats: number[] = [];
+  for (let i = 0; i < 180; i++) { birds.update(1 / 60, 1); beats.push(shoulder.rotation.x); }
+  expect(Math.max(...beats) - Math.min(...beats)).toBeGreaterThan(.5);
+  expect(Math.max(...beats) - Math.min(...beats)).toBeLessThan(1.4);
   expect(bird.position.x).toBeGreaterThan(x); expect(bird.position.y).toBe(y);
   birds.dispose(); scene.dispose(); engine.dispose();
+});
+
+
+it("uses simpler, smaller, hazier silhouettes in the distant layer", async () => {
+  const { StandardMaterial } = await import("@babylonjs/core/Materials/standardMaterial");
+  const engine = new NullEngine(), scene = new Scene(engine), birds = new BackdropBirds(scene);
+  birds.update(0, 1);
+  const far = scene.getMaterialByName("BackdropBirdMaterial"), near = scene.getMaterialByName("BackdropBirdMaterial-2");
+  if (!(far instanceof StandardMaterial) || !(near instanceof StandardMaterial)) throw new Error("Expected aerial perspective");
+  expect(far.alpha).toBeLessThan(near.alpha);
+  expect(far.emissiveColor.b).toBeGreaterThan(near.emissiveColor.b);
+  expect(far.disableLighting).toBe(true); expect(near.specularColor.asArray()).toEqual([0, 0, 0]);
+  expect(scene.meshes.some(mesh => /Bird(Head|Beak)/.test(mesh.name))).toBe(false);
+  expect(scene.meshes.length).toBeLessThanOrEqual(18);
+  birds.dispose(); expect(scene.materials.some(m => m.name.startsWith("BackdropBirdMaterial"))).toBe(false);
+  scene.dispose(); engine.dispose();
 });

@@ -8,19 +8,17 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 
 interface WingStation { span: number; leading: number; trailing: number; thickness: number }
 
-/** Closed, cambered wing with an actual underside, rounded shoulder and tapered dark tip. */
+/** Simple closed wing: its silhouette changes through a full stroke without fine feather detail. */
 function createWing(name: string, side: number, scene: Scene, tip = false): Mesh {
   const mesh = new Mesh(name, scene);
   const stations: WingStation[] = tip
     ? [{ span: 0, leading: 0, trailing: -.22, thickness: .025 }, { span: .22, leading: -.03, trailing: -.19, thickness: .018 }, { span: .44, leading: -.15, trailing: -.155, thickness: .004 }]
     : [{ span: 0, leading: .10, trailing: -.14, thickness: .045 }, { span: .17, leading: .04, trailing: -.24, thickness: .04 }, { span: .34, leading: -.05, trailing: -.27, thickness: .025 }];
-  const positions: number[] = [], indices: number[] = [], colors: number[] = [];
+  const positions: number[] = [], indices: number[] = [];
   stations.forEach(({ span, leading, trailing, thickness }, i) => {
     const camber = Math.sin(i / 2 * Math.PI) * .025;
     for (const [x, y] of [[leading, thickness], [trailing, thickness * .3], [leading, -thickness], [trailing, -thickness * .3]]) {
       positions.push(x ?? 0, (y ?? 0) + camber, side * span);
-      const dark = tip ? i / 2 : 0;
-      colors.push(1 - dark * .77, 1 - dark * .69, 1 - dark * .59, 1);
     }
     if (i > 0) {
       const p = (i - 1) * 4, n = i * 4;
@@ -29,10 +27,19 @@ function createWing(name: string, side: number, scene: Scene, tip = false): Mesh
     }
   });
   indices.push(0, 1, 3, 0, 3, 2, 8, 10, 11, 8, 11, 9);
-  const data = new VertexData(); data.positions = positions; data.indices = indices; data.colors = colors;
+  if (side > 0) for (let i = 0; i < indices.length; i += 3) {
+    const n = indices[i + 1] ?? 0; indices[i + 1] = indices[i + 2] ?? 0; indices[i + 2] = n;
+  }
+  const data = new VertexData(); data.positions = positions; data.indices = indices;
   const normals: number[] = []; VertexData.ComputeNormals(positions, indices, normals); data.normals = normals;
   data.applyToMesh(mesh); mesh.isPickable = false;
   return mesh;
+}
+
+function stroke(p: number): number {
+  const down = p < .38, progress = down ? p / .38 : (p - .38) / .62;
+  const ease = .5 - .5 * Math.cos(progress * Math.PI);
+  return down ? -1.02 + ease * 2 : .98 - ease * 2;
 }
 
 interface BirdWing { hinge: TransformNode; tip: Mesh; side: number }
@@ -41,9 +48,8 @@ interface BirdWing { hinge: TransformNode; tip: Mesh; side: number }
 export class BackdropBirds {
   readonly #scene: Scene;
   readonly #root: TransformNode;
-  readonly #material: StandardMaterial;
-  readonly #beakMaterial: StandardMaterial;
-  readonly #birds: { root: TransformNode; wings: BirdWing[] }[] = [];
+  readonly #materials: StandardMaterial[] = [];
+  readonly #birds: { root: TransformNode; wings: BirdWing[]; opacity: number }[] = [];
   readonly #reduced: boolean;
   #elapsed = 0;
 
@@ -52,70 +58,63 @@ export class BackdropBirds {
     this.#root = new TransformNode("BackdropBirds", scene);
     this.#root.parent = scene.activeCamera;
     this.#root.position.z = 4 - (scene.activeCamera?.position.z ?? -10);
-    this.#material = new StandardMaterial("BackdropBirdMaterial", scene);
-    this.#material.diffuseColor = new Color3(.84, .9, .97);
-    this.#material.emissiveColor = new Color3(.10, .14, .20);
-    this.#material.specularColor = new Color3(.18, .22, .28);
-    this.#material.specularPower = 24;
-    this.#material.backFaceCulling = false;
-    this.#material.twoSidedLighting = true;
-    this.#beakMaterial = new StandardMaterial("BackdropBirdBeakMaterial", scene);
-    this.#beakMaterial.diffuseColor = new Color3(1, .65, .12);
-    this.#beakMaterial.emissiveColor = new Color3(.2, .08, .01);
     for (let i = 0; i < 3; i++) {
+      const material = new StandardMaterial(i === 0 ? "BackdropBirdMaterial" : `BackdropBirdMaterial-${String(i)}`, scene);
+      // Aerial perspective: distant silhouettes shift towards the sky and lose contrast.
+      material.disableLighting = true;
+      material.diffuseColor = Color3.Black();
+      material.emissiveColor = Color3.Lerp(new Color3(.12, .25, .35), new Color3(.58, .78, .88), .68 - i * .14);
+      material.specularColor = Color3.Black();
+      this.#materials.push(material);
       const root = new TransformNode(`BackdropBird-${String(i)}`, scene); root.parent = this.#root;
       const body = MeshBuilder.CreateSphere(`BackdropBirdBody-${String(i)}`, { diameter: 1, segments: 12 }, scene);
-      body.parent = root; body.scaling.set(.40, .17, .19); body.material = this.#material; body.isPickable = false;
-      const head = MeshBuilder.CreateSphere(`BackdropBirdHead-${String(i)}`, { diameter: .17, segments: 10 }, scene);
-      head.parent = root; head.position.set(.18, .07, 0); head.material = this.#material; head.isPickable = false;
-      const beak = MeshBuilder.CreateCylinder(`BackdropBirdBeak-${String(i)}`, { diameterTop: 0, diameterBottom: .07, height: .16, tessellation: 6 }, scene);
-      beak.parent = root; beak.position.set(.32, .065, 0); beak.rotation.z = -Math.PI / 2;
-      beak.material = this.#beakMaterial; beak.isPickable = false;
+      body.parent = root; body.scaling.set(.40, .17, .19); body.material = material; body.isPickable = false;
       const tail = MeshBuilder.CreateCylinder(`BackdropBirdTail-${String(i)}`, { diameterTop: 0, diameterBottom: .24, height: .24, tessellation: 3 }, scene);
       tail.parent = root; tail.position.x = -.26; tail.rotation.z = -Math.PI / 2;
-      tail.scaling.z = .3; tail.material = this.#material; tail.isPickable = false;
+      tail.scaling.z = .3; tail.material = material; tail.isPickable = false;
       const wings: BirdWing[] = [];
       for (const side of [-1, 1]) {
         const hinge = new TransformNode(`BackdropBirdShoulder-${String(i)}-${String(side)}`, scene);
         hinge.parent = root; hinge.position.set(-.03, .025, side * .07);
         const wing = createWing(`BackdropBirdWing-${String(i)}-${String(side)}`, side, scene);
-        wing.parent = hinge; wing.material = this.#material;
+        wing.parent = hinge; wing.material = material;
         const tip = createWing(`BackdropBirdTip-${String(i)}-${String(side)}`, side, scene, true);
-        tip.parent = hinge; tip.position.set(-.05, 0, side * .34); tip.material = this.#material;
+        tip.parent = hinge; tip.position.set(-.05, 0, side * .34); tip.material = material;
         wings.push({ hinge, tip, side });
       }
-      this.#birds.push({ root, wings });
+      this.#birds.push({ root, wings, opacity: .55 + i * .075 });
     }
   }
 
   public update(seconds: number, visibility: number): void {
     this.#elapsed += Math.min(.1, Math.max(0, seconds));
     this.#root.setEnabled(visibility > .001);
-    this.#material.alpha = visibility; this.#beakMaterial.alpha = visibility;
     const camera = this.#scene.activeCamera;
     const width = (camera?.orthoRight ?? 14) - (camera?.orthoLeft ?? -14);
     const height = (camera?.orthoTop ?? 21) - (camera?.orthoBottom ?? -21);
     const left = camera?.orthoLeft ?? -14, bottom = camera?.orthoBottom ?? -21;
     const viewportWidth = this.#scene.getEngine().getRenderingCanvas()?.clientWidth || this.#scene.getEngine().getRenderWidth();
     // Keep the entire flock between gameplay and scenery even at extreme camera zoom.
-    this.#root.scaling.z = Math.min(1, .7 / Math.max(.7, width * 40 / Math.max(1, viewportWidth)));
-    this.#birds.forEach(({ root, wings }, i) => {
+    this.#root.scaling.z = Math.min(1, .7 / Math.max(.7, width * 26 / Math.max(1, viewportWidth)));
+    this.#birds.forEach(({ root, wings, opacity }, i) => {
+      const material = this.#materials[i]; if (material) material.alpha = visibility * opacity;
       const t = this.#elapsed;
       const progress = (t / (38 + i * 9) + .14 + i * .27) % 1;
       root.position.set(left + width * (-.08 + progress * 1.16), bottom + height * ([.7, .46, .29][i] ?? .5), 0);
-      root.scaling.setAll(width * (28 + i * 6) / Math.max(1, viewportWidth));
-      root.rotation.set(this.#reduced ? -.18 : -.18 + Math.sin(t * .7 + i) * .24,
-        -.55 + (this.#reduced ? 0 : Math.sin(t * .43 + i * 2) * .16), this.#reduced ? 0 : Math.sin(t * .6 + i) * .045);
-      const phase = t * Math.PI * 2 * (1.35 + i * .12) + i * 1.9;
-      // Short glides interrupt the wingbeat; each bird has its own phase.
-      const glide = this.#reduced ? 0 : .5 + .5 * Math.sin(t * .65 + i * 2);
-      const amplitude = this.#reduced ? 0 : .2 + .8 * Math.min(1, glide * 2);
+      root.scaling.setAll(width * (18 + i * 4) / Math.max(1, viewportWidth));
+      root.rotation.set(-.18 + Math.sin(t * .5 + i) * (this.#reduced ? .025 : .08), -.55, 0);
+      const beat = t * (this.#reduced ? .85 : 1.65 + i * .13) + i * .31;
+      const phase = beat % 1;
+      const glide = .5 + .5 * Math.sin(t * .85 + i * 1.9);
+      const transition = Math.max(0, Math.min(1, (glide - .78) / .2));
+      const amplitude = (1 - transition * transition * (3 - 2 * transition)) * (this.#reduced ? .65 : 1);
+      // Fast downstroke, slower recovery; both wings move together around the body axis.
       for (const { hinge, tip, side } of wings) {
-        hinge.rotation.x = side * (.08 + Math.sin(phase) * .95 * amplitude);
-        tip.rotation.x = side * (.12 + Math.sin(phase - .65) * .32 * amplitude);
+        hinge.rotation.x = side * (.08 + stroke(phase) * amplitude);
+        tip.rotation.x = side * (.12 + stroke((phase + .88) % 1) * .28 * amplitude);
       }
     });
   }
 
-  public dispose(): void { this.#root.dispose(); this.#material.dispose(); this.#beakMaterial.dispose(); }
+  public dispose(): void { this.#root.dispose(); for (const material of this.#materials) material.dispose(); }
 }
