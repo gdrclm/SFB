@@ -41,24 +41,35 @@ export function createEncounterLayout(
   const x = Math.max(-maximumCenter, Math.min(maximumCenter, (route[step % route.length] ?? 0) * mirror));
   const leftSpan = x - width / 2 + edge;
   const rightSpan = edge - x - width / 2;
-  const leftCount = count === 1 ? (x > 0 ? 1 : 0)
+  const broadGroup = (step + variant) % 4 !== 1;
+  const leftCount = count === 4 && broadGroup && Math.min(leftSpan, rightSpan) >= 1.6 ? 2
+    : count === 1 ? (x > 0 ? 1 : 0)
     : Math.max(1, Math.min(count - 1, Math.round(count * leftSpan / (leftSpan + rightSpan))));
   const islands: { x: number; width: number; depthFraction: number }[] = [];
   for (const [side, start, span, amount] of [[-1, -edge, leftSpan, leftCount], [1, x + width / 2, rightSpan, count - leftCount]]) {
     if (side === undefined || start === undefined || span === undefined || amount === undefined || amount <= 0) continue;
-    const cell = span / amount;
+    // Give one side a long ledge regularly, while its neighbours remain short.
+    // A viewport change still never affects the width of a generated island.
+    const broadSide = x === 0 ? (variant % 2 === 0 ? -1 : 1) : x > 0 ? -1 : 1;
+    const broadIndex = side === broadSide && span >= 3.2 && broadGroup
+      ? (step + variant) % amount : -1;
+    const totalWeight = amount + (broadIndex >= 0 ? 2.6 : 0);
+    let offset = 0;
     for (let i = 0; i < amount; i++) {
+      const broad = i === broadIndex;
+      const cell = span * (broad ? 3.6 : 1) / totalWeight;
       const index = islands.length;
       const variation = .5 + .5 * Math.sin(step * 2.13 + variant * 1.7 + index * 3.71);
-      const islandWidth = Math.min(2.25, Math.max(.8, cell * (.52 + .23 * variation)), cell - .12);
+      const islandWidth = Math.min(broad ? 5.4 : 2.25, Math.max(.8, cell * (broad ? .9 : .52 + .23 * variation)), cell - .12);
       // Alternating edge baffles close cell seams, without filling the corridor.
       const edgeBaffle = side < 0 ? i === 0 && (step + variant) % 3 !== 1
         : i === amount - 1 && (step + variant) % 3 !== 0;
-      const center = edgeBaffle ? side * (halfWidth - .12 - islandWidth / 2) : start + cell * (i + .5);
+      const center = edgeBaffle ? side * (halfWidth - .12 - islandWidth / 2) : start + offset + cell / 2;
       islands.push({
         x: center, width: islandWidth,
         depthFraction: ((index + step + variant) % 3) * .45,
       });
+      offset += cell;
     }
   }
   return { passage: { x, width }, rhythm: rhythm[step % rhythm.length] ?? 1, islands };

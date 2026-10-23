@@ -303,7 +303,7 @@ it.each(["trap", "rich-lane", "break-run", "death-tunnel"] as const)(
       expect(active.length).toBeGreaterThan(24);
       for (const p of active) {
         expect(p.encounterTheme).toBe(theme);
-        expect(p.width).toBeLessThan(4.5);
+        expect(p.width).toBeLessThanOrEqual(5.4);
         if (Math.abs(p.mesh.position.x) <= 5) continue;
         const plans = listener.mock.calls.filter(([, additional]) => !additional).map(([plan]) => plan);
         // A bounded pool can expose part of a side group before its completion
@@ -364,5 +364,5 @@ it("keeps six logical island groups ahead despite staggering and pool reuse", ()
   }
   expect(listener.mock.calls.filter(([, additional]) => !additional).length).toBeGreaterThan(12);
   expect(platforms.some(platform => platform.isActive && platform.mesh.position.y < ball.position.y)).toBe(true);
-  expect(platforms.filter(platform => platform.isActive).every(platform => platform.width <= 2.25)).toBe(true);
+  expect(platforms.filter(platform => platform.isActive).every(platform => platform.width <= 5.4)).toBe(true);
 });

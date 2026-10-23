@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { platformSpriteSlices, platformSpriteRect } from "./PlatformSpriteLayout";
 import { gameConfig } from "../config/gameConfig";
 import { PlatformRoutePlanner, type PlannedPlatform, type PlatformEncounterTheme } from "./PlatformRoutePlanner";
 
@@ -27,7 +28,7 @@ describe("flight encounters", () => {
         for (const member of members(plan)) {
           const width = member.widthScale * 7.5;
           expect(width).toBeGreaterThan(.6);
-          expect(width).toBeLessThanOrEqual(2.25);
+          expect(width).toBeLessThanOrEqual(5.4);
           expect(Math.abs(member.x) + width / 2).toBeLessThanOrEqual(5);
           expect(Math.abs(member.x - passage.x) - width / 2).toBeGreaterThanOrEqual(passage.width / 2 - .00001);
           expect(member.yOffset ?? 0).toBeLessThanOrEqual(0);
@@ -122,5 +123,18 @@ it("breaks permanent straight bypasses, including the seams of wide-screen cells
     }
     expect(plans.some(plan => members(plan).some(member => Math.abs(member.x - 5) <= member.widthScale * 7.5 / 2 + .5))).toBe(true);
     expect(plans.some(plan => members(plan).some(member => Math.abs(member.x + 5) <= member.widthScale * 7.5 / 2 + .5))).toBe(true);
+  }
+});
+
+
+it.each(themes)("mixes broad joined ledges and short islands regularly in %s", theme => {
+  for (let variant = 0; variant < 4; variant++) {
+    const planner = plannerFor(theme, variant);
+    const plans = Array.from({ length: 12 }, () => planner.planNext(30, 0, difficulty));
+    const widths = plans.flatMap(plan => members(plan).map(member => member.widthScale * 7.5));
+    expect(widths.filter(width => width >= 3.5).length).toBeGreaterThanOrEqual(2);
+    expect(widths.some(width => platformSpriteSlices(width + .6, platformSpriteRect(0, 0)).length >= 5)).toBe(true);
+    expect(widths.filter(width => width < 2).length).toBeGreaterThanOrEqual(6);
+    expect(plans.slice(0, 6).some(plan => members(plan).some(member => member.widthScale * 7.5 >= 3.5))).toBe(true);
   }
 });
