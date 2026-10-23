@@ -138,6 +138,7 @@ export class BallDynamicsFX {
 
   public trigger(event: BallExpression): void {
     this.#root.position.copyFrom(this.#ball.position);
+    this.#root.rotation.copyFrom(this.#ball.rotation);
     if (event === "break" || event === "hurt") {
       this.#impactAge = 0;
       this.#flash.visibility = this.#reduced ? .25 : .8;
@@ -174,7 +175,7 @@ export class BallDynamicsFX {
     const r = this.#radius, t = this.#time;
     const low = getRenderQuality(this.#ball.getScene().getEngine()) === "low";
     this.#root.position.copyFrom(this.#ball.position);
-    this.#root.rotation.z = this.#ball.rotation.z * .8;
+    this.#root.rotation.copyFrom(this.#ball.rotation);
     const smooth = 1 - Math.exp(-16 * delta);
     const burst = motion.anticipating ? .15 : motion.boost;
     const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);

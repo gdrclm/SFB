@@ -1,6 +1,7 @@
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { expect, it } from "vitest";
 import { BallDynamicsFX } from "./BallDynamicsFX";
 
@@ -108,5 +109,27 @@ it("keeps the comet anchored to the ball as its tips lengthen with camera zoom",
   expect(comet.position.y / comet.scaling.y).toBeCloseTo(2);
   expect(scene.getTransformNodeByName("BallFXRoot")?.position.asArray()).toEqual([3, -100, 0]);
   expect(comet.visibility).toBe(1);
+  fx.dispose(); scene.dispose(); engine.dispose();
+});
+
+
+it("turns the comet with the character in both directions without inheriting squash", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, .5);
+  ball.position.set(2, -10, 0);
+  ball.scaling.set(.8, 1.6, .8);
+  const comet = scene.getMeshByName("BallFXComet");
+  const root = scene.getTransformNodeByName("BallFXRoot");
+  if (!comet || !root) throw new Error("Expected character FX");
+  for (const turn of [-.35, .35, 0]) {
+    ball.rotation.set(0, -turn, turn);
+    fx.update(1 / 60, { speed: 40, look: -turn, boost: 0, anticipating: false, slow: false, danger: false });
+    const ballUp = Vector3.TransformNormal(Vector3.Up(), ball.computeWorldMatrix(true)).normalize();
+    const jetUp = Vector3.TransformNormal(Vector3.Up(), comet.computeWorldMatrix(true)).normalize();
+    expect(Vector3.Dot(ballUp, jetUp)).toBeCloseTo(1, 6);
+    expect(root.rotation.asArray()).toEqual(ball.rotation.asArray());
+    expect(root.position.asArray()).toEqual(ball.position.asArray());
+    expect(root.scaling.asArray()).toEqual([1, 1, 1]);
+  }
   fx.dispose(); scene.dispose(); engine.dispose();
 });
