@@ -178,7 +178,7 @@ export class BallDynamicsFX {
     const smooth = 1 - Math.exp(-16 * delta);
     const burst = motion.anticipating ? .15 : motion.boost;
     const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);
-    this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || this.#reduced);
+    this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || motion.speed <= 0, this.#reduced);
     const arcTarget = motion.slow ? .8 : Math.max(Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;
     const windTarget = motion.slow ? 0 : Math.max(speedPower > 0 ? .18 + speedPower * .82 : 0, burst);

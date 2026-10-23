@@ -20,11 +20,13 @@ it("adds more, longer and thicker side wind as speed doubles", () => {
   fx.dispose(); scene.dispose(); engine.dispose();
 });
 
-it("shows the comet on acceleration and suppresses it during SLOW and reduced motion", () => {
+it("keeps the attached comet visible at normal speed and reduced motion, but suppresses it during SLOW and bounce", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, 1);
   const motion = { speed: 10, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
   fx.update(1 / 60, motion);
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(1);
+  fx.update(1 / 60, { ...motion, speed: 0 });
   expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(0);
   fx.update(1 / 60, { ...motion, speed: 20 });
   expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(1);
@@ -33,7 +35,8 @@ it("shows the comet on acceleration and suppresses it during SLOW and reduced mo
   fx.dispose();
   const reduced = new BallDynamicsFX(ball, 1, true);
   reduced.update(1 / 60, { ...motion, speed: 80, boost: 1 });
-  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(0);
+  expect(scene.getMeshByName("BallFXComet")?.visibility).toBe(1);
+  expect(scene.getMeshByName("BallFXComet")?.scaling.y).toBeLessThanOrEqual(1.5);
   reduced.dispose(); scene.dispose(); engine.dispose();
 });
 
@@ -82,5 +85,28 @@ it("keeps the slow orbit active while suppressing high-speed streaks", () => {
   expect(scene.getMeshByName("BallFXArc-0")?.visibility).toBeGreaterThan(.5);
   expect(scene.getMeshByName("BallFXWind-0")?.visibility).toBe(0);
   expect(scene.getMeshByName("BallFXOrbitDot-0")?.visibility).toBeGreaterThan(0);
+  fx.dispose(); scene.dispose(); engine.dispose();
+});
+
+it("keeps the comet anchored to the ball as its tips lengthen with camera zoom", async () => {
+  const { FreeCamera } = await import("@babylonjs/core/Cameras/freeCamera");
+  const { Vector3 } = await import("@babylonjs/core/Maths/math.vector");
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const camera = new FreeCamera("camera", new Vector3(0, 0, -10), scene);
+  scene.activeCamera = camera;
+  const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, .5);
+  const motion = { speed: 20, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
+  camera.orthoTop = 10; camera.orthoBottom = -10;
+  fx.update(.016, motion);
+  const comet = scene.getMeshByName("BallFXComet");
+  if (!comet) throw new Error("Expected attached comet");
+  const initialLength = comet.scaling.y;
+  camera.orthoTop = 120; camera.orthoBottom = -120;
+  ball.position.set(3, -100, 0);
+  fx.update(.016, { ...motion, speed: 160 });
+  expect(comet.scaling.y).toBeGreaterThan(initialLength);
+  expect(comet.position.y / comet.scaling.y).toBeCloseTo(2);
+  expect(scene.getTransformNodeByName("BallFXRoot")?.position.asArray()).toEqual([3, -100, 0]);
+  expect(comet.visibility).toBe(1);
   fx.dispose(); scene.dispose(); engine.dispose();
 });
