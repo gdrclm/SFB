@@ -1,3 +1,4 @@
+import { createBallLimbs } from "./BallLimbs";
 import { ToonBallMaterial } from "./ToonBallMaterial";
 import { createBallFace } from "./BallFace";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -72,6 +73,7 @@ export function createBallMesh(scene: Scene, config: GameConfig): Mesh {
   button.scaling.set(1, .18, 1); button.material = blueMaterial; button.isPickable = false;
 
   createBallFace(ball, config.ball.radius, darkMaterial, scene);
+  createBallLimbs(ball, config.ball.radius, blueMaterial);
 
   return ball;
 }

@@ -1,3 +1,4 @@
+import { BackdropBirds } from "./BackdropBirds";
 import { preloadCrystalBackdrop } from "./createIllustratedBackdrop";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -10,6 +11,7 @@ import { createPhaseOneBackdrop, type WorldAppearance } from "./createPhaseOneBa
 
 export class DepthBackdrop {
   readonly #scene: Scene;
+  #birds: BackdropBirds | null;
   readonly #rig: TransformNode;
   readonly #appearance: WorldAppearance;
   readonly #locations = new DepthLocations();
@@ -29,6 +31,8 @@ export class DepthBackdrop {
     this.#previousCameraY = rig.position.y;
     this.#location = this.#currentLocation = this.#locations.observe(startDepth);
     this.#current = createPhaseOneBackdrop(scene, rig, appearance, this.#location);
+    this.#birds = this.#location === "sky" ? new BackdropBirds(scene, this.#reduced) : null;
+    this.#birds?.update(0, 1);
     preloadCrystalBackdrop();
   }
   public get crystalBlend(): number {
@@ -67,6 +71,10 @@ export class DepthBackdrop {
       this.#currentLocation = this.#location;
       this.#current.position.y = 0; this.#blend = 0;
     }
+    const skyVisibility = this.#next === null ? (this.#currentLocation === "sky" ? 1 : 0)
+      : (this.#currentLocation === "sky" ? 1 - this.#blend : 0) + (this.#location === "sky" ? this.#blend : 0);
+    this.#birds?.update(realSeconds, skyVisibility);
+    if (skyVisibility === 0 && this.#next === null) { this.#birds?.dispose(); this.#birds = null; }
   }
   #isReady(mesh: Mesh): boolean {
     return (mesh.material as StandardMaterial).diffuseTexture?.isReady() !== false
@@ -80,5 +88,5 @@ export class DepthBackdrop {
     mesh.position.y = offset;
     this.#scenery(mesh)?.update(this.#travel, this.#steeringX, this.#rig.position.y + offset, height, this.#reduced);
   }
-  public dispose(): void { this.#next?.dispose(false, true); this.#current.dispose(false, true); }
+  public dispose(): void { this.#birds?.dispose(); this.#next?.dispose(false, true); this.#current.dispose(false, true); }
 }

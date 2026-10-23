@@ -68,6 +68,9 @@ export class BallDynamicsFX {
   readonly #drops: Mesh[] = [];
   readonly #stars: Particle[] = [];
   readonly #shards: Particle[] = [];
+  readonly #embers: Particle[] = [];
+  #emberClock = 0;
+  #emberCursor = 0;
   readonly #flash: Mesh;
   readonly #reduced: boolean;
   readonly #baselineSpeed: number;
@@ -132,6 +135,11 @@ export class BallDynamicsFX {
       shard.material = crystal; shard.isPickable = false; shard.visibility = 0;
       this.#shards.push({ mesh: shard, offset: Vector3.Zero(), velocity: Vector3.Zero(), age: 1, life: .5, follow: false, scale: 1 });
     }
+    for (let i = 0; i < 24; i++) {
+      const mesh = star(`BallFXEmber-${String(i)}`, scene);
+      mesh.material = i % 3 === 0 ? white : cyan; mesh.visibility = 0;
+      this.#embers.push({ mesh, offset: Vector3.Zero(), velocity: Vector3.Zero(), age: 1, life: .6, follow: false, scale: radius * .1 });
+    }
     this.#flash = star("BallFXImpactFlash", scene); this.#flash.parent = this.#root;
     this.#flash.material = white; this.#flash.position.y = -radius * .9; this.#flash.visibility = 0;
   }
@@ -180,6 +188,7 @@ export class BallDynamicsFX {
     const burst = motion.anticipating ? .15 : motion.boost;
     const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);
     this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || motion.speed <= 0, this.#reduced);
+    this.#updateEmbers(delta, speedPower, motion.speed > 0 && !motion.slow, low);
     const arcTarget = motion.slow ? .8 : Math.max(Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;
     const windTarget = motion.slow ? 0 : Math.max(speedPower > 0 ? .18 + speedPower * .82 : 0, burst);
@@ -231,10 +240,37 @@ export class BallDynamicsFX {
     }
   }
 
+  #updateEmbers(seconds: number, power: number, emitting: boolean, low: boolean): void {
+    const r = this.#radius;
+    const rate = this.#reduced ? 3 : low ? 9 + power * 7 : 12 + power * 20;
+    this.#emberClock = emitting ? this.#emberClock + Math.min(.1, seconds) * rate : 0;
+    const world = this.#root.computeWorldMatrix(true);
+    while (this.#emberClock >= 1) {
+      this.#emberClock--;
+      const seed = this.#emberCursor++;
+      const p = this.#embers[seed % this.#embers.length]; if (!p) continue;
+      const side = seed % 2 ? -1 : 1, scatter = (seed * .618034) % 1;
+      p.age = 0; p.life = .45 + scatter * .35;
+      p.offset.set(side * r * (.35 + scatter * .6), r * (.8 + scatter * (1.6 + power * 3)), r * .12);
+      Vector3.TransformCoordinatesToRef(p.offset, world, p.offset);
+      p.velocity.set(side * r * (.12 + scatter * .25), r * .6, 0);
+      p.scale = r * (.12 + power * .12) * (.7 + scatter * .6);
+    }
+    for (const p of this.#embers) {
+      if (p.age >= p.life) { p.mesh.visibility = 0; continue; }
+      p.age += seconds;
+      const fade = Math.max(0, 1 - p.age / p.life);
+      p.offset.addInPlaceFromFloats(p.velocity.x * seconds, p.velocity.y * seconds, 0);
+      p.mesh.position.copyFrom(p.offset);
+      p.mesh.scaling.setAll(p.scale * (.4 + fade * .6));
+      p.mesh.visibility = fade ** 1.5 * (this.#reduced ? .3 : .85);
+    }
+  }
+
   public dispose(): void {
     this.#comet.dispose();
     this.#root.dispose();
-    for (const pool of [this.#stars, this.#shards]) for (const p of pool) p.mesh.dispose();
+    for (const pool of [this.#stars, this.#shards, this.#embers]) for (const p of pool) p.mesh.dispose();
     for (const material of this.#materials) material.dispose();
   }
 }

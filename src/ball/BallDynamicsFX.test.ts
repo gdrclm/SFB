@@ -133,3 +133,25 @@ it("turns the comet with the character in both directions without inheriting squ
   }
   fx.dispose(); scene.dispose(); engine.dispose();
 });
+
+it("leaves fading comet particles in world space with bounded resources", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, .5);
+  const motion = { speed: 30, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
+  const resources = [scene.meshes.length, scene.materials.length];
+  fx.update(.1, motion);
+  const ember = scene.meshes.find(mesh => mesh.name.startsWith("BallFXEmber-") && mesh.visibility > 0);
+  if (!ember) throw new Error("Expected residual particle");
+  const y = ember.position.y;
+  ball.position.y = -10;
+  fx.update(.1, { ...motion, speed: 0 });
+  expect(ember.position.y).toBeGreaterThan(y);
+  expect(ember.position.y).toBeGreaterThan(-1);
+  expect(ember.visibility).toBeGreaterThan(0);
+  fx.update(1, { ...motion, speed: 0 });
+  expect(scene.meshes.filter(mesh => mesh.name.startsWith("BallFXEmber-")).every(mesh => mesh.visibility === 0)).toBe(true);
+  for (let i = 0; i < 180; i++) fx.update(1 / 60, motion);
+  expect([scene.meshes.length, scene.materials.length]).toEqual(resources);
+  fx.dispose(); expect(scene.meshes).toHaveLength(1);
+  scene.dispose(); engine.dispose();
+});

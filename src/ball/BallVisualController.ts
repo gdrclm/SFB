@@ -1,3 +1,4 @@
+import { getBallLimbs } from "./BallLimbs";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -126,6 +127,7 @@ export class BallVisualController implements FixedSimulationSystem {
 
   public react(event: BallExpression): void {
     this.#fx.trigger(event);
+    if (event === "break" || event === "hurt" || event === "defeat") getBallLimbs(this.#ball)?.tuck(event === "defeat");
     // Contact still deforms the body while a higher-priority facial pose is held.
     if (event === "hurt" || event === "break") {
       this.#impactElapsed = 0; this.#impactKind = event;
@@ -141,6 +143,7 @@ export class BallVisualController implements FixedSimulationSystem {
   public renderDefeat(seconds: number, age: number): void {
     const dt = Math.max(0, Math.min(.1, seconds));
     getBallFace(this.#ball)?.update("defeat", dt, 0);
+    getBallLimbs(this.#ball)?.update(dt, 0);
     const pulse = Math.exp(-age * 3) * Math.sin(age * 16);
     const amount = 1 - Math.exp(-12 * dt);
     const sy = .9 + pulse * .12;
@@ -160,6 +163,7 @@ export class BallVisualController implements FixedSimulationSystem {
   }
 
   public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
+    getBallLimbs(this.#ball)?.update(realDeltaSeconds, this.#motion.fallSpeed);
     this.#expression.update(realDeltaSeconds, this.#motion.fallSpeed >= 45, this.#danger, this.#motion.fallSpeed >= 16);
     const faceExpression = this.#slowActive && ["neutral", "focus", "fall"].includes(this.#expression.current) ? "slow" : this.#expression.current;
     (this.#ball.metadata as { expression: BallExpression }).expression = faceExpression;
