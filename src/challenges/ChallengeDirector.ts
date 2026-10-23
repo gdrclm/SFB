@@ -3,6 +3,7 @@ import type { PlatformEncounterTheme } from "../platform/PlatformRoutePlanner";
 export const CHALLENGES = [
   { theme: "rich-lane", title: "Золотая развилка", text: "Больше монет за прочной платформой. Сверьте скорость и цену BOOST перед входом." },
   { theme: "trap", title: "Зигзаг", text: "Проход меняет сторону. Планируйте следующий поворот заранее." },
+  { theme: "bait", title: "Приманка", text: "Монеты зовут на другую сторону. Под последней группой — ловушка." },
   { theme: "death-tunnel", title: "Узкий коридор", text: "Держитесь внутри коридора: по краям сверхпрочные платформы." },
   { theme: "chaos", title: "Мозаика", text: "Несколько типов платформ в одном ряду. Сравнивайте прочность со скоростью." },
   { theme: "break-run", title: "Каскад", text: "Пробивайте цепочку платформ и наращивайте комбо." },

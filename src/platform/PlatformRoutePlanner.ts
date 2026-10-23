@@ -1,3 +1,5 @@
+import { speedAfterBreak } from "../collision/BreakResistance";
+import { createEncounterLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
   PlatformKind,
@@ -7,6 +9,7 @@ import type { PhaseOneDifficulty } from "../progression/PhaseOneController";
 import type { PlatformRouteKind } from "./PlatformController";
 
 export type PlatformEncounterTheme =
+  | "bait"
   | "break-run"
   | "chaos"
   | "trap"
@@ -20,6 +23,9 @@ export interface PlannedCoinTrail {
   readonly count: number;
   readonly spacing: number;
   readonly sway?: number;
+  readonly endX?: number;
+  readonly curve?: number;
+  readonly heightAbovePlatform?: number;
 }
 
 export interface PlannedPlatform {
@@ -35,12 +41,15 @@ export interface PlannedPlatform {
   readonly kind: PlatformKind;
   readonly encounterTheme: PlatformEncounterTheme;
   readonly encounterRowIndex: number;
+  readonly passage?: Readonly<{ x: number; width: number }>;
+  readonly bandDepth?: number;
   readonly coinTrail?: PlannedCoinTrail;
   readonly choices?: readonly PlannedPlatformChoice[];
 }
 
 export interface PlannedPlatformChoice {
   readonly x: number;
+  readonly yOffset?: number;
   readonly strength: number;
   readonly strengthLevel: PlatformStrengthLevel;
   readonly routeKind: PlatformRouteKind;
@@ -101,6 +110,9 @@ export class PlatformRoutePlanner {
   readonly #config: GameConfig;
   readonly #random: () => number;
   #nextY: number;
+  #previousPassageX: number | null = null;
+  #previousBandDepth = 0;
+  #zoneCycle = 0;
   #lastTheme: PlatformEncounterTheme | null = null;
   #activeTheme: PlatformEncounterTheme | null = null;
   #scheduledTheme: PlatformEncounterTheme | null = null;
@@ -159,40 +171,41 @@ export class PlatformRoutePlanner {
     const blueprint = this.#getPendingBlueprint();
     const generation = this.#config.platformGeneration;
     const worldSpeed = ballSpeed * this.#config.ball.movementScale;
-    const spacing = Math.max(
-      generation.minimumSpacing,
-      worldSpeed * difficulty.reactionWindowSeconds,
-    );
-    this.#nextY -= spacing;
+    const layout = createEncounterLayout(theme, themeRowIndex + this.#zoneCycle * 3,
+      this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
+      this.#config.ball.radius, generation.multiRowSideMargin);
+    const turnDistance = this.#previousPassageX === null ? 0 : Math.abs(layout.passage.x - this.#previousPassageX);
+    // Leave time to steer out of the preceding band's lowest island.
+    const travelTime = .24 + turnDistance / this.#config.ball.horizontalMaxSpeed;
+    const clearance = this.#config.ball.radius * 2 + Math.max(...this.#config.platforms.map(platform => platform.size.height)) + .15;
+    const clearSpacing = Math.max(generation.minimumSpacing,
+      clearance + worldSpeed * Math.max(travelTime, difficulty.reactionWindowSeconds * .55 * layout.rhythm));
+    this.#nextY -= clearSpacing + this.#previousBandDepth;
+    const bandDepth = Math.min(3, Math.max(1.15, worldSpeed * .20));
+    this.#previousBandDepth = bandDepth;
+    this.#previousPassageX = layout.passage.x;
 
-    const predictedSpeedAtCollision = Math.max(
-      0,
-      ballSpeed -
-        mandatoryPlatformsAhead * this.#config.successfulHit.speedLoss,
-    );
-    const reactionWindowSeconds =
-      worldSpeed <= Number.EPSILON
-        ? Number.POSITIVE_INFINITY
-        : spacing / worldSpeed;
-    const row = this.#planRowMembers(
-      blueprint,
-      predictedSpeedAtCollision,
-      difficulty,
-    );
+    let predictedSpeedAtCollision = ballSpeed;
+    for (let i = 0; i < mandatoryPlatformsAhead; i++) {
+      predictedSpeedAtCollision = speedAfterBreak(predictedSpeedAtCollision,
+        Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction);
+    }
+    const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
+    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty);
     const primary = row.find((member) => member.isPrimaryLane);
     if (primary === undefined) {
       throw new Error("A generated encounter row must contain a primary lane.");
     }
 
-    const coinTrail =
-      blueprint.coinTrail === undefined
-        ? undefined
-        : {
-            x: row[blueprint.coinLaneIndex ?? blueprint.primaryLaneIndex]?.x ?? primary.x,
-            count: blueprint.coinTrail.count,
-            spacing: blueprint.coinTrail.spacing,
-            ...(blueprint.coinTrail.sway === undefined ? {} : { sway: blueprint.coinTrail.sway }),
-          };
+    const coinTarget = row[blueprint.coinLaneIndex ?? blueprint.primaryLaneIndex] ?? primary;
+    const coinTrail = blueprint.coinTrail === undefined ? undefined : {
+      x: layout.passage.x,
+      endX: coinTarget.x,
+      curve: (this.#encounterVariant % 2 === 0 ? 1 : -1) * .35,
+      heightAbovePlatform: clearSpacing * .8 + (coinTarget.yOffset ?? 0),
+      count: blueprint.coinTrail.count,
+      spacing: Math.min(blueprint.coinTrail.spacing, clearSpacing * .6 / Math.max(1, blueprint.coinTrail.count - 1)),
+    };
     const plan: PlannedPlatform = {
       x: primary.x,
       y: this.#nextY,
@@ -200,7 +213,9 @@ export class PlatformRoutePlanner {
       strengthLevel: primary.strengthLevel,
       routeKind: primary.routeKind,
       widthScale: primary.widthScale,
-      safeLaneX: primary.x,
+      safeLaneX: layout.passage.x,
+      passage: layout.passage,
+      bandDepth,
       reactionWindowSeconds,
       stageNumber: difficulty.stageNumber,
       kind: primary.kind,
@@ -211,6 +226,7 @@ export class PlatformRoutePlanner {
         .filter((member) => member !== primary)
         .map((member) => ({
           x: member.x,
+          yOffset: member.yOffset ?? 0,
           strength: member.strength,
           strengthLevel: member.strengthLevel,
           routeKind: member.routeKind,
@@ -225,19 +241,21 @@ export class PlatformRoutePlanner {
 
   #planRowMembers(
     blueprint: RowBlueprint,
+    layout: EncounterLayout,
+    bandDepth: number,
     predictedSpeedAtCollision: number,
     difficulty: PhaseOneDifficulty,
   ): readonly PlannedRowMember[] {
-    const positions = this.#getLanePositions(blueprint.lanes.length);
-    const widthScale = this.#getLaneWidthScale(blueprint.lanes.length);
-    return positions.map((x, laneIndex) => {
+    const templateWidth = this.#config.platforms[0]?.size.width ?? 7.5;
+    return layout.islands.map((island, laneIndex) => {
       const member = blueprint.lanes[laneIndex];
       if (member === undefined) {
         throw new Error("An encounter row blueprint is incomplete.");
       }
       return {
-        x,
-        widthScale,
+        x: island.x,
+        yOffset: laneIndex === blueprint.primaryLaneIndex ? 0 : -island.depthFraction * bandDepth,
+        widthScale: island.width / templateWidth,
         kind: member.kind,
         isPrimaryLane: laneIndex === blueprint.primaryLaneIndex,
         ...this.#getMemberProperties(
@@ -269,6 +287,7 @@ export class PlatformRoutePlanner {
         throw new Error("At least one encounter theme must be available.");
       }
       this.#activeTheme = selected;
+      this.#zoneCycle += 1;
       this.#encounterVariant = this.#randomIndex(4);
     }
     return this.#activeTheme;
@@ -279,9 +298,13 @@ export class PlatformRoutePlanner {
     rowIndex: number,
   ): RowBlueprint {
     switch (theme) {
-      case "break-run":
-        return { lanes: [SAFE_STANDARD, SAFE_STANDARD, SAFE_STANDARD], primaryLaneIndex: rowIndex % 3,
-          coinLaneIndex: rowIndex % 3, coinTrail: { count: 3, spacing: .65 } };
+      case "bait":
+        return { lanes: [SAFE_STANDARD], primaryLaneIndex: 0 };
+      case "break-run": {
+        const count = rowIndex % 4 === 3 ? 1 : rowIndex % 2 === 0 ? 3 : 2;
+        return { lanes: Array.from({ length: count }, () => SAFE_STANDARD), primaryLaneIndex: rowIndex % count,
+          coinLaneIndex: rowIndex % count, coinTrail: { count: 3, spacing: .65 } };
+      }
       case "chaos":
         return this.#createChaosBlueprint();
       case "trap":
@@ -357,22 +380,14 @@ export class PlatformRoutePlanner {
   }
 
   #createRichLaneBlueprint(rowIndex: number): RowBlueprint {
-    const primaryLaneIndex = this.#encounterVariant % 2;
-    const lanes: RowMember[] = [BOOST_STANDARD, BOOST_STANDARD];
+    const count = rowIndex % 2 === 0 ? 2 : 3;
+    const primaryLaneIndex = (this.#encounterVariant + rowIndex) % count;
+    const lanes = Array.from({ length: count }, () => BOOST_STANDARD);
     lanes[primaryLaneIndex] = SAFE_STANDARD;
-    const coinTrail =
-      rowIndex === 0
-        ? {
-            count: this.#config.coins.richTrailCount,
-            spacing: this.#config.coins.richTrailSpacing,
-            sway: 0.45,
-          }
-        : undefined;
+    if (count === 3) lanes[(primaryLaneIndex + 2) % count] = DEADLY_BLACK;
     return {
-      lanes,
-      primaryLaneIndex,
-      coinLaneIndex: (primaryLaneIndex + 1) % 2,
-      ...(coinTrail === undefined ? {} : { coinTrail }),
+      lanes, primaryLaneIndex, coinLaneIndex: (primaryLaneIndex + 1) % count,
+      coinTrail: { count: rowIndex === 0 ? this.#config.coins.richTrailCount : 5, spacing: this.#config.coins.richTrailSpacing },
     };
   }
 
@@ -485,38 +500,6 @@ export class PlatformRoutePlanner {
       ? Math.max(0, Math.min(1 - Number.EPSILON, value))
       : 0;
     return Math.floor(normalized * length);
-  }
-
-  #getLanePositions(count: number): readonly number[] {
-    const generation = this.#config.platformGeneration;
-    const usableWidth =
-      this.#config.playSpace.halfWidth * 2 -
-      generation.multiRowSideMargin * 2;
-    const platformWidth =
-      (usableWidth - generation.multiRowGap * (count - 1)) / count;
-    const firstCenter =
-      -this.#config.playSpace.halfWidth +
-      generation.multiRowSideMargin +
-      platformWidth / 2;
-    return Array.from(
-      { length: count },
-      (_, index) =>
-        firstCenter + index * (platformWidth + generation.multiRowGap),
-    );
-  }
-
-  #getLaneWidthScale(count: number): number {
-    const template = this.#config.platforms[0];
-    if (template === undefined || template.size.width <= 0) {
-      throw new Error("A positive-width platform template is required.");
-    }
-    const generation = this.#config.platformGeneration;
-    const usableWidth =
-      this.#config.playSpace.halfWidth * 2 -
-      generation.multiRowSideMargin * 2;
-    const width =
-      (usableWidth - generation.multiRowGap * (count - 1)) / count;
-    return width / template.size.width;
   }
 
   #getStrengthLevel(strength: number): PlatformStrengthLevel {

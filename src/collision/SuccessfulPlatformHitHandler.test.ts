@@ -29,7 +29,7 @@ function createFeedback(): {
 }
 
 describe("SuccessfulPlatformHitHandler", () => {
-  it("releases the platform and subtracts exactly one unit of speed", () => {
+  it("releases the platform and spends momentum in proportion to resistance", () => {
     const ball = { fallSpeed: 10 };
     const platform = { isActive: true, strength: 7 } as PlatformController;
     const beginRelease = vi.fn(() => true);
@@ -45,7 +45,7 @@ describe("SuccessfulPlatformHitHandler", () => {
 
     expect(handler.handle(collision)).toBe(true);
 
-    expect(ball.fallSpeed).toBe(9);
+    expect(ball.fallSpeed).toBeCloseTo(8.824);
     expect(beginRelease).toHaveBeenCalledWith(platform);
     expect(completeRelease).toHaveBeenCalledWith(platform);
     expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7);
@@ -88,4 +88,20 @@ it("plasma breaks an otherwise impossible platform without impact braking or spe
   expect(handler.handle({ platform, ballSpeed: 180, assessment: "insufficient" }, true)).toBe(true);
   expect(pool.completeRelease).toHaveBeenCalledWith(platform);
   expect(ball.fallSpeed).toBe(180); expect(ball.startBreakImpact).not.toHaveBeenCalled();
+});
+
+
+it("barely slows a fast ball on a weak panel, but a near-limit hit costs real momentum", () => {
+  const remaining = (strength: number): number => {
+    const ball = { fallSpeed: 50, startBreakImpact: vi.fn() };
+    const platform = { isActive: true, strength, mesh: { position: { y: 0 } }, size: { height: .3 } } as PlatformController;
+    const pool = { beginRelease: () => true, completeRelease: () => true };
+    const handler = new SuccessfulPlatformHitHandler(ball, pool, createFeedback().feedback, gameConfig);
+    handler.handle({ platform, ballSpeed: 50, assessment: "sufficient" });
+    expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50);
+    return ball.fallSpeed;
+  };
+  expect(remaining(10)).toBeCloseTo(49.52);
+  expect(remaining(49)).toBeCloseTo(38.4752);
+  expect(remaining(10) - remaining(49)).toBeGreaterThan(10);
 });

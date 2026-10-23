@@ -1,248 +1,126 @@
 import { describe, expect, it } from "vitest";
 import { gameConfig } from "../config/gameConfig";
-import type { PhaseOneDifficulty } from "../progression/PhaseOneController";
-import {
-  PlatformRoutePlanner,
-  type PlannedPlatform,
-  type PlannedPlatformChoice,
-  type PlatformEncounterTheme,
-} from "./PlatformRoutePlanner";
+import { PlatformRoutePlanner, type PlannedPlatform, type PlatformEncounterTheme } from "./PlatformRoutePlanner";
 
-const THEME_RANDOM: Readonly<Record<PlatformEncounterTheme, number>> = {
-  chaos: 0.01,
-  "break-run": 0.01,
-  trap: 0.2,
-  deception: 0.4,
-  "rich-lane": 0.55,
-  "danger-lane": 0.72,
-  "death-tunnel": 0.9,
-};
-
-function difficulty(
-  platformStrength: number,
-  reactionWindowSeconds = 1.5,
-  stageNumber = 1,
-): PhaseOneDifficulty {
-  return { stageNumber, platformStrength, reactionWindowSeconds };
-}
-
-function scriptedRandom(values: readonly number[], fallback = 0): () => number {
-  let index = 0;
-  return () => values[index++] ?? fallback;
-}
-
-function plannerFor(
-  theme: PlatformEncounterTheme,
-  variant = 0,
-): PlatformRoutePlanner {
-  const planner = new PlatformRoutePlanner(
-    0,
-    gameConfig,
-    scriptedRandom([THEME_RANDOM[theme], variant / 4]),
-  );
-  if (theme === "break-run") planner.queueEncounter(theme);
+const themes: readonly PlatformEncounterTheme[] = ["chaos", "trap", "deception", "rich-lane", "danger-lane", "death-tunnel", "break-run"];
+const difficulty = { stageNumber: 6, platformStrength: 12, reactionWindowSeconds: .8 };
+function plannerFor(theme: PlatformEncounterTheme, variant = 0): PlatformRoutePlanner {
+  const planner = new PlatformRoutePlanner(0, gameConfig, () => variant / 4);
+  planner.queueEncounter(theme);
   return planner;
 }
-
-function rowMembers(
-  plan: PlannedPlatform,
-): readonly (PlannedPlatformChoice & { readonly isPrimary?: boolean })[] {
-  return [
-    {
-      x: plan.x,
-      strength: plan.strength,
-      strengthLevel: plan.strengthLevel,
-      routeKind: plan.routeKind,
-      widthScale: plan.widthScale,
-      kind: plan.kind,
-      isTrap: plan.routeKind !== "mandatory",
-      isPrimary: true,
-    },
-    ...(plan.choices ?? []),
-  ];
+function members(plan: PlannedPlatform) {
+  return [{ x: plan.x, yOffset: 0, widthScale: plan.widthScale, strength: plan.strength, kind: plan.kind, routeKind: plan.routeKind }, ...(plan.choices ?? [])];
 }
 
-describe("PlatformRoutePlanner encounters", () => {
-  it("preserves the configured reaction window at different speeds", () => {
-    const slowPlanner = plannerFor("trap");
-    const fastPlanner = plannerFor("trap");
-
-    const slowPlan = slowPlanner.planNext(10, 0, difficulty(9));
-    const fastPlan = fastPlanner.planNext(20, 0, difficulty(9));
-
-    expect(slowPlan.reactionWindowSeconds).toBeCloseTo(1.5, 10);
-    expect(fastPlan.reactionWindowSeconds).toBeCloseTo(1.5, 10);
-    expect(Math.abs(fastPlan.y)).toBeCloseTo(Math.abs(slowPlan.y) * 2, 10);
-  });
-
-  it("keeps a selected theme for a full zone and never repeats it immediately", () => {
-    const planner = new PlatformRoutePlanner(
-      0,
-      gameConfig,
-      scriptedRandom([THEME_RANDOM["rich-lane"], 0, 0.99, 0]),
-    );
-    const plans = Array.from({ length: 6 }, () =>
-      planner.planNext(20, 0, difficulty(10)),
-    );
-
-    expect(plans.slice(0, 5).map((plan) => plan.encounterTheme)).toEqual(
-      Array.from({ length: 5 }, () => "rich-lane"),
-    );
-    expect(plans[5]?.encounterTheme).toBe("death-tunnel");
-  });
-
-  it("builds a trap by placing a deadly platform behind vitality", () => {
-    const planner = plannerFor("trap");
-    const bait = planner.planNext(20, 0, difficulty(10));
-    const followUp = planner.planNext(20, 0, difficulty(10));
-    const deathBehindBait = rowMembers(followUp).find(
-      (member) => member.kind === "super-heavy" && member.x === bait.x,
-    );
-
-    expect(bait.kind).toBe("vitality");
-    expect(deathBehindBait).toBeDefined();
-    expect(followUp.x).not.toBe(bait.x);
-  });
-
-  it("turns two attractive deception lanes into deadly lanes on the next row", () => {
-    const planner = plannerFor("deception");
-    const bait = planner.planNext(20, 0, difficulty(10));
-    const followUp = planner.planNext(20, 0, difficulty(10));
-    const attractiveLaneXs = rowMembers(bait)
-      .filter((member) => member.kind === "vitality" || member.kind === "time-slow")
-      .map((member) => member.x);
-    const deadlyXs = rowMembers(followUp)
-      .filter((member) => member.kind === "super-heavy")
-      .map((member) => member.x);
-
-    expect(attractiveLaneXs).toHaveLength(2);
-    expect(deadlyXs.sort((left, right) => left - right)).toEqual(
-      attractiveLaneXs.sort((left, right) => left - right),
-    );
-    expect(followUp.routeKind).toBe("boost");
-  });
-
-  it("offers a safe route without the rich trail and a BOOST route with ten coins", () => {
-    const planner = plannerFor("rich-lane");
-    const plan = planner.planNext(20, 0, difficulty(10));
-
-    expect(plan.coinTrail).toEqual({
-      x: plan.choices?.[0]?.x,
-      count: 10,
-      sway: 0.45,
-      spacing: gameConfig.coins.richTrailSpacing,
-    });
-    expect(plan.encounterTheme).toBe("rich-lane");
-    expect(plan.routeKind).toBe("mandatory");
-    expect(plan.strength).toBeLessThanOrEqual(20);
-    expect(plan.coinTrail?.x).not.toBe(plan.x);
-    const risky = plan.choices?.[0];
-    expect(risky?.routeKind).toBe("boost");
-    expect(risky?.strength).toBeGreaterThan(22);
-    expect(risky?.strength).toBeLessThanOrEqual(30);
-  });
-
-  it("creates a danger lane with three deadly choices", () => {
-    const planner = plannerFor("danger-lane");
-    const plan = planner.planNext(20, 0, difficulty(10));
-    const members = rowMembers(plan);
-
-    expect(members).toHaveLength(4);
-    expect(members.filter((member) => member.kind === "super-heavy")).toHaveLength(3);
-    expect(plan.strength).toBeLessThanOrEqual(20);
-  });
-
-  it("creates a five-row tunnel with deadly outer walls", () => {
-    const planner = plannerFor("death-tunnel");
-    const plans = Array.from({ length: 5 }, () =>
-      planner.planNext(20, 0, difficulty(10)),
-    );
-
-    for (const plan of plans) {
-      const members = [...rowMembers(plan)].sort((left, right) => left.x - right.x);
-      expect(members[0]?.kind).toBe("super-heavy");
-      expect(members.at(-1)?.kind).toBe("super-heavy");
-      expect(Math.abs(plan.x)).toBeLessThan(
-        gameConfig.platformGeneration.choiceLaneOffsetX,
-      );
-    }
-  });
-
-  it("keeps encounter rows inside the play space without bypass-sized gaps", () => {
-    const template = gameConfig.platforms[0];
-    if (template === undefined) {
-      throw new Error("A platform template is required.");
-    }
-
-    for (const theme of Object.keys(THEME_RANDOM) as PlatformEncounterTheme[]) {
-      const planner = plannerFor(theme);
-      const members = [...rowMembers(
-        planner.planNext(20, 0, difficulty(10)),
-      )].sort((left, right) => left.x - right.x);
-      const width = template.size.width * (members[0]?.widthScale ?? 0);
-      expect((members[0]?.x ?? 0) - width / 2).toBeGreaterThanOrEqual(
-        -gameConfig.playSpace.halfWidth,
-      );
-      expect((members.at(-1)?.x ?? 0) + width / 2).toBeLessThanOrEqual(
-        gameConfig.playSpace.halfWidth,
-      );
-      for (let index = 1; index < members.length; index += 1) {
-        const gap =
-          (members[index]?.x ?? 0) -
-          (members[index - 1]?.x ?? 0) -
-          width;
-        expect(gap).toBeLessThan(gameConfig.ball.radius * 2);
+describe("flight encounters", () => {
+  it.each(themes)("leaves a clear, reachable winding passage through %s at every speed", theme => {
+    for (const speed of [10, 20, 50, 160, 600]) for (let variant = 0; variant < 4; variant++) {
+      const planner = plannerFor(theme, variant);
+      let previous: PlannedPlatform | null = null;
+      for (let i = 0; i < 18; i++) {
+        const plan = planner.planNext(speed, i % 6, difficulty);
+        const passage = plan.passage;
+        if (!passage) throw new Error("Expected an open flight passage.");
+        expect(passage.width).toBeGreaterThan(gameConfig.ball.radius * 2 + .5);
+        let occupiedWidth = 0;
+        for (const member of members(plan)) {
+          const width = member.widthScale * 7.5;
+          expect(width).toBeGreaterThan(.6);
+          expect(width).toBeLessThanOrEqual(2.25);
+          expect(Math.abs(member.x) + width / 2).toBeLessThanOrEqual(5);
+          expect(Math.abs(member.x - passage.x) - width / 2).toBeGreaterThanOrEqual(passage.width / 2 - .00001);
+          expect(member.yOffset ?? 0).toBeLessThanOrEqual(0);
+          expect(member.yOffset ?? 0).toBeGreaterThanOrEqual(-(plan.bandDepth ?? 0));
+          occupiedWidth += width;
+        }
+        expect(occupiedWidth).toBeLessThan(6.5);
+        if (previous?.passage) {
+          const clearance = gameConfig.ball.radius * 2 + .6 + .15;
+          const travelSeconds = (previous.y - (previous.bandDepth ?? 0) - plan.y - clearance) / (speed * gameConfig.ball.movementScale);
+          expect(travelSeconds + .00001).toBeGreaterThanOrEqual(.24 + Math.abs(passage.x - previous.passage.x) / gameConfig.ball.horizontalMaxSpeed);
+        }
+        previous = plan;
       }
     }
   });
 
-  it("keeps boost routes within one Boost and black routes above one Boost", () => {
-    const planner = plannerFor("danger-lane");
-    const first = planner.planNext(20, 0, difficulty(12));
-    const second = planner.planNext(20, 0, difficulty(12));
-    const members = [...rowMembers(first), ...rowMembers(second)];
-    const boost = members.find((member) => member.routeKind === "boost");
-    const deadly = members.find((member) => member.kind === "super-heavy");
+  it.each(themes)("varies the rhythm, widths and elevations in %s instead of filling equal rows", theme => {
+    const planner = plannerFor(theme);
+    const plans = Array.from({ length: 12 }, () => planner.planNext(50, 0, difficulty));
+    const spacings = plans.slice(1).map((plan, index) => Number(((plans[index]?.y ?? 0) - plan.y).toFixed(3)));
+    expect(new Set(spacings).size).toBeGreaterThan(3);
+    expect(new Set(plans.map(plan => plan.passage?.x)).size).toBeGreaterThan(3);
+    expect(new Set(plans.flatMap(plan => members(plan).map(member => member.widthScale.toFixed(3)))).size).toBeGreaterThan(4);
+    expect(plans.some(plan => (plan.choices ?? []).some(choice => (choice.yOffset ?? 0) < -.2))).toBe(true);
+  });
 
-    expect(boost?.strength).toBeGreaterThan(20);
-    expect(boost?.strength).toBeLessThanOrEqual(
-      20 * gameConfig.boost.speedMultiplier,
-    );
-    expect(deadly?.strength).toBeGreaterThan(
-      20 * gameConfig.boost.speedMultiplier,
-    );
+  it("gives zones different geometry, not just different materials", () => {
+    const signatures = themes.map(theme => {
+      const planner = plannerFor(theme);
+      return Array.from({ length: 4 }, () => {
+        const plan = planner.planNext(30, 0, difficulty);
+        return [plan.y, plan.passage?.x, members(plan).map(member => [member.x, member.yOffset, member.widthScale])];
+      });
+    });
+    expect(new Set(signatures.map(signature => JSON.stringify(signature))).size).toBe(themes.length);
+  });
+
+  it("leads rich rewards along a bent route towards an optional BOOST island", () => {
+    const planner = plannerFor("rich-lane");
+    const plan = planner.planNext(50, 0, difficulty);
+    const trail = plan.coinTrail;
+    expect(trail?.x).toBe(plan.passage?.x);
+    expect(trail?.endX).not.toBe(trail?.x);
+    expect(trail?.curve).not.toBe(0);
+    expect(trail?.count).toBe(10);
+    const target = members(plan).find(member => member.x === trail?.endX);
+    expect(target?.routeKind).toBe("boost");
+    expect(target?.strength).toBeGreaterThan(50);
+    expect(target?.strength).toBeLessThanOrEqual(75);
+    expect(planner.planNext(50, 0, difficulty).coinTrail?.count).toBe(5);
+  });
+
+  it("offers a combo cascade of weak islands with breathing spaces and a free bypass", () => {
+    const planner = plannerFor("break-run");
+    const plans = Array.from({ length: 4 }, () => planner.planNext(50, 3, difficulty));
+    expect(new Set(plans.map(plan => members(plan).length)).size).toBe(3);
+    for (const plan of plans) for (const member of members(plan)) {
+      expect(member.strength).toBeLessThanOrEqual(50);
+      expect(member.kind).toBe("standard");
+      expect(plan.passage?.width).toBeGreaterThan(2);
+    }
+  });
+
+  it("keeps trap and tunnel danger above one BOOST, while leaving a physical opening", () => {
+    for (const theme of ["trap", "deception", "death-tunnel"] as const) {
+      const planner = plannerFor(theme);
+      const plans = Array.from({ length: 4 }, () => planner.planNext(50, 0, difficulty));
+      expect(plans.some(plan => members(plan).some(member => member.strength > 75))).toBe(true);
+      expect(plans.every(plan => plan.passage !== undefined)).toBe(true);
+    }
+  });
+
+  it("switches pending layouts before allocation and keeps the scheduled theme", () => {
+    const planner = plannerFor("death-tunnel");
+    expect(planner.getNextRowPlatformCount()).toBe(4);
+    planner.queueEncounter("rich-lane");
+    expect(planner.getNextRowPlatformCount()).toBe(2);
+    for (let i = 0; i < 14; i++) expect(planner.planNext(20, 0, difficulty).encounterTheme).toBe("rich-lane");
+    planner.queueEncounter("trap");
+    expect(planner.planNext(20, 0, difficulty).encounterRowIndex).toBe(0);
   });
 });
 
-it("switches an upcoming encounter before allocating its row, with fresh lane counts", () => {
-  const planner = plannerFor("death-tunnel");
-  expect(planner.getNextRowPlatformCount()).toBe(4);
-  planner.queueEncounter("rich-lane");
-  expect(planner.getNextRowPlatformCount()).toBe(2);
-  const plan = planner.planNext(20, 0, difficulty(10));
-  expect(plan.encounterTheme).toBe("rich-lane");
-  expect(plan.encounterRowIndex).toBe(0);
-  expect(plan.coinTrail).toBeDefined();
-});
 
-it("keeps a scheduled zone recognizable until the next timed event", () => {
-  const planner = plannerFor("chaos");
-  planner.queueEncounter("rich-lane");
-  for (let row = 0; row < 14; row++) expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("rich-lane");
-  planner.queueEncounter("trap");
-  expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("trap");
-});
-
-
-it("keeps original lane sizes and a playable destruction cascade", () => {
-  const planner = plannerFor("break-run");
-  const plan = planner.planNext(40, 0, difficulty(15));
-  const members = rowMembers(plan);
-  expect(members.some(member => member.x < 0)).toBe(true);
-  expect(members.some(member => member.x > 0)).toBe(true);
-  for (const member of members) {
-    expect(Math.abs(member.x) + member.widthScale * 7.5 / 2).toBeLessThanOrEqual(5);
-    expect(member.strength).toBeLessThanOrEqual(40); expect(member.kind).toBe("standard");
+it("breaks permanent straight bypasses, including the seams of wide-screen cells", () => {
+  for (const theme of ["trap", "death-tunnel", "danger-lane"] as const) {
+    const planner = plannerFor(theme);
+    const plans = Array.from({ length: 18 }, () => planner.planNext(30, 0, difficulty));
+    for (let x = -4.5; x <= 4.5; x += .25) {
+      expect(plans.some(plan => members(plan).some(member => Math.abs(member.x - x) <= member.widthScale * 7.5 / 2 + .5))).toBe(true);
+    }
+    expect(plans.some(plan => members(plan).some(member => Math.abs(member.x - 5) <= member.widthScale * 7.5 / 2 + .5))).toBe(true);
+    expect(plans.some(plan => members(plan).some(member => Math.abs(member.x + 5) <= member.widthScale * 7.5 / 2 + .5))).toBe(true);
   }
-  expect(plan.encounterTheme).toBe("break-run"); expect(plan.coinTrail?.count).toBe(3);
 });

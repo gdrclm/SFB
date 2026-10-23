@@ -21,7 +21,8 @@ export type PlatformGeneratedListener = (plan: PlannedPlatform, additionalCell: 
 
 interface RowLayout {
   readonly y: number;
-  readonly members: readonly Readonly<{ x: number; properties: PlatformActivationProperties }>[];
+  lowestY: number;
+  readonly members: readonly Readonly<{ x: number; yOffset: number; properties: PlatformActivationProperties }>[];
   readonly generated: Set<string>;
   readonly completedCells: Set<number>;
   readonly plan: PlannedPlatform | undefined;
@@ -35,6 +36,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
   #planner: PlatformRoutePlanner;
   #halfWidth: number;
   readonly #rows = new Map<string, RowLayout>();
+  readonly #bands = new WeakMap<PlatformController, { key: string; activationId: number }>();
   readonly #random: () => number;
   public enabled = true;
   public allowSlowPlatforms = true;
@@ -97,7 +99,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       this.#ball.position.y +
       this.#config.platformGeneration.recycleAboveBallDistance;
     for (const [key, row] of this.#rows) {
-      if (row.y > recycleY) this.#rows.delete(key);
+      if (row.lowestY > recycleY) this.#rows.delete(key);
     }
     for (const platform of this.#pool.platforms) {
       if (platform.isActive && platform.mesh.position.y > recycleY) {
@@ -145,7 +147,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
         const choicePlatform = this.#pool.acquire(
           new Vector3(
             choice.x,
-            plan.y,
+            plan.y + (choice.yOffset ?? 0),
             this.#config.playSpace.depth,
           ),
           {
@@ -195,6 +197,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
     // must not return when the camera zooms or its pool slot is reused.
     const members = platforms.map(platform => ({
       x: platform.mesh.position.x,
+      yOffset: platform.mesh.position.y - first.mesh.position.y,
       properties: {
         encounterTheme: platform.encounterTheme,
         strength: platform.strength,
@@ -205,8 +208,10 @@ export class PlatformGenerator implements FixedSimulationSystem {
         isTrap: platform.routeKind !== "mandatory",
       },
     }));
-    this.#rows.set(first.mesh.position.y.toFixed(4), {
-      y: first.mesh.position.y, members, plan,
+    const key = first.mesh.position.y.toFixed(4);
+    for (const platform of platforms) this.#bands.set(platform, { key, activationId: platform.activationId });
+    this.#rows.set(key, {
+      y: first.mesh.position.y, lowestY: Math.min(...platforms.map(platform => platform.mesh.position.y)), members, plan,
       generated: new Set(members.map((_, index) => `0:${String(index)}`)),
       completedCells: new Set([0]),
     });
@@ -215,37 +220,45 @@ export class PlatformGenerator implements FixedSimulationSystem {
   #fillSideSpace(): void {
     const base = this.#config.playSpace.halfWidth;
     if (this.#halfWidth <= base + .01) return;
-    // Repeat fixed-size zone layouts instead of spreading 2–4 platforms over
-    // the entire viewport. Populate nearer rows first within the pool budget.
+    // Continue the encounter with mirrored, vertically shifted island groups.
+    // Nearer bands get the bounded pool budget first; widths stay fixed.
     const cellWidth = base * 2;
     const cellCount = Math.ceil((this.#halfWidth - base) / cellWidth);
     const rows = [...this.#rows.values()]
-      .filter(row => row.y < this.#ball.position.y)
+      .filter(row => row.lowestY < this.#ball.position.y)
       .sort((a, b) => b.y - a.y);
     for (const row of rows) {
       for (let distance = 1; distance <= cellCount; distance++) {
         for (const side of [-1, 1]) {
           const cell = distance * side;
           const offset = cell * cellWidth;
+          const mirror = Math.abs(cell) % 2 === 0 ? 1 : -1;
+          const phase = ((cell * 2 + (row.plan?.encounterRowIndex ?? 0)) % 5 + 5) % 5;
+          const depthShift = -.11 * phase * (row.plan?.bandDepth ?? 1);
           for (const [index, member] of row.members.entries()) {
             const key = `${String(cell)}:${String(index)}`;
             if (row.generated.has(key)) continue;
             if (this.#pool.availableCount < 1) return;
             const platform = this.#pool.acquire(
-              new Vector3(member.x + offset, row.y, this.#config.playSpace.depth),
+              new Vector3(member.x * mirror + offset, row.y + member.yOffset + depthShift, this.#config.playSpace.depth),
               member.properties,
             );
             if (!platform) return;
             row.generated.add(key);
+            this.#bands.set(platform, { key: row.y.toFixed(4), activationId: platform.activationId });
+            row.lowestY = Math.min(row.lowestY, platform.mesh.position.y);
           }
           if (row.plan && !row.completedCells.has(cell)) {
             row.completedCells.add(cell);
             const plan = row.plan;
             for (const listener of this.#generatedListeners) {
               listener({
-                ...plan, x: plan.x + offset, safeLaneX: plan.safeLaneX + offset,
-                ...(plan.choices ? { choices: plan.choices.map(choice => ({ ...choice, x: choice.x + offset })) } : {}),
-                ...(plan.coinTrail ? { coinTrail: { ...plan.coinTrail, x: plan.coinTrail.x + offset } } : {}),
+                ...plan, x: plan.x * mirror + offset, y: plan.y + depthShift, safeLaneX: plan.safeLaneX * mirror + offset,
+                ...(plan.passage ? { passage: { ...plan.passage, x: plan.passage.x * mirror + offset } } : {}),
+                ...(plan.choices ? { choices: plan.choices.map(choice => ({ ...choice, x: choice.x * mirror + offset })) } : {}),
+                ...(plan.coinTrail ? { coinTrail: { ...plan.coinTrail, x: plan.coinTrail.x * mirror + offset,
+                  ...(plan.coinTrail.endX === undefined ? {} : { endX: plan.coinTrail.endX * mirror + offset }),
+                  ...(plan.coinTrail.curve === undefined ? {} : { curve: plan.coinTrail.curve * mirror }) } } : {}),
               }, true);
             }
           }
@@ -263,7 +276,10 @@ export class PlatformGenerator implements FixedSimulationSystem {
 
   #countRows(platforms: readonly PlatformController[]): number {
     return new Set(
-      platforms.map((platform) => platform.mesh.position.y.toFixed(4)),
+      platforms.map((platform) => {
+        const band = this.#bands.get(platform);
+        return band?.activationId === platform.activationId ? band.key : platform.mesh.position.y.toFixed(4);
+      }),
     ).size;
   }
 }

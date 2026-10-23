@@ -247,3 +247,18 @@ it("uses the expanded camera width for immediate steering and clamps safely on s
   ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
   ball.setPlayfieldHalfWidth(NaN); expect(ball.horizontalLimit).toBe(5.5);
 });
+
+
+it("carries momentum through a weak panel and holds against a near-limit panel", () => {
+  const distance = (resistance: number): number => {
+    const transform = createTransform();
+    const ball = new BallController(transform, createInput(), gameConfig);
+    ball.fallSpeed = 50;
+    ball.startBreakImpact(0, resistance);
+    if (resistance < .3) expect(ball.verticalVelocity).toBeLessThan(-10);
+    simulate(ball, .05, 120);
+    return -ball.position.y;
+  };
+  expect(distance(.2)).toBeGreaterThan(.65);
+  expect(distance(.98)).toBeLessThan(.01);
+});

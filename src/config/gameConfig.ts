@@ -111,7 +111,7 @@ export interface GameConfig {
     readonly forcedSlowDurationRealSeconds: number;
   };
   readonly successfulHit: {
-    readonly speedLoss: number;
+    readonly maximumSpeedLossFraction: number;
     readonly platformEffectSeconds: number;
     readonly fragmentSpread: number;
     readonly fragmentDrop: number;
@@ -317,7 +317,7 @@ export const gameConfig: GameConfig = Object.freeze({
     forcedSlowDurationRealSeconds: 3,
   }),
   successfulHit: Object.freeze({
-    speedLoss: 1,
+    maximumSpeedLossFraction: .24,
     platformEffectSeconds: 0.48,
     fragmentSpread: 2.4,
     fragmentDrop: 2,

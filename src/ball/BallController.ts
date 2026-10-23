@@ -1,3 +1,4 @@
+import { breakImpactProfile } from "../collision/BreakResistance";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { HorizontalInput } from "../input/HorizontalInput";
@@ -41,6 +42,8 @@ export class BallController implements FixedSimulationSystem {
   readonly #impactRetention: number;
   #breakElapsed: number | null = null;
   #breakHold = .04;
+  #breakRecovery = .12;
+  #breakTransmission = 0;
   #verticalVelocity = 0;
 
   public get verticalVelocity(): number { return this.#verticalVelocity; }
@@ -53,8 +56,11 @@ export class BallController implements FixedSimulationSystem {
     this.#transform.position.y = contactY;
     this.#copyCurrentPositionToPrevious();
     this.#breakElapsed = 0;
-    this.#breakHold = .025 + .035 * Math.max(0, Math.min(1, resistance));
-    this.#verticalVelocity = 0;
+    const impact = breakImpactProfile(resistance);
+    this.#breakHold = impact.hold;
+    this.#breakRecovery = impact.recovery;
+    this.#breakTransmission = impact.minimumTransmission;
+    this.#verticalVelocity = -this.#fallSpeed * this.#config.movementScale * this.#breakTransmission;
   }
 
   public constructor(
@@ -165,8 +171,8 @@ export class BallController implements FixedSimulationSystem {
     let transmission = 1;
     if (this.#breakElapsed !== null) {
       this.#breakElapsed += fixedDeltaSeconds;
-      const t = Math.max(0, (this.#breakElapsed - this.#breakHold) / .12);
-      transmission = t >= 1 ? 1 : t * t * (3 - 2 * t);
+      const t = Math.max(0, (this.#breakElapsed - this.#breakHold) / this.#breakRecovery);
+      transmission = t >= 1 ? 1 : this.#breakTransmission + (1 - this.#breakTransmission) * t * t * (3 - 2 * t);
       if (t >= 1) this.#breakElapsed = null;
     }
     this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission;

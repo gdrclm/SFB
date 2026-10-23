@@ -1,3 +1,5 @@
+import { BaitZoneController } from "../challenges/BaitZoneController";
+import { breakImpactProfile, breakResistance } from "../collision/BreakResistance";
 import { EncounterFeedback } from "../feedback/EncounterFeedback";
 import { acquireGameScene } from "../scene/GameSceneSession";
 import { LifeFeedback } from "../feedback/LifeFeedback";
@@ -143,6 +145,7 @@ export class GameApplication {
   #backdrop: DepthBackdrop | null = null;
   #elapsedPlatformSeconds = 0;
   #opening: StagedOpening | null = null;
+  #baitZone: BaitZoneController | null = null;
   #guideStrengths: number[] = [];
   #contextGuide: ContextGuide | null = null;
   readonly #reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -470,6 +473,9 @@ export class GameApplication {
     this.#renderPhaseStage();
     this.#fixedStep.register(this.#phaseOneController);
     this.#platformPool = createStaticPlatformPool(this.#scene, this.#config);
+    // Templates supply pooled art/physics, not three identical opening walls.
+    for (const platform of this.#platformPool.platforms) if (platform.isActive) this.#platformPool.release(platform);
+    for (const coin of coins) coin.deactivate();
     await waitForPlatformSprites(this.#scene);
     if (this.#hasBeenDisposed()) return;
     this.#platformLabels = new PlatformLabels(this.#scene, this.#canvas,
@@ -489,7 +495,15 @@ export class GameApplication {
     this.#platformGenerator.allowSlowPlatforms = false;
     this.#platformGenerator.queueEncounter("chaos");
     this.#fixedStep.register(this.#platformGenerator);
+    this.#baitZone = new BaitZoneController(this.#ballController, coins, this.#platformPool, this.#config, () => {
+      const camera = mainScene.camera;
+      return { halfWidth: Math.max(this.#config.playSpace.halfWidth, ((camera.orthoRight ?? 5) - (camera.orthoLeft ?? -5)) / 2),
+        spaceBelow: Math.max(7, (this.#ballController?.position.y ?? 0) - (camera.globalPosition.y + (camera.orthoBottom ?? -7))) };
+    }, () => { this.#platformGenerator?.queueEncounter("chaos"); });
+    this.#fixedStep.register(this.#baitZone);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
+      this.#baitZone?.cancel();
+      if (challenge.theme === "bait") this.#baitZone?.arm();
       this.#platformGenerator?.queueEncounter(challenge.theme);
       const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
       notice.dataset.theme = challenge.theme;
@@ -677,6 +691,7 @@ export class GameApplication {
     this.#successfulHitEffects?.dispose();
     this.#unsuccessfulHitEffects?.dispose();
     this.#ballVisualController?.dispose();
+    this.#baitZone?.cancel(); this.#baitZone = null;
     this.#platformPool?.dispose();
     this.#boostButton?.dispose();
     this.#slowModeButton?.dispose(); this.#slowModeButton = null;
@@ -841,7 +856,7 @@ export class GameApplication {
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
       this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
-      if (!powered && !this.#reducedMotion) this.#hitStopRemaining = collision.platform.kind === "super-heavy" ? .04 : .02;
+      if (!powered && !this.#reducedMotion) this.#hitStopRemaining = breakImpactProfile(breakResistance(collision.ballSpeed, collision.platform.strength)).hitStop;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       // Invulnerable hits destroy scenery but do not masquerade as skill hits or recharge BOOST.

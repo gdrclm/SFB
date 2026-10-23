@@ -134,3 +134,15 @@ it("adds side-cell reward trails without advancing the main row coin interval", 
   expect(coins.filter(coin => coin.isActive)).toHaveLength(4);
   expect(coins[3]?.mesh.position.x).toBe(2);
 });
+
+
+it("places a reward arc above the target island rather than another vertical coin stripe", () => {
+  const coins = Array.from({ length: 5 }, () => createCoin());
+  const generator = new CoinGenerator({ position: { x: 0, y: 0, z: 0 } }, coins, gameConfig);
+  generator.handlePlatformGenerated(plan({ coinTrail: { x: -2, endX: 2, curve: 1, count: 5, spacing: .6, heightAbovePlatform: 4 } }));
+  expect(coins[0]?.mesh.position.x).toBe(-2);
+  expect(coins[2]?.mesh.position.x).toBeCloseTo(1);
+  expect(coins[4]?.mesh.position.x).toBeCloseTo(2);
+  expect(coins[0]?.mesh.position.y).toBe(-6);
+  expect(coins[4]?.mesh.position.y).toBeCloseTo(-8.4);
+});

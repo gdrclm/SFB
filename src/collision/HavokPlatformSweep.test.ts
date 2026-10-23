@@ -1,3 +1,4 @@
+import { PlatformRoutePlanner } from "../platform/PlatformRoutePlanner";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -191,4 +192,34 @@ describe("HavokPlatformSweep", () => {
     scene.dispose();
     engine.dispose();
   });
+});
+
+
+it("lets a ball-sized Havok sweep fly through generated openings and hit the actual islands", async () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const wasm = await readFile(new URL("../../node_modules/@babylonjs/havok/lib/esm/HavokPhysics.wasm", import.meta.url));
+  const plugin = new HavokPlugin(true, await HavokPhysics({ wasmBinary: Uint8Array.from(wasm).buffer }));
+  scene.enablePhysics(Vector3.Zero(), plugin);
+  const planner = new PlatformRoutePlanner(0, gameConfig, () => .2);
+  const template = gameConfig.platforms[0];
+  if (!template) throw new Error("Expected a platform template.");
+  for (const theme of ["trap", "rich-lane", "death-tunnel"] as const) {
+    planner.queueEncounter(theme);
+    const plan = planner.planNext(50, 0, { stageNumber: 3, platformStrength: 12, reactionWindowSeconds: .8 });
+    const members = [{ ...plan, yOffset: 0 }, ...(plan.choices ?? [])];
+    const platforms = members.map((member, index) => {
+      const platform = new PlatformController(scene, gameConfig, { ...template, id: `opening-${String(index)}` }, false);
+      platform.reactivate(new Vector3(member.x, plan.y + (member.yOffset ?? 0), 0), {
+        strength: member.strength, strengthLevel: member.strengthLevel, widthScale: member.widthScale,
+      });
+      return platform;
+    });
+    const sweep = new HavokPlatformSweep(scene, plugin, gameConfig.ball.radius, platforms);
+    const passageX = plan.passage?.x ?? 0;
+    expect(sweep.cast({ x: passageX, y: plan.y + 2, z: 0 }, { x: passageX, y: plan.y - (plan.bandDepth ?? 0) - 2, z: 0 })).toBeNull();
+    expect(sweep.cast({ x: plan.x, y: plan.y + 2, z: 0 }, { x: plan.x, y: plan.y - 2, z: 0 })).not.toBeNull();
+    sweep.dispose(); platforms.forEach(platform => { platform.dispose(); });
+  }
+  scene.dispose(); engine.dispose();
 });

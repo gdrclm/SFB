@@ -5,7 +5,7 @@ export type EncounterMood = "neutral" | "trap" | "danger" | "reward" | "shatter"
 export function encounterMood(theme: PlatformEncounterTheme): EncounterMood {
   if (theme === "rich-lane") return "reward";
   if (theme === "break-run") return "shatter";
-  if (theme === "trap" || theme === "deception") return "trap";
+  if (theme === "trap" || theme === "deception" || theme === "bait") return "trap";
   if (theme === "danger-lane" || theme === "death-tunnel") return "danger";
   return "neutral";
 }

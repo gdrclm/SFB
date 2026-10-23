@@ -33,6 +33,7 @@ export class CoinGenerator implements FixedSimulationSystem {
   }
 
   public handlePlatformGenerated(plan: PlannedPlatform, additionalCell = false): void {
+    if (plan.encounterTheme === "bait") return;
     if (!additionalCell) this.#generatedRowCount += 1;
     if (plan.coinTrail !== undefined) {
       this.#spawnCoinTrail(plan);
@@ -64,13 +65,14 @@ export class CoinGenerator implements FixedSimulationSystem {
     if (trail === undefined) {
       return;
     }
-    const startY = plan.y + this.#config.coins.heightAbovePlatform;
+    const startY = plan.y + (trail.heightAbovePlatform ?? this.#config.coins.heightAbovePlatform);
     const selected = this.#coins.filter((coin) => !coin.isActive).slice(0, trail.count);
     const chain = { remaining: selected.length, cancelled: selected.length !== trail.count };
     let spawnedCount = 0;
     for (const coin of selected) {
+      const progress = spawnedCount / Math.max(1, trail.count - 1);
       coin.reactivate({
-        x: trail.x + (trail.sway ?? 0) * (spawnedCount % 2 === 0 ? -1 : 1),
+        x: trail.x + ((trail.endX ?? trail.x) - trail.x) * progress + Math.sin(progress * Math.PI) * (trail.curve ?? 0) + (trail.sway ?? 0) * (spawnedCount % 2 === 0 ? -1 : 1),
         y: startY - spawnedCount * trail.spacing,
       });
       coin.chain = chain;

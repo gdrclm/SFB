@@ -7,7 +7,7 @@ it("introduces different physical encounter themes every 20–40 simulation seco
   director.fixedUpdate(.01); expect(start.mock.calls[0]?.[0].theme).toBe("rich-lane");
   director.fixedUpdate(39.99); expect(start).toHaveBeenCalledTimes(1);
   director.fixedUpdate(.01); expect(start.mock.calls[1]?.[0].theme).toBe("trap");
-  director.fixedUpdate(20); expect(start.mock.calls[2]?.[0].theme).toBe("death-tunnel");
+  director.fixedUpdate(20); expect(start.mock.calls[2]?.[0].theme).toBe("bait");
 });
 
 it("increases physical challenge frequency during a long run without removing reaction gaps", () => {
