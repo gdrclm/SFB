@@ -2,7 +2,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { BallController } from "../ball/BallController";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
-import type { PlatformController } from "./PlatformController";
+import type { PlatformActivationProperties, PlatformController } from "./PlatformController";
 import type { PlatformPool } from "./PlatformPool";
 import {
   PlatformRoutePlanner,
@@ -17,7 +17,15 @@ type GeneratorPool = Pick<
   "platforms" | "availableCount" | "acquire" | "release"
 > & Partial<Pick<PlatformPool, "beginGeneration">>;
 type DifficultySource = Pick<PhaseOneController, "currentDifficulty">;
-export type PlatformGeneratedListener = (plan: PlannedPlatform) => void;
+export type PlatformGeneratedListener = (plan: PlannedPlatform, additionalCell: boolean) => void;
+
+interface RowLayout {
+  readonly y: number;
+  readonly members: readonly Readonly<{ x: number; properties: PlatformActivationProperties }>[];
+  readonly generated: Set<string>;
+  readonly completedCells: Set<number>;
+  readonly plan: PlannedPlatform | undefined;
+}
 
 export class PlatformGenerator implements FixedSimulationSystem {
   readonly #ball: GeneratorBall;
@@ -26,6 +34,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
   readonly #config: GameConfig;
   #planner: PlatformRoutePlanner;
   #halfWidth: number;
+  readonly #rows = new Map<string, RowLayout>();
   readonly #random: () => number;
   public enabled = true;
   public allowSlowPlatforms = true;
@@ -51,19 +60,20 @@ export class PlatformGenerator implements FixedSimulationSystem {
       ? Math.min(...activeY)
       : ball.position.y;
     this.#planner = new PlatformRoutePlanner(initialLowestY, config, random);
+    this.#rememberInitialRows();
   }
 
   public setPlayfieldHalfWidth(halfWidth: number): void {
     if (!Number.isFinite(halfWidth)) return;
     this.#halfWidth = Math.max(this.#config.playSpace.halfWidth, halfWidth);
-    this.#planner.setPlayfieldHalfWidth(this.#halfWidth);
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void { this.#planner.queueEncounter(theme); }
 
   public resumeFromCurrentPosition(): void {
     this.#planner = new PlatformRoutePlanner(this.#ball.position.y, this.#config, this.#random);
-    this.#planner.setPlayfieldHalfWidth(this.#halfWidth);
+    this.#rows.clear();
+    this.#rememberInitialRows();
     this.enabled = true;
   }
 
@@ -86,6 +96,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
     const recycleY =
       this.#ball.position.y +
       this.#config.platformGeneration.recycleAboveBallDistance;
+    for (const [key, row] of this.#rows) {
+      if (row.y > recycleY) this.#rows.delete(key);
+    }
     for (const platform of this.#pool.platforms) {
       if (platform.isActive && platform.mesh.position.y > recycleY) {
         this.#pool.release(platform);
@@ -127,8 +140,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
         return;
       }
 
+      const members = [platform];
       for (const choice of plan.choices ?? []) {
-        this.#pool.acquire(
+        const choicePlatform = this.#pool.acquire(
           new Vector3(
             choice.x,
             plan.y,
@@ -144,11 +158,13 @@ export class PlatformGenerator implements FixedSimulationSystem {
             kind: !this.allowSlowPlatforms && choice.kind === "time-slow" ? "standard" : choice.kind,
           },
         );
+        if (choicePlatform) members.push(choicePlatform);
       }
 
+      this.#rememberRow(members, plan);
       activeAheadCount += 1;
       for (const listener of this.#generatedListeners) {
-        listener(plan);
+        listener(plan, false);
       }
       if (
         plan.routeKind !== "bypass" ||
@@ -159,33 +175,80 @@ export class PlatformGenerator implements FixedSimulationSystem {
     }
   }
 
+  #rememberInitialRows(): void {
+    const grouped = new Map<string, PlatformController[]>();
+    for (const platform of this.#pool.platforms) {
+      if (!platform.isActive) continue;
+      const key = platform.mesh.position.y.toFixed(4);
+      const members = grouped.get(key) ?? [];
+      members.push(platform);
+      grouped.set(key, members);
+    }
+    for (const members of grouped.values()) this.#rememberRow(members);
+  }
+
+  #rememberRow(platforms: readonly PlatformController[], plan?: PlannedPlatform): void {
+    const first = platforms[0];
+    if (!first) return;
+    const templateWidth = this.#config.platforms[0]?.size.width ?? 7.5;
+    // Store the original layout independently of live meshes: a broken platform
+    // must not return when the camera zooms or its pool slot is reused.
+    const members = platforms.map(platform => ({
+      x: platform.mesh.position.x,
+      properties: {
+        encounterTheme: platform.encounterTheme,
+        strength: platform.strength,
+        strengthLevel: platform.strengthLevel,
+        routeKind: platform.routeKind,
+        kind: platform.kind,
+        widthScale: platform.width / templateWidth,
+        isTrap: platform.routeKind !== "mandatory",
+      },
+    }));
+    this.#rows.set(first.mesh.position.y.toFixed(4), {
+      y: first.mesh.position.y, members, plan,
+      generated: new Set(members.map((_, index) => `0:${String(index)}`)),
+      completedCells: new Set([0]),
+    });
+  }
+
   #fillSideSpace(): void {
     const base = this.#config.playSpace.halfWidth;
     if (this.#halfWidth <= base + .01) return;
-    const target = base + Math.ceil((this.#halfWidth - base) / base) * base - this.#config.platformGeneration.multiRowSideMargin;
-    const rows = new Map<string, PlatformController[]>();
-    for (const platform of this.#getActivePlatformsAhead()) {
-      const key = platform.mesh.position.y.toFixed(4);
-      const row = rows.get(key) ?? []; row.push(platform); rows.set(key, row);
-    }
-    const templateWidth = this.#config.platforms[0]?.size.width ?? 7.5;
-    const gap = this.#config.platformGeneration.multiRowGap;
-    for (const row of [...rows.values()].sort((a, b) => (b[0]?.mesh.position.y ?? 0) - (a[0]?.mesh.position.y ?? 0))) {
-      const sample = row[0]; if (!sample) continue;
-      const width = (platform: PlatformController): number => platform.width || templateWidth;
-      for (const side of [-1, 1]) {
-        const neighbor = row.reduce((outer, p) => side * p.mesh.position.x > side * outer.mesh.position.x ? p : outer, sample);
-        let edge = Math.max(base, ...row.map(p => side * p.mesh.position.x + width(p) / 2));
-        while (target - edge - gap >= 1.25) {
-          if (this.#pool.availableCount < 1) return;
-          const span = Math.min(base, target - edge - gap);
-          const platform = this.#pool.acquire(new Vector3(side * (edge + gap + span / 2), sample.mesh.position.y, this.#config.playSpace.depth), {
-            encounterTheme: neighbor.encounterTheme,
-            strength: neighbor.strength, strengthLevel: neighbor.strengthLevel, routeKind: neighbor.routeKind, isTrap: neighbor.routeKind !== "mandatory",
-            widthScale: span / templateWidth, kind: neighbor.kind === "time-slow" && !this.allowSlowPlatforms ? "standard" : neighbor.kind,
-          });
-          if (!platform) return;
-          row.push(platform); edge += gap + span;
+    // Repeat fixed-size zone layouts instead of spreading 2–4 platforms over
+    // the entire viewport. Populate nearer rows first within the pool budget.
+    const cellWidth = base * 2;
+    const cellCount = Math.ceil((this.#halfWidth - base) / cellWidth);
+    const rows = [...this.#rows.values()]
+      .filter(row => row.y < this.#ball.position.y)
+      .sort((a, b) => b.y - a.y);
+    for (const row of rows) {
+      for (let distance = 1; distance <= cellCount; distance++) {
+        for (const side of [-1, 1]) {
+          const cell = distance * side;
+          const offset = cell * cellWidth;
+          for (const [index, member] of row.members.entries()) {
+            const key = `${String(cell)}:${String(index)}`;
+            if (row.generated.has(key)) continue;
+            if (this.#pool.availableCount < 1) return;
+            const platform = this.#pool.acquire(
+              new Vector3(member.x + offset, row.y, this.#config.playSpace.depth),
+              member.properties,
+            );
+            if (!platform) return;
+            row.generated.add(key);
+          }
+          if (row.plan && !row.completedCells.has(cell)) {
+            row.completedCells.add(cell);
+            const plan = row.plan;
+            for (const listener of this.#generatedListeners) {
+              listener({
+                ...plan, x: plan.x + offset, safeLaneX: plan.safeLaneX + offset,
+                ...(plan.choices ? { choices: plan.choices.map(choice => ({ ...choice, x: choice.x + offset })) } : {}),
+                ...(plan.coinTrail ? { coinTrail: { ...plan.coinTrail, x: plan.coinTrail.x + offset } } : {}),
+              }, true);
+            }
+          }
         }
       }
     }

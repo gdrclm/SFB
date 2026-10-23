@@ -234,14 +234,14 @@ it("keeps a scheduled zone recognizable until the next timed event", () => {
 });
 
 
-it("spans the widened camera width with valid choices and a playable destruction cascade", () => {
-  const planner = plannerFor("break-run"); planner.setPlayfieldHalfWidth(18);
+it("keeps original lane sizes and a playable destruction cascade", () => {
+  const planner = plannerFor("break-run");
   const plan = planner.planNext(40, 0, difficulty(15));
   const members = rowMembers(plan);
-  expect(members.some(member => member.x < -5)).toBe(true);
-  expect(members.some(member => member.x > 5)).toBe(true);
+  expect(members.some(member => member.x < 0)).toBe(true);
+  expect(members.some(member => member.x > 0)).toBe(true);
   for (const member of members) {
-    expect(Math.abs(member.x) + member.widthScale * 7.5 / 2).toBeLessThanOrEqual(18);
+    expect(Math.abs(member.x) + member.widthScale * 7.5 / 2).toBeLessThanOrEqual(5);
     expect(member.strength).toBeLessThanOrEqual(40); expect(member.kind).toBe("standard");
   }
   expect(plan.encounterTheme).toBe("break-run"); expect(plan.coinTrail?.count).toBe(3);

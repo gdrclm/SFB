@@ -1,13 +1,14 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
-import type { PlatformKind } from "../config/gameConfig";
+import type { PlatformKind, PlatformStrengthLevel } from "../config/gameConfig";
 import type {
   PlatformActivationProperties,
   PlatformController,
   PlatformRouteKind,
 } from "./PlatformController";
-import { PlatformGenerator } from "./PlatformGenerator";
+import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
+import { PlatformGenerator, type PlatformGeneratedListener } from "./PlatformGenerator";
 import type { PlatformPool } from "./PlatformPool";
 
 const difficultySource = {
@@ -29,6 +30,8 @@ interface MockPlatform {
   isActive: boolean;
   routeKind: PlatformRouteKind;
   strength: number;
+  strengthLevel: PlatformStrengthLevel;
+  encounterTheme: PlatformEncounterTheme;
   kind: PlatformKind;
   widthScale: number;
 }
@@ -43,6 +46,8 @@ function createPlatform(y: number, isActive: boolean): MockPlatform {
     isActive,
     routeKind: "mandatory",
     strength: 7,
+    strengthLevel: "low",
+    encounterTheme: "chaos",
     kind: "standard",
     widthScale: 1,
     get width() { return 7.5 * this.widthScale; },
@@ -64,6 +69,8 @@ function createPool(platforms: MockPlatform[]): {
       platform.isActive = true;
       platform.routeKind = properties.routeKind ?? "mandatory";
       platform.strength = properties.strength;
+      platform.strengthLevel = properties.strengthLevel;
+      platform.encounterTheme = properties.encounterTheme ?? "chaos";
       platform.kind = properties.kind ?? "standard";
       platform.widthScale = properties.widthScale ?? 1;
       return asController(platform);
@@ -281,4 +288,67 @@ it("fills both new side areas without moving existing platforms or duplicating e
   const count = platforms.filter(p => p.isActive).length;
   for (let i = 0; i < 60; i++) generator.fixedUpdate();
   expect(platforms.filter(p => p.isActive)).toHaveLength(count);
+});
+
+
+it.each(["trap", "rich-lane", "break-run", "death-tunnel"] as const)(
+  "adds original-sized %s layouts across wide screens and preserves them in future rows",
+  (theme) => {
+    const platforms = Array.from({ length: 144 }, () => createPlatform(0, false));
+    const { pool } = createPool(platforms);
+    const ball = { position: { x: 0, y: 4.5, z: 0 }, fallSpeed: 10 };
+    const generator = new PlatformGenerator(ball, pool, difficultySource, gameConfig, () => 0);
+    const listener = vi.fn<PlatformGeneratedListener>();
+    generator.onPlatformGenerated(listener);
+    generator.setPlayfieldHalfWidth(18);
+    generator.queueEncounter(theme);
+    generator.fixedUpdate();
+    const verifyRows = (): void => {
+      const active = platforms.filter(p => p.isActive);
+      expect(active.length).toBeGreaterThan(24);
+      for (const p of active) {
+        expect(p.encounterTheme).toBe(theme);
+        expect(p.width).toBeLessThan(4.5);
+        if (Math.abs(p.mesh.position.x) <= 5) continue;
+        const cell = Math.round(p.mesh.position.x / 10);
+        const original = active.find(other => other.mesh.position.y === p.mesh.position.y &&
+          Math.abs(other.mesh.position.x - (p.mesh.position.x - cell * 10)) < .001);
+        expect(original).toBeDefined();
+        expect(p.width).toBe(original?.width);
+        expect(p.kind).toBe(original?.kind);
+        expect(p.routeKind).toBe(original?.routeKind);
+        expect(p.strength).toBe(original?.strength);
+      }
+    };
+    verifyRows();
+    const basePlan = listener.mock.calls.find(([, additional]) => !additional)?.[0];
+    const extraPlan = listener.mock.calls.find(([, additional]) => additional)?.[0];
+    expect(extraPlan?.widthScale).toBe(basePlan?.widthScale);
+    if (theme === "rich-lane" || theme === "break-run") {
+      expect(extraPlan?.coinTrail?.x).toBeCloseTo((basePlan?.coinTrail?.x ?? 0) - 10);
+    }
+    // Moving into subsequent rows must not start generating giant platforms.
+    ball.position.y = -20;
+    generator.fixedUpdate();
+    verifyRows();
+  },
+);
+
+it("does not resurrect a broken side platform on subsequent ticks or zoom changes", () => {
+  const platforms = Array.from({ length: 144 }, () => createPlatform(0, false));
+  const { pool } = createPool(platforms);
+  const generator = new PlatformGenerator(
+    { position: { x: 0, y: 4.5, z: 0 }, fallSpeed: 10 }, pool, difficultySource, gameConfig, () => 0,
+  );
+  generator.queueEncounter("trap");
+  generator.setPlayfieldHalfWidth(9.6);
+  generator.fixedUpdate();
+  const broken = platforms.find(p => p.isActive && p.mesh.position.x > 5);
+  if (!broken) throw new Error("Expected a side platform.");
+  const { x, y } = broken.mesh.position;
+  broken.isActive = false;
+  generator.fixedUpdate();
+  generator.setPlayfieldHalfWidth(18);
+  generator.fixedUpdate();
+  expect(platforms.some(p => p.isActive && p.mesh.position.x === x && p.mesh.position.y === y)).toBe(false);
 });

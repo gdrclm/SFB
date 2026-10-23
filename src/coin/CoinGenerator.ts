@@ -32,12 +32,13 @@ export class CoinGenerator implements FixedSimulationSystem {
     }
   }
 
-  public handlePlatformGenerated(plan: PlannedPlatform): void {
-    this.#generatedRowCount += 1;
+  public handlePlatformGenerated(plan: PlannedPlatform, additionalCell = false): void {
+    if (!additionalCell) this.#generatedRowCount += 1;
     if (plan.coinTrail !== undefined) {
       this.#spawnCoinTrail(plan);
       return;
     }
+    if (additionalCell) return;
     const interval = Math.max(
       1,
       this.#config.coins.spawnEveryRows - Math.floor((plan.stageNumber - 1) / 5),

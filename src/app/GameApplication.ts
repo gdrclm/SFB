@@ -481,8 +481,8 @@ export class GameApplication {
       this.#config,
     );
     this.#unsubscribePlatformGenerated = this.#platformGenerator.onPlatformGenerated(
-      (plan) => {
-        this.#coinGenerator?.handlePlatformGenerated(plan);
+      (plan, additionalCell) => {
+        this.#coinGenerator?.handlePlatformGenerated(plan, additionalCell);
       },
     );
     this.#syncPlayfieldWidth();

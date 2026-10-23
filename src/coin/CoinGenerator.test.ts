@@ -121,3 +121,16 @@ it("spawns alternating precision targets on a risky coin trail", () => {
   expect(coins[1]?.mesh.position.x).toBeCloseTo(2.85);
   expect(coins[2]?.mesh.position.x).toBeCloseTo(1.95);
 });
+
+
+it("adds side-cell reward trails without advancing the main row coin interval", () => {
+  const coins = Array.from({ length: 8 }, () => createCoin());
+  const generator = new CoinGenerator({ position: { x: 0, y: 0, z: 0 } }, coins, gameConfig);
+  generator.handlePlatformGenerated(plan());
+  generator.handlePlatformGenerated(plan({ coinTrail: { x: 12, count: 3, spacing: .5 } }), true);
+  expect(coins.filter(coin => coin.isActive)).toHaveLength(3);
+  expect(coins.filter(coin => coin.isActive).every(coin => coin.mesh.position.x === 12)).toBe(true);
+  generator.handlePlatformGenerated(plan({ x: 2 }));
+  expect(coins.filter(coin => coin.isActive)).toHaveLength(4);
+  expect(coins[3]?.mesh.position.x).toBe(2);
+});

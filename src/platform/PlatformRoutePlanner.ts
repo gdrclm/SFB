@@ -99,7 +99,6 @@ const SAFE_TIME_SLOW: RowMember = Object.freeze({
 
 export class PlatformRoutePlanner {
   readonly #config: GameConfig;
-  #halfWidth: number;
   readonly #random: () => number;
   #nextY: number;
   #lastTheme: PlatformEncounterTheme | null = null;
@@ -120,12 +119,7 @@ export class PlatformRoutePlanner {
 
     this.#nextY = initialLowestY;
     this.#config = config;
-    this.#halfWidth = config.playSpace.halfWidth;
     this.#random = random;
-  }
-
-  public setPlayfieldHalfWidth(halfWidth: number): void {
-    if (Number.isFinite(halfWidth)) this.#halfWidth = Math.max(this.#config.playSpace.halfWidth, halfWidth);
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void {
@@ -496,12 +490,12 @@ export class PlatformRoutePlanner {
   #getLanePositions(count: number): readonly number[] {
     const generation = this.#config.platformGeneration;
     const usableWidth =
-      this.#halfWidth * 2 -
+      this.#config.playSpace.halfWidth * 2 -
       generation.multiRowSideMargin * 2;
     const platformWidth =
       (usableWidth - generation.multiRowGap * (count - 1)) / count;
     const firstCenter =
-      -this.#halfWidth +
+      -this.#config.playSpace.halfWidth +
       generation.multiRowSideMargin +
       platformWidth / 2;
     return Array.from(
@@ -518,7 +512,7 @@ export class PlatformRoutePlanner {
     }
     const generation = this.#config.platformGeneration;
     const usableWidth =
-      this.#halfWidth * 2 -
+      this.#config.playSpace.halfWidth * 2 -
       generation.multiRowSideMargin * 2;
     const width =
       (usableWidth - generation.multiRowGap * (count - 1)) / count;
