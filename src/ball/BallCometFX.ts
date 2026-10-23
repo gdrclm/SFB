@@ -30,7 +30,7 @@ void main() {
     float seed = float(i);
     float side = i == 0 ? -.86 : i == 1 ? .87 : i == 2 ? -.31 : i == 3 ? -1.15 : 1.17;
     float reach = i == 0 ? 7.4 : i == 1 ? 8.9 : i == 2 ? 5.3 : i == 3 ? 3.9 : 4.6;
-    reach *= .32 + power*.68;
+    reach *= .16 + power*.84;
     float y = p.y + .2*stretch;
     float t = clamp(y / reach, 0.0, 1.0);
     float base = smoothstep(-.8*stretch, .15, y);
@@ -80,7 +80,7 @@ export class BallCometFX {
     this.#mesh.material = this.#material;
   }
   public update(time: number, power: number, boost: number, stretch: number, suppressed: boolean, reducedMotion = false): void {
-    const amount = Math.max(.22 + .78 * Math.pow(power, .65), boost);
+    const amount = Math.max(.04 + .96 * Math.pow(power, 1.6), boost);
     this.#mesh.visibility = suppressed ? 0 : 1;
     // A widening orthographic camera must not shrink the character's jet to a few pixels.
     // Extend the tips, keeping the origin fixed at the ball, without enlarging its aura.

@@ -123,6 +123,19 @@ describe("BallVisualController", () => {
     engine.dispose();
   });
 
+  it("keeps the trajectory trail readable at starting speed without waiting for late stages", () => {
+    const { engine, scene, controller } = createFixture();
+    const trail = scene.getMeshByName("BallSpeedTrail");
+    if (!(trail?.material instanceof StandardMaterial)) throw new Error("Expected trajectory trail");
+    expect(trail.material.backFaceCulling).toBe(false);
+    expect(trail.visibility * trail.material.alpha).toBeGreaterThan(.45);
+    updateFor(controller, 1);
+    expect(trail.material.backFaceCulling).toBe(false);
+    expect(trail.visibility * trail.material.alpha).toBeGreaterThan(.45);
+    expect(trail.material.emissiveColor.b).toBeGreaterThan(.8);
+    controller.dispose(); scene.dispose(); engine.dispose();
+  });
+
   it("smoothly stretches, brightens and strengthens the outline with speed", () => {
     const { engine, scene, ball, motion, controller, material } = createFixture();
     const baseEmissive =

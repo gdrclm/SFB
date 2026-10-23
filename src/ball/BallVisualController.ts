@@ -49,6 +49,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #speedColor: Color3;
   readonly #phaseColor: Color3;
   readonly #baseOutlineColor: Color3;
+  readonly #baseTrailColor = new Color3(.25, .9, 1);
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;
   #stretchIntensity = 0;
@@ -96,6 +97,8 @@ export class BallVisualController implements FixedSimulationSystem {
       ball.getScene(),
     );
     this.#trailMaterial.disableLighting = true;
+    this.#trailMaterial.backFaceCulling = false;
+    this.#trailMaterial.disableDepthWrite = true;
     this.#trailMaterial.diffuseColor = Color3.Black();
     this.#trailMaterial.alpha = 0.72;
     this.#trail.material = this.#trailMaterial;
@@ -281,8 +284,8 @@ export class BallVisualController implements FixedSimulationSystem {
 
     this.#material.diffuseColor.copyFrom(displayColor);
     this.#material.emissiveColor.copyFrom(displayColor).scaleInPlace(emissiveStrength);
-    this.#trailMaterial.emissiveColor.copyFrom(displayColor);
-    this.#trailMaterial.alpha = .6 + this.#trailIntensity * .35;
+    Color3.LerpToRef(this.#baseTrailColor, displayColor, .35 + this.#trailIntensity * .35, this.#trailMaterial.emissiveColor);
+    this.#trailMaterial.alpha = .85 + this.#trailIntensity * .1;
     this.#trail.diameter = this.#ballConfig.radius * this.#config.trailDiameterScale * (1 + this.#trailIntensity * 2.4 + this.#boostStrength * .4);
     this.#trail.visibility = Math.max(this.#boostStrength * .65, lerp(
       this.#config.baseTrailVisibility,
