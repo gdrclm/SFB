@@ -20,6 +20,7 @@ export class SuccessfulPlatformHitHandler {
   readonly #platformPool: Pick<PlatformPool, "beginRelease" | "completeRelease">;
   readonly #feedback: SuccessfulHitFeedback;
   readonly #maximumSpeedLossFraction: number;
+  readonly #maximumSpeedLoss: number;
   readonly #radius: number;
 
   public constructor(
@@ -32,6 +33,7 @@ export class SuccessfulPlatformHitHandler {
     this.#platformPool = platformPool;
     this.#feedback = feedback;
     this.#maximumSpeedLossFraction = config.successfulHit.maximumSpeedLossFraction;
+    this.#maximumSpeedLoss = config.successfulHit.maximumSpeedLoss;
     this.#radius = config.ball.radius;
   }
 
@@ -49,7 +51,7 @@ export class SuccessfulPlatformHitHandler {
       this.#platformPool.completeRelease(collision.platform);
     }, force);
 
-    if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction);
+    if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction, this.#maximumSpeedLoss);
     if (!powered) this.#ball.startBreakImpact?.(collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
       breakResistance(collision.ballSpeed, collision.platform.strength));
     this.#feedback.playBallReaction();

@@ -1,3 +1,6 @@
+import { BoostController } from "../boost/BoostController";
+import { GameState } from "../core/GameStateController";
+import { RunWallet } from "../currency/RunWallet";
 import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import type { PlatformController } from "../platform/PlatformController";
@@ -45,7 +48,7 @@ describe("SuccessfulPlatformHitHandler", () => {
 
     expect(handler.handle(collision)).toBe(true);
 
-    expect(ball.fallSpeed).toBeCloseTo(8.824);
+    expect(ball.fallSpeed).toBeCloseTo(9.902);
     expect(beginRelease).toHaveBeenCalledWith(platform);
     expect(completeRelease).toHaveBeenCalledWith(platform);
     expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7);
@@ -91,7 +94,7 @@ it("plasma breaks an otherwise impossible platform without impact braking or spe
 });
 
 
-it("barely slows a fast ball on a weak panel, but a near-limit hit costs real momentum", () => {
+it("barely slows a fast ball on a weak panel, preserves the run even on a near-limit hit", () => {
   const remaining = (strength: number): number => {
     const ball = { fallSpeed: 50, startBreakImpact: vi.fn() };
     const platform = { isActive: true, strength, mesh: { position: { y: 0 } }, size: { height: .3 } } as PlatformController;
@@ -101,7 +104,28 @@ it("barely slows a fast ball on a weak panel, but a near-limit hit costs real mo
     expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50);
     return ball.fallSpeed;
   };
-  expect(remaining(10)).toBeCloseTo(49.52);
-  expect(remaining(49)).toBeCloseTo(38.4752);
-  expect(remaining(10) - remaining(49)).toBeGreaterThan(10);
+  expect(remaining(10)).toBeCloseTo(49.96);
+  expect(remaining(49)).toBeCloseTo(49.4);
+  expect(remaining(10)).toBeGreaterThan(remaining(49));
+  expect(remaining(49)).toBeGreaterThan(49);
+});
+
+
+it("turns a six-hit risky combo into a net acceleration instead of erasing the run", () => {
+  for (const initialSpeed of [10, 50, 180, 600]) {
+    const ball = { fallSpeed: initialSpeed };
+    const boost = new BoostController(ball, { current: GameState.Playing }, new RunWallet(1000, 2), gameConfig);
+    const handler = new SuccessfulPlatformHitHandler(ball,
+      { beginRelease: () => true, completeRelease: () => true }, createFeedback().feedback, gameConfig);
+    for (let i = 0; i < boost.hitsRequired; i++) {
+      const speed = ball.fallSpeed;
+      const platform = { isActive: true, strength: speed } as PlatformController;
+      expect(handler.handle({ platform, ballSpeed: speed, assessment: "sufficient" })).toBe(true);
+      expect(speed - ball.fallSpeed).toBeLessThanOrEqual(.600001);
+      boost.recordSuccessfulHit();
+    }
+    expect(ball.fallSpeed).toBeGreaterThan(initialSpeed * .88);
+    expect(boost.tryBoost().success).toBe(true);
+    expect(ball.fallSpeed).toBeGreaterThan(initialSpeed * 1.3);
+  }
 });

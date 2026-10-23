@@ -142,17 +142,17 @@ describe("BallController", () => {
     }).toThrow(RangeError);
   });
 
-  it("arrests a break at contact, transfers momentum gradually and keeps steering responsive", () => {
+  it("briefly resists a break without stopping the fall or horizontal steering", () => {
     const transform = createTransform(), controller = new BallController(transform, createInput(true, 1), gameConfig);
     controller.fallSpeed = 29;
     controller.startBreakImpact(-5, .9);
     controller.fixedUpdate(1 / 60);
-    expect(transform.position.y).toBe(-5);
-    expect(controller.verticalVelocity).toBe(0);
+    expect(transform.position.y).toBeLessThan(-5);
+    expect(controller.verticalVelocity).toBeLessThan(-7.5);
     expect(transform.position.x).toBeGreaterThan(0);
     simulate(controller, .08, 60);
     expect(transform.position.y).toBeLessThan(-5);
-    expect(transform.position.y).toBeGreaterThan(-5.5);
+    expect(transform.position.y).toBeGreaterThan(-6);
     simulate(controller, .2, 60);
     expect(controller.verticalVelocity).toBeCloseTo(-controller.fallSpeed * gameConfig.ball.movementScale, 8);
   });
@@ -249,7 +249,7 @@ it("uses the expanded camera width for immediate steering and clamps safely on s
 });
 
 
-it("carries momentum through a weak panel and holds against a near-limit panel", () => {
+it("keeps both weak and near-limit breaks moving while retaining a readable resistance difference", () => {
   const distance = (resistance: number): number => {
     const transform = createTransform();
     const ball = new BallController(transform, createInput(), gameConfig);
@@ -260,5 +260,6 @@ it("carries momentum through a weak panel and holds against a near-limit panel",
     return -ball.position.y;
   };
   expect(distance(.2)).toBeGreaterThan(.65);
-  expect(distance(.98)).toBeLessThan(.01);
+  expect(distance(.98)).toBeGreaterThan(.7);
+  expect(distance(.2)).toBeGreaterThan(distance(.98));
 });

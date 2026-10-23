@@ -188,7 +188,7 @@ export class PlatformRoutePlanner {
     let predictedSpeedAtCollision = ballSpeed;
     for (let i = 0; i < mandatoryPlatformsAhead; i++) {
       predictedSpeedAtCollision = speedAfterBreak(predictedSpeedAtCollision,
-        Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction);
+        Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction, this.#config.successfulHit.maximumSpeedLoss);
     }
     const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
     const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty);

@@ -1,5 +1,4 @@
 import { BaitZoneController } from "../challenges/BaitZoneController";
-import { breakImpactProfile, breakResistance } from "../collision/BreakResistance";
 import { EncounterFeedback } from "../feedback/EncounterFeedback";
 import { acquireGameScene } from "../scene/GameSceneSession";
 import { LifeFeedback } from "../feedback/LifeFeedback";
@@ -156,7 +155,6 @@ export class GameApplication {
   #challengeDirector: ChallengeDirector | null = null;
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
-  #hitStopRemaining = 0;
   #runSeconds = 0;
   #sentResult: string | null = null;
   #lastDepthCheckpoint = 0;
@@ -315,7 +313,6 @@ export class GameApplication {
     this.#boostCoach = new BoostCoach();
     this.#challengeRemaining = 0;
     this.#challengeDirector = null;
-    this.#hitStopRemaining = 0;
     this.#runSeconds = 0; this.#sentResult = null;
     this.#energyHighWater = this.#config.economy.initialEnergy;
     this.#lastDepthCheckpoint = 0;
@@ -739,9 +736,8 @@ export class GameApplication {
     const timeScale = isPaused
       ? 1
       : (this.#slowModeController?.update(realDeltaSeconds) ?? 1);
-    if (!isPaused && this.#hitStopRemaining > 0) this.#hitStopRemaining = Math.max(0, this.#hitStopRemaining - realDeltaSeconds);
-    else if (!isPaused && this.#gameState.current !== GameState.GameOver) {
-      this.#fixedStep.advance(realDeltaSeconds, timeScale, () => this.#hitStopRemaining <= 0 && this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial);
+    if (!isPaused && this.#gameState.current !== GameState.GameOver) {
+      this.#fixedStep.advance(realDeltaSeconds, timeScale, () => this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial);
     }
     isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     this.#lastFrameTimeMs = nowMs;
@@ -856,7 +852,6 @@ export class GameApplication {
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
       this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
-      if (!powered && !this.#reducedMotion) this.#hitStopRemaining = breakImpactProfile(breakResistance(collision.ballSpeed, collision.platform.strength)).hitStop;
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       // Invulnerable hits destroy scenery but do not masquerade as skill hits or recharge BOOST.
