@@ -1,19 +1,11 @@
+import { WindCanvas } from "./WindCanvas";
 
-export function calculateSpeedFeedback(speed: number): { duration: number; opacity: number; power: number; length: number; width: number; lanes: number } {
-  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
-  const power = Math.max(0, Math.min(1, Math.log2(Math.max(1, safeSpeed / 10)) / 5));
-  return {
-    duration: 1.45 - 1.2 * power,
-    opacity: power === 0 ? 0 : .08 + .86 * power ** .9,
-    length: 8 + 48 * power ** 1.2,
-    width: 1.4 + 4.2 * power,
-    lanes: power === 0 ? 0 : 1 + 11 * power,
-    power,
-  };
-}
+import { calculateSpeedFeedback } from "./SpeedFeedbackCurve";
+export { calculateSpeedFeedback } from "./SpeedFeedbackCurve";
 
 export class SpeedFeedback {
   readonly #root: HTMLElement;
+  readonly #wind: WindCanvas;
   readonly #label: HTMLElement;
   #animation: Animation | null = null;
   #burst: Animation | null = null;
@@ -22,9 +14,11 @@ export class SpeedFeedback {
   public constructor(root: HTMLElement, label: HTMLElement) {
     this.#root = root;
     this.#label = label;
+    this.#wind = new WindCanvas(root);
   }
 
   public render(speed: number, frozen: boolean): void {
+    this.#wind.configure(speed, frozen);
     const feedback = calculateSpeedFeedback(speed);
     this.#opacity = feedback.opacity;
     this.#root.style.setProperty("--streak-duration", `${String(feedback.duration)}s`);
@@ -40,7 +34,10 @@ export class SpeedFeedback {
     }
   }
 
+  public draw(deltaSeconds: number): void { this.#wind.draw(deltaSeconds); }
+
   public playBoost(): void {
+    this.#wind.boost();
     this.#label.textContent = "ϟ";
     this.#animation?.cancel();
     this.#burst?.cancel();
@@ -59,6 +56,7 @@ export class SpeedFeedback {
   }
 
   public dispose(): void {
+    this.#wind.dispose();
     this.#animation?.cancel();
     this.#burst?.cancel();
     this.#label.textContent = "";

@@ -732,6 +732,7 @@ export class GameApplication {
       if (this.#powers?.invulnerable) this.#slowModeButtonElement.disabled = true;
       this.#speedFeedback?.render(this.#ballController?.fallSpeed ?? 0, isPaused || this.#gameState.current === GameState.GameOver);
     }
+    this.#speedFeedback?.draw(realDeltaSeconds);
     if (!isPaused && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
     const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
     this.#elapsedPlatformSeconds = advanceIdleTime(this.#elapsedPlatformSeconds, realDeltaSeconds, platformAnimationPaused, this.#reducedMotion);
