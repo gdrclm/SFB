@@ -114,12 +114,14 @@ function showStartupError(error: unknown): void {
   console.error(error);
 }
 
-async function restartApplication(): Promise<void> {
-  requestedGuidedRun = false;
+async function restartApplication(guided = false): Promise<void> {
+  requestedGuidedRun = guided;
   restartButton.disabled = true;
   try {
     activeTicket = requestedRanked ? await network.beginRun() : null;
-    await lifecycle.restart();
+    await lifecycle.restart(guided);
+    interfaceLayer.inert = false;
+    canvas.focus({ preventScroll: true });
   } catch (error: unknown) {
     showStartupError(error);
   } finally {

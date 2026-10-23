@@ -13,8 +13,10 @@ export class ContextGuide {
   #startX: number | null = null;
   #input: TutorialInput = tutorialInput();
   #paused = false;
+  #closing = 0;
   public constructor(dialog: HTMLDialogElement, skip: () => void) {
     this.#dialog = dialog; this.#skip = skip;
+    dialog.hidden = false; dialog.removeAttribute("open"); delete dialog.dataset.closing;
     this.#arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.#arrow.id = "guide-arrow"; this.#arrow.setAttribute("aria-hidden", "true");
     this.#arrow.innerHTML = '<defs><marker id="guide-arrow-head" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#e9ffff" stroke-width="2"/></marker></defs><path class="guide-line" fill="none" stroke="#e9ffff" stroke-width="4" marker-end="url(#guide-arrow-head)"/>';
@@ -28,6 +30,7 @@ export class ContextGuide {
   public show(tip: GuideTip, anchor?: () => HintPoint | null): void {
     const data = guideHint(tip, this.#input);
     if (!data) return;
+    this.#closing = 0; delete this.#dialog.dataset.closing; delete this.#arrow.dataset.closing;
     this.#tip = tip; this.#remaining = data.seconds; this.#anchor = anchor;
     this.#dialog.dataset.tip = tip;
     const text = this.#dialog.querySelector("#context-text");
@@ -36,6 +39,9 @@ export class ContextGuide {
     const picture = this.#dialog.querySelector("#context-picture");
     if (picture) picture.innerHTML = tip === "fork" || tip === "super-heavy" ? tutorialVisuals.platform("super-heavy", 25)
       : tip === "vitality" ? tutorialVisuals.platform("vitality", 7) + tutorialVisuals.heart
+      : tip === "time-slow" ? tutorialVisuals.platform("time-slow", 7)
+      : tip === "ability" ? tutorialVisuals.slow
+      : tip === "abilities" ? '<span class="tutorial-icon" aria-hidden="true">◉ ✺</span>'
       : tip === "life" ? tutorialVisuals.heart : tip === "coin" ? tutorialVisuals.coin
       : tip === "annihilation" ? '<span class="tutorial-icon" aria-hidden="true">◉</span>' : "";
     if (!this.#dialog.open) this.#dialog.setAttribute("open", "");
@@ -44,10 +50,16 @@ export class ContextGuide {
   public completed(tip: GuideTip): void { if (this.#tip === tip) this.#close(); }
   public setPaused(paused: boolean): void {
     this.#paused = paused; this.#dialog.hidden = paused;
-    this.#arrow.style.display = paused || this.#tip === null ? "none" : "block";
+    this.#arrow.style.display = paused || this.#tip === null && this.#closing === 0 ? "none" : "block";
   }
   public fixedUpdate(realDeltaSeconds: number): void {
-    if (this.#tip === null || this.#paused) return;
+    if (this.#paused) return;
+    if (this.#closing > 0) {
+      this.#closing = Math.max(0, this.#closing - realDeltaSeconds);
+      if (this.#closing === 0) this.#hide();
+      return;
+    }
+    if (this.#tip === null) return;
     this.#remaining -= realDeltaSeconds;
     if (this.#remaining <= 0) this.#close();
   }
@@ -76,14 +88,23 @@ export class ContextGuide {
       const text = this.#dialog.querySelector("#context-text");
       if (data && text) text.textContent = data.text;
     }
+    if (input === "desktop" && Math.abs(event.movementX) > 0) this.completed("platform");
     if (input === "desktop" && this.#startX === null) this.#startX = event.clientX;
     if (this.#startX !== null && Math.abs(event.clientX - this.#startX) >= 12) this.completed("platform");
   };
   readonly #release = (): void => { this.#startX = null; };
   readonly #skipAll = (): void => { this.#close(); this.#skip(); };
-  #close(): void { this.#tip = null; this.#dialog.removeAttribute("open"); this.#arrow.style.display = "none"; }
+  #close(): void {
+    if (this.#tip === null) return;
+    this.#tip = null; this.#closing = .18;
+    this.#dialog.dataset.closing = "true"; this.#arrow.dataset.closing = "true";
+  }
+  #hide(): void {
+    this.#tip = null; this.#closing = 0; this.#dialog.removeAttribute("open");
+    delete this.#dialog.dataset.closing; delete this.#arrow.dataset.closing; this.#arrow.style.display = "none";
+  }
   public dispose(): void {
-    this.#close(); this.#arrow.remove();
+    this.#hide(); this.#arrow.remove();
     document.removeEventListener("pointerdown", this.#touch, true);
     document.removeEventListener("pointermove", this.#move, true);
     document.removeEventListener("pointerup", this.#release, true);

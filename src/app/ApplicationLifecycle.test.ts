@@ -63,3 +63,14 @@ describe("ApplicationLifecycle", () => {
     expect(second.start).toHaveBeenCalledOnce();
   });
 });
+
+it("explicitly restarts training even after a normal run, independently of saved completion", async () => {
+  const { application, start, reset } = createApplication();
+  const lifecycle = new ApplicationLifecycle(() => application);
+  await lifecycle.restart(false);
+  await lifecycle.restart(true);
+  await lifecycle.restart(true);
+  await lifecycle.restart(false);
+  expect(start).toHaveBeenCalledWith(false);
+  expect(reset.mock.calls).toEqual([[true], [true], [false]]);
+});

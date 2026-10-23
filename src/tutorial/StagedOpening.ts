@@ -1,21 +1,22 @@
 import type { PlatformKind } from "../config/gameConfig";
 
 export const GUIDED_OPENING_KEY = "speed-fall-ball.guided-opening.v1";
-export type GuideTip = "platform" | "coin" | "boost" | "fork" | "free" | "life" | "combo" | "vitality" | "time-slow" | "super-heavy" | "annihilation";
+export type GuideTip = "platform" | "coin" | "boost" | "fork" | "free" | "life" | "combo" | "vitality" | "time-slow" | "super-heavy" | "annihilation" | "ability" | "abilities";
 export interface OpeningActions {
-  spawn(kind: "platform" | "coin" | "boost" | "fork" | "practice" | "vitality" | "annihilation"): void;
+  spawn(kind: "platform" | "coin" | "boost" | "fork" | "practice" | "vitality" | "time-slow" | "ability" | "ability-demo" | "abilities" | "annihilation" | "annihilation-demo"): void;
   explain(tip: GuideTip): void;
   random(): void;
   complete(): void;
   readyForBoost?(): boolean;
-  abilityUsed?(): boolean;
 }
 const sequence = [
   { at: 0, kind: "platform" }, { at: 2, kind: "practice" }, { at: 4, kind: "coin" },
   { at: 5, kind: "practice" }, { at: 7, kind: "practice" }, { at: 9, kind: "practice" }, { at: 11, kind: "practice" },
   { at: 16, kind: "boost" }, { at: 23, kind: "fork" },
   { at: 26, kind: "practice" }, { at: 29, kind: "vitality" },
-  { at: 36, kind: "annihilation" },
+  { at: 35, kind: "time-slow" }, { at: 41, kind: "ability" },
+  { at: 44, kind: "ability-demo" }, { at: 47, kind: "abilities" }, { at: 52, kind: "annihilation" },
+  { at: 54, kind: "annihilation-demo" },
 ] as const;
 
 export class StagedOpening {
@@ -49,22 +50,13 @@ export class StagedOpening {
       this.#next++;
       if (event.kind === "fork") this.#seen.add("super-heavy");
       this.#actions.spawn(event.kind);
-      if (event.kind !== "practice") {
+      if (event.kind !== "practice" && event.kind !== "annihilation-demo" && event.kind !== "ability-demo") {
         this.discover(event.kind);
         return;
       }
       event = sequence[this.#next];
     }
-    if (this.#elapsed - this.#delay + 1e-9 >= 44) {
-      if (this.#actions.abilityUsed?.() === false) {
-        if (this.#elapsed - this.#lastPractice >= 6) {
-          this.#lastPractice = this.#elapsed;
-          this.#actions.explain("annihilation");
-        }
-        return;
-      }
-      this.#finish();
-    }
+    if (this.#elapsed - this.#delay + 1e-9 >= 58) this.#finish();
   }
 
   public discover(tip: GuideTip): void {

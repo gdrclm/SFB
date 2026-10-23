@@ -13,7 +13,9 @@ export function guideHint(tip: GuideTip, input: TutorialInput): { text: string; 
     case "vitality": return { text: "Зелёная: +1 жизнь", target: "world", seconds: 6 };
     case "life": return { text: "−1 жизнь. Ищи зелёную", target: "#lives", seconds: 4 };
     case "time-slow": return { text: "Голубая замедляет", target: "world", seconds: 5 };
-    case "annihilation": return { text: input === "desktop" ? "Пробел — очисти экран" : "Нажми — очисти экран", target: "#slow-mode-button", seconds: 8 };
+    case "ability": return { text: input === "desktop" ? "Пробел — замедление" : "Нажми — замедление", target: "#slow-mode-button", seconds: 6 };
+    case "abilities": return { text: "В магазине: ◉ аннигиляция, ✺ плазма", target: "#slow-mode-button", seconds: 5 };
+    case "annihilation": return { text: "◉ Аннигиляция очищает экран", target: "#slow-mode-button", seconds: 6 };
     case "free": return null;
   }
 }

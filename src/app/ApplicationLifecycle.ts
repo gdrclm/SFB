@@ -1,6 +1,6 @@
 export interface LifecycleApplication {
-  start(): Promise<void>;
-  reset(): Promise<void>;
+  start(guided?: boolean): Promise<void>;
+  reset(guided?: boolean): Promise<void>;
   dispose(): void;
 }
 
@@ -12,14 +12,14 @@ export class ApplicationLifecycle {
     this.#createApplication = createApplication;
   }
 
-  public async restart(): Promise<void> {
+  public async restart(guided?: boolean): Promise<void> {
     const application = this.#application ?? this.#createApplication();
     const reusing = this.#application !== null;
     this.#application = application;
 
     try {
-      if (reusing) await application.reset();
-      else await application.start();
+      if (reusing) { if (guided === undefined) await application.reset(); else await application.reset(guided); }
+      else { if (guided === undefined) await application.start(); else await application.start(guided); }
     } catch (error: unknown) {
       if (this.#application === application) {
         application.dispose();

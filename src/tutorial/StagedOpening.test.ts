@@ -23,8 +23,11 @@ describe("staged opening", () => {
     opening.fixedUpdate(12); expect(events.slice(-2)).toEqual(["spawn:boost", "tip:boost"]);
     opening.fixedUpdate(7); expect(events.slice(-2)).toEqual(["spawn:fork", "tip:fork"]);
     opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:vitality", "tip:vitality"]);
-    opening.fixedUpdate(7); expect(events.slice(-2)).toEqual(["spawn:annihilation", "tip:annihilation"]);
-    opening.fixedUpdate(8);
+    opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:time-slow", "tip:time-slow"]);
+    opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:ability", "tip:ability"]);
+    opening.fixedUpdate(6); expect(events.slice(-2)).toEqual(["spawn:abilities", "tip:abilities"]);
+    opening.fixedUpdate(5); expect(events.slice(-2)).toEqual(["spawn:annihilation", "tip:annihilation"]);
+    opening.fixedUpdate(6);
     expect(random).not.toHaveBeenCalled();
     expect(events.filter((event) => event === "spawn:practice")).toHaveLength(6);
     expect(complete).toHaveBeenCalledOnce();
@@ -59,7 +62,7 @@ describe("staged opening", () => {
     expect(events.filter(event => event === "tip:life")).toHaveLength(1);
     opening.platformAppeared("vitality"); opening.platformAppeared("vitality");
     expect(events.filter(event => event === "tip:vitality")).toHaveLength(1);
-    for (let i = 0; i < 2500; i++) opening.fixedUpdate(.02);
+    for (let i = 0; i < 3500; i++) opening.fixedUpdate(.02);
     const count = events.length;
     opening.platformAppeared("time-slow"); opening.discover("combo");
     expect(events).toHaveLength(count);
@@ -93,15 +96,15 @@ it("waits for a legitimately earned BOOST and offers practice instead of an impo
 });
 
 
-it("waits for the trial ability to be used, then completes once without starting random gameplay", () => {
-  let used = false;
-  const explain = vi.fn(), complete = vi.fn(), random = vi.fn();
-  const opening = new StagedOpening({ spawn: vi.fn(), explain, complete, random, abilityUsed: () => used });
-  for (let i = 0; i < 2500; i++) opening.fixedUpdate(.02);
-  expect(opening.isScripted).toBe(true);
-  expect(complete).not.toHaveBeenCalled();
-  expect(explain).toHaveBeenCalledWith("annihilation");
-  used = true; opening.fixedUpdate(.02); opening.fixedUpdate(10);
+it("demonstrates both abilities and ends automatically without any keyboard or ability gate", () => {
+  const spawn = vi.fn(), complete = vi.fn(), random = vi.fn();
+  const opening = new StagedOpening({ spawn, explain: vi.fn(), complete, random });
+  for (let i = 0; i < 3500; i++) opening.fixedUpdate(.02);
+  expect(spawn).toHaveBeenCalledWith("time-slow");
+  expect(spawn).toHaveBeenCalledWith("ability");
+  expect(spawn).toHaveBeenCalledWith("ability-demo");
+  expect(spawn).toHaveBeenCalledWith("abilities");
+  expect(spawn).toHaveBeenCalledWith("annihilation-demo");
   expect(complete).toHaveBeenCalledOnce(); expect(random).not.toHaveBeenCalled();
   expect(opening.isScripted).toBe(false);
 });

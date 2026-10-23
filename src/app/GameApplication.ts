@@ -87,7 +87,7 @@ export interface GameApplicationActions {
   readonly developerStartDepth?: number | undefined;
   readonly ranked?: boolean;
   readonly onFinished?: (result: RunResult, durationMs: number) => void;
-  readonly restart: () => Promise<void>;
+  readonly restart: (guided?: boolean) => Promise<void>;
   readonly exit: () => void;
 }
 
@@ -145,8 +145,11 @@ export class GameApplication {
   #elapsedPlatformSeconds = 0;
   #opening: StagedOpening | null = null;
   #guidedRun = false;
-  #tutorialPower = false;
+  #tutorialPower: "slow" | "annihilation" | null = null;
   #tutorialAbilityUsed = false;
+  #tutorialAutoDemo = false;
+  #tutorialSlowRemaining = 0;
+  #tutorialAvoidY: number | null = null;
   #tutorialFinishAge: number | null = null;
   #tutorialFinish: HTMLElement | null = null;
   #baitZone: BaitZoneController | null = null;
@@ -341,7 +344,8 @@ export class GameApplication {
   }
 
   public async start(guided = this.#actions.guided === true): Promise<void> {
-    this.#guidedRun = guided; this.#tutorialPower = false; this.#tutorialAbilityUsed = false; this.#tutorialFinishAge = null;
+    document.body.dataset.training = String(guided);
+    this.#guidedRun = guided; this.#tutorialPower = null; this.#tutorialAbilityUsed = false; this.#tutorialAutoDemo = false; this.#tutorialSlowRemaining = 0; this.#tutorialAvoidY = null; this.#tutorialFinishAge = null;
     this.#gameOverElement.hidden = true;
     this.#comboView = new ComboView(requireMenuElement(this.#interfaceLayerElement, "#combo-panel"));
     this.#fixedStep.register(this.#comboView);
@@ -413,6 +417,14 @@ export class GameApplication {
         this.#showRunResults();
       }
       this.#opening?.fixedUpdate(delta);
+      if (this.#tutorialAvoidY !== null && this.#ballController !== null && this.#ballController.position.y < this.#tutorialAvoidY && !this.#ballController.isBouncing) {
+        this.#contextGuide?.completed("fork"); this.#contextGuide?.completed("super-heavy"); this.#tutorialAvoidY = null;
+      }
+      if (this.#tutorialAutoDemo && !this.#tutorialAbilityUsed) this.#powers?.tryMiniAnnihilation();
+      if (this.#tutorialSlowRemaining > 0) {
+        this.#tutorialSlowRemaining = Math.max(0, this.#tutorialSlowRemaining - real);
+        if (this.#tutorialSlowRemaining === 0) this.#slowModeController?.requestStop();
+      }
     } });
     requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Забег завершён";
     this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("hidden");
@@ -474,7 +486,7 @@ export class GameApplication {
       this.#handlePhaseCompleted,
     );
     this.#renderPhaseStage();
-    this.#fixedStep.register(this.#phaseOneController);
+    this.#fixedStep.register({ fixedUpdate: (delta: number) => { if (!this.#guidedRun) this.#phaseOneController?.fixedUpdate(delta); } });
     this.#platformPool = createStaticPlatformPool(this.#scene, this.#config);
     // Templates supply pooled art/physics, not three identical opening walls.
     for (const platform of this.#platformPool.platforms) if (platform.isActive) this.#platformPool.release(platform);
@@ -517,7 +529,7 @@ export class GameApplication {
     this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
       () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),
       kind => {
-        if (kind === "annihilation" && this.#tutorialPower) { this.#tutorialAbilityUsed = true; this.#contextGuide?.completed("annihilation"); }
+        if (kind === "annihilation" && this.#tutorialPower === "annihilation") { this.#tutorialAbilityUsed = true; this.#contextGuide?.completed("annihilation"); }
         this.#slowModeController?.cancelForBoost();
         if (this.#ballController !== null) {
           if (kind === "annihilation") this.#feel?.annihilation(this.#ballController.position);
@@ -578,7 +590,7 @@ export class GameApplication {
       this.#gameState,
       this.#wallet,
       this.#config,
-      (active) => { this.#haptics.request(active ? "slowOn" : "slowOff"); this.#ballVisualController?.setSlow(active); if (active) this.#ballVisualController?.react("slow"); },
+      (active) => { if (active && !this.#slowModeController?.isForced) { this.#contextGuide?.completed("ability"); if (this.#guidedRun) this.#tutorialSlowRemaining = 1.5; } this.#haptics.request(active ? "slowOn" : "slowOff"); this.#ballVisualController?.setSlow(active); if (active) this.#ballVisualController?.react("slow"); },
     );
     this.#bindAbilityButton();
     this.#boostController = new BoostController(
@@ -611,7 +623,7 @@ export class GameApplication {
       active: () => this.#runStarted && this.#pauseMenuElement.hidden && this.#gameState.current !== GameState.Tutorial && this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Results,
       boost: () => { this.#boostButton?.activate(); },
       abilityDown: () => {
-        if (this.#opening?.isScripted && !this.#tutorialPower) return;
+        if (this.#opening?.isScripted && this.#tutorialPower === null) return;
         if (this.#powerView !== null) this.#powerView.keyboardDown();
         else this.#slowModeButtonElement.click();
       },
@@ -650,7 +662,7 @@ export class GameApplication {
     this.#contextGuide?.dispose();
     this.#tutorialFinish?.remove(); this.#tutorialFinish = null; this.#tutorialFinishAge = null;
     this.#interfaceLayerElement.classList.remove("tutorial-finale");
-    document.body.dataset.guideStage = "off";
+    document.body.dataset.guideStage = "off"; document.body.dataset.training = "false";
     this.#platformLabels?.dispose();
     this.#desktopControls?.dispose(); this.#desktopControls = null;
     this.#powerView?.dispose(); this.#powerView = null;
@@ -774,7 +786,7 @@ export class GameApplication {
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || this.#opening?.isScripted !== true || !this.#boostCoach.visible;
     this.#contextGuide?.setPaused(hideNotices);
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
-    this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
+    this.#backdrop?.update(this.#guidedRun ? 0 : this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
     this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
@@ -881,7 +893,7 @@ export class GameApplication {
       }
       const hit = this.#combo.hit(collision.ballSpeed, collision.platform.strength);
       if (hit.tierIncreased) this.#ballVisualController?.react("combo");
-      if (this.#boostController?.recordSuccessfulHit()) this.#boostButton?.playCharged();
+      if (this.#boostController?.recordSuccessfulHit()) { this.#boostButton?.playCharged(); this.#contextGuide?.completed("combo"); }
       this.#comboView?.hit(hit);
       this.#updateMission({ type: "hit", combo: hit.count });
       const previousLives = this.#lives.remainingLives;
@@ -897,8 +909,11 @@ export class GameApplication {
       return;
     }
 
+    // Training demonstrates the reaction once, but can never become a losing run.
+    if (this.#guidedRun && this.#lives.remainingLives <= 2) this.#lives.restoreLives(1);
     const bounced = this.#unsuccessfulHitHandler?.handle(collision) ?? false;
     if (bounced) {
+      if (this.#guidedRun) this.#platformPool?.release(collision.platform);
       this.#lifeFeedback?.hit();
       this.#ballVisualController?.react("hurt");
       this.#boostCoach.failedImpact();
@@ -944,6 +959,7 @@ export class GameApplication {
 
   #applyDestroyedPlatformEffect(platform: PlatformController): string {
     if (platform.kind === "vitality") {
+      this.#contextGuide?.completed("vitality"); this.#contextGuide?.completed("life");
       this.#ballVisualController?.react("heal");
       const restoredLives = this.#lives.restoreLives(
         this.#config.platformEffects.vitalityLives,
@@ -959,6 +975,7 @@ export class GameApplication {
     }
 
     if (platform.kind === "time-slow" && !this.#powers?.invulnerable) {
+      this.#contextGuide?.completed("time-slow");
       this.#slowModeController?.forceStart(
         this.#config.platformEffects.forcedSlowDurationRealSeconds,
       );
@@ -1146,7 +1163,7 @@ export class GameApplication {
 
   readonly #restartGame = (): void => {
     this.#pauseRestartButtonElement.disabled = true;
-    void this.#actions.restart().finally(() => {
+    void this.#actions.restart(this.#guidedRun).finally(() => {
       this.#pauseRestartButtonElement.disabled = false;
     });
   };
@@ -1242,7 +1259,7 @@ export class GameApplication {
     this.#contextGuide = new ContextGuide(dialog,
       () => { this.#opening?.skip(); document.body.dataset.guideStage = "off"; document.body.dataset.guideCombo = "true"; document.body.dataset.guideSlow = "true"; },
     );
-    const spawn = (x: number, y: number, strength: number, widthScale: number, kind: "standard" | "super-heavy" | "vitality" = "standard"): void => {
+    const spawn = (x: number, y: number, strength: number, widthScale: number, kind: "standard" | "super-heavy" | "vitality" | "time-slow" = "standard"): void => {
       this.#guideStrengths.push(strength);
       pool.acquire(new Vector3(x, y, this.#config.playSpace.depth), {
         strength, strengthLevel: strength > 15 ? "high" : "low", widthScale, kind, routeKind: "mandatory", tutorialDanger: kind === "super-heavy",
@@ -1250,8 +1267,11 @@ export class GameApplication {
     };
     this.#opening = new StagedOpening({
       readyForBoost: () => this.#boostController?.canBoost ?? false,
-      abilityUsed: () => this.#tutorialAbilityUsed,
       spawn: (kind) => {
+        if (kind !== "practice" && kind !== "ability-demo" && kind !== "annihilation-demo") {
+          for (const platform of pool.platforms) if (platform.isActive) pool.release(platform);
+          for (const coin of coins) coin.deactivate();
+        }
         this.#guideStrengths = [];
         document.body.dataset.guideStage = kind === "practice" ? "fork" : kind;
         if (kind === "platform") spawn(ball.position.x, ball.position.y - 3.5, 7, 0.8);
@@ -1262,27 +1282,35 @@ export class GameApplication {
           if ((this.#opening?.elapsed ?? 0) >= 4) coins.find((coin) => !coin.isActive)?.reactivate({ x: ball.position.x, y: ball.position.y - 3.1 });
         }
         if (kind === "vitality") spawn(ball.position.x, ball.position.y - 6, Math.max(1, Math.floor(ball.fallSpeed * .5)), .6, "vitality");
+        if (kind === "time-slow") spawn(ball.position.x, ball.position.y - 6, Math.max(1, Math.floor(ball.fallSpeed * .5)), .65, "time-slow");
+        if (kind === "ability") {
+          this.#tutorialPower = "slow"; this.#bindAbilityButton(); document.body.dataset.guideSlow = "true";
+        }
+        if (kind === "ability-demo" && !this.#slowModeController?.isActive) this.#slowModeController?.requestStart();
         if (kind === "annihilation") {
-          this.#tutorialPower = true; this.#powers?.setTutorialAnnihilation(true); this.#bindAbilityButton();
+          this.#slowModeController?.cancelForBoost();
+          this.#tutorialPower = "annihilation"; this.#powers?.setTutorialAnnihilation(true); this.#bindAbilityButton();
           document.body.dataset.guideSlow = "true";
           for (const x of [-2.5, 0, 2.5]) {
-            spawn(x, ball.position.y - 7, Math.ceil(ball.fallSpeed * 2), .32, "super-heavy");
+            spawn(x, ball.position.y - Math.max(12, ball.fallSpeed * .8), Math.ceil(ball.fallSpeed * 2), .32, "super-heavy");
             coins.find(coin => !coin.isActive)?.reactivate({ x, y: ball.position.y - 5.5 });
           }
         }
+        if (kind === "annihilation-demo") this.#tutorialAutoDemo = true;
         if (kind === "fork") {
+          this.#tutorialAvoidY = ball.position.y - 9;
           spawn(-2.5, ball.position.y - 9, Math.max(1, Math.floor(ball.fallSpeed * 0.7)), 0.66);
           spawn(2.5, ball.position.y - 9, Math.ceil(ball.fallSpeed * 1.8), 0.66, "super-heavy");
         }
       },
       explain: (tip) => {
-        if (tip === "time-slow") document.body.dataset.guideSlow = "true";
-        const kind = tip === "vitality" ? "vitality" : tip === "fork" || tip === "super-heavy" ? "super-heavy" : null;
+        const kind = tip === "vitality" || tip === "time-slow" ? tip : tip === "fork" || tip === "super-heavy" ? "super-heavy" : null;
         this.#contextGuide?.show(tip, tip === "platform" ? () => this.#feel?.screenPoint(ball.position) ?? null
           : tip === "coin" ? () => { const coin = coins.find(candidate => candidate.isActive); return coin === undefined ? null : this.#feel?.screenPoint(coin.mesh.position) ?? null; }
           : kind ? () => { const platform = pool.platforms.find(candidate => candidate.isActive && candidate.kind === kind); return platform ? this.#feel?.screenPoint(platform.mesh.position) ?? null : null; } : undefined);
       },
       random: () => {
+        this.#guidedRun = false; document.body.dataset.training = "false";
         for (const platform of pool.platforms) if (platform.isActive) pool.release(platform);
         for (const coin of coins) coin.deactivate();
         this.#platformGenerator?.resumeFromCurrentPosition();
@@ -1291,7 +1319,7 @@ export class GameApplication {
       },
       complete: () => {
         saveFinishedOpening();
-        this.#tutorialPower = false; this.#powers?.setTutorialAnnihilation(false); this.#bindAbilityButton();
+        this.#tutorialPower = null; this.#powers?.setTutorialAnnihilation(false); this.#bindAbilityButton();
         if (!this.#opening?.wasSkipped) this.#beginTutorialFinish();
       },
     });
@@ -1301,9 +1329,9 @@ export class GameApplication {
     this.#powerView?.dispose(); this.#powerView = null;
     this.#slowModeButton?.dispose(); this.#slowModeButton = null;
     if (this.#powers === null || this.#slowModeController === null) return;
-    if (this.#tutorialPower || this.#config.powers.annihilation || this.#config.powers.plasma) {
+    if (this.#tutorialPower === "annihilation" || this.#tutorialPower === null && (this.#config.powers.annihilation || this.#config.powers.plasma)) {
       this.#powerView = new PowerUpView(this.#slowModeButtonElement, this.#powers,
-        this.#tutorialPower || !this.#config.powers.plasma ? "annihilation" : "plasma");
+        this.#tutorialPower === "annihilation" || !this.#config.powers.plasma ? "annihilation" : "plasma");
     } else this.#slowModeButton = new SlowModeButtonController(this.#slowModeButtonElement, this.#slowModeController);
   }
 
@@ -1321,7 +1349,10 @@ export class GameApplication {
     screen.setAttribute("role", "dialog"); screen.setAttribute("aria-modal", "true");
     screen.setAttribute("aria-labelledby", "tutorial-finish-title");
     screen.innerHTML = '<div class="game-over-card"><span class="tutorial-finish-star" aria-hidden="true">✦</span><h1 id="tutorial-finish-title">Обучение завершено</h1><button id="tutorial-again" type="button">Начать заново</button><button id="tutorial-menu" type="button">Главное меню</button></div>';
-    screen.querySelector("#tutorial-again")?.addEventListener("click", () => { void this.reset(true); });
+    screen.querySelector("#tutorial-again")?.addEventListener("click", () => {
+      for (const button of screen.querySelectorAll<HTMLButtonElement>("button")) button.disabled = true;
+      void this.#actions.restart(true);
+    });
     screen.querySelector("#tutorial-menu")?.addEventListener("click", this.#exitGame);
     this.#interfaceLayerElement.append(screen); this.#tutorialFinish = screen;
   }
@@ -1384,10 +1415,10 @@ export class GameApplication {
   #finishRun(outcome: "completed" | "interrupted") {
     const previousBest = this.#history.top(1)[0]?.score ?? 0;
     const result = this.#runProgress.finish(
-      this.#actions.developerStartDepth === undefined ? this.#history : null, this.#wallet.coins, this.#destroyedPlatformCount, outcome,
+      this.#actions.developerStartDepth === undefined && !this.#guidedRun ? this.#history : null, this.#wallet.coins, this.#destroyedPlatformCount, outcome,
       { best: this.#combo.best, bonus: this.#combo.bonus },
     );
-    if (this.#actions.developerStartDepth !== undefined) return result;
+    if (this.#actions.developerStartDepth !== undefined || this.#guidedRun) return result;
     this.#profile.creditRuns([result]);
     renderBankBalance(this.#profile.coins);
     if (outcome === "completed" && this.#sentResult !== result.id) {
@@ -1405,7 +1436,7 @@ export class GameApplication {
   }
 
   #updateMission(event: MissionEvent): void {
-    if (this.#actions.developerStartDepth !== undefined) return;
+    if (this.#actions.developerStartDepth !== undefined || this.#guidedRun) return;
     const beforeProgress = this.#profile.mission.progress;
     const result = this.#profile.applyMissionEvent(event);
     if (!result.rewarded && event.type !== "run-start" && event.type !== "life-lost" && this.#profile.mission.progress !== beforeProgress) this.#missionIntroRemaining = 1.2;

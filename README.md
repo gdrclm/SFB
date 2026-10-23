@@ -153,20 +153,34 @@ explain cursor steering, right mouse BOOST and Space for the left ability;
 touch arrows explain relative swipes and the two buttons. The actual platform,
 coin and heart art accompanies the short hints. Full rules remain in How to Play.
 
-Random generation stays disabled throughout staging. Practice platforms build
-the real six-hit BOOST charge before the boost gate; a missed charge extends
-practice rather than granting free energy. Coins explicitly teach acceleration,
-the fork shows a red dangerous platform, and a green platform teaches healing.
-At second 36, a temporary annihilation trial replaces the left ability. Its
-charges and any existing annihilation zone are restored when the lesson ends;
-the trial never buys or equips an item in the saved profile.
+Training is a safe staged scenario entirely in the first sky location. Physical
+depth never changes its backdrop; stage progression and random challenges stay
+disabled. Mistakes demonstrate a bounce and heart loss, but cannot end training;
+the struck tutorial obstacle is removed so it cannot trap the hero. Training
+coins, missions and results never alter the player's bank, purchases or records.
 
-After all stages (at least 44 active seconds) and an actual trial activation,
-physics and camera following stop. The hero spins rapidly, stretches and flies
+Practice platforms build the real six-hit BOOST charge before the boost gate;
+a missed charge extends practice rather than granting free energy. Coins teach
+acceleration, the fork shows red danger and the green platform teaches healing.
+A dedicated cyan platform at second 35 demonstrates forced slowing; at second 41
+the left button demonstrates manual slow mode (Space on desktop, tap on touch).
+A brief automatic slow demonstration follows if needed. The shop hint introduces
+annihilation and plasma. At second 52 a temporary annihilation trial replaces the
+left slot, followed by an automatic screen-clearing demonstration at second 54.
+The player can try it early; no press or hold is required to complete training.
+Temporary charges and any existing zone are restored without changing saved gear.
+
+Movement, coin pickup, BOOST, manual slow mode, green healing and cyan slowing
+start dismissing their respective hint immediately, with a 180 ms fade. New hints
+cancel any old fade; replay resets the shared hint element, arrows and input.
+
+At second 58 (plus any BOOST practice delay), completion starts automatically.
+Physics and camera following stop while the hero spins, stretches and flies
 above the camera in a 1.7-second finale. A compact “Обучение завершено” screen
-then offers only “Начать заново” (replay the lesson) and “Главное меню”. There is
-no automatic random run or ordinary defeat summary. Reduced-motion settings
-soften the spin, and a hidden/unfocused tab does not advance the finale.
+then offers only “Начать заново” (replay the entire lesson) and “Главное меню”.
+Replay explicitly passes training mode through the normal application lifecycle,
+resets all lesson state and restores focus. No ordinary defeat summary appears.
+Reduced-motion settings soften the spin; a hidden/unfocused tab pauses the finale.
 
 Completion is saved under `speed-fall-ball.guided-opening.v1`.
 **Обучающий забег** replays the lesson from the main menu. Skip immediately
