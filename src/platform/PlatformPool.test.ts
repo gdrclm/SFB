@@ -63,3 +63,16 @@ describe("PlatformPool", () => {
     expect(pool.acquire()).toBe(platform);
   });
 });
+
+
+it("grows only on demand, limits per-tick allocation and keeps the shared platform list live", () => {
+  const factory = vi.fn(() => { const { platform } = createPlatform(); platform.deactivate(); return platform; });
+  const pool = new PlatformPool([], factory, 6), shared = pool.platforms;
+  expect(factory).not.toHaveBeenCalled();
+  for (let i = 0; i < 4; i++) expect(pool.acquire()).not.toBeNull();
+  expect(pool.acquire()).toBeNull(); expect(shared).toHaveLength(4);
+  pool.beginGeneration(); expect(pool.acquire()).not.toBeNull(); expect(pool.acquire()).not.toBeNull();
+  expect(pool.acquire()).toBeNull(); expect(shared).toHaveLength(6);
+  const platform = shared[0]; if (!platform) throw new Error("Expected pooled platform");
+  pool.release(platform); expect(pool.acquire()).toBe(platform); expect(factory).toHaveBeenCalledTimes(6);
+});

@@ -25,6 +25,7 @@ function scriptedRandom(values: readonly number[], fallback = 0): () => number {
 
 interface MockPlatform {
   readonly mesh: { readonly position: Vector3 };
+  readonly width: number;
   isActive: boolean;
   routeKind: PlatformRouteKind;
   strength: number;
@@ -44,6 +45,7 @@ function createPlatform(y: number, isActive: boolean): MockPlatform {
     strength: 7,
     kind: "standard",
     widthScale: 1,
+    get width() { return 7.5 * this.widthScale; },
   };
 }
 
@@ -260,4 +262,23 @@ it("suppresses forced-slow platforms until BOOST is learned, then permits them",
   generator.queueEncounter("death-tunnel");
   generator.fixedUpdate();
   expect(platforms.some((p) => p.isActive && p.kind === "time-slow")).toBe(true);
+});
+
+
+it("fills both new side areas without moving existing platforms or duplicating extensions", () => {
+  const platforms = Array.from({ length: 144 }, () => createPlatform(0, false));
+  const { pool } = createPool(platforms), ball = { position: { x: 0, y: 4.5, z: 0 }, fallSpeed: 10 };
+  const generator = new PlatformGenerator(ball, pool, difficultySource, gameConfig, () => 0);
+  generator.fixedUpdate();
+  const original = platforms.filter(p => p.isActive).map(p => ({ p, x: p.mesh.position.x, width: p.width }));
+  generator.setPlayfieldHalfWidth(18); generator.fixedUpdate();
+  for (const { p, x, width } of original) { expect(p.mesh.position.x).toBe(x); expect(p.width).toBe(width); }
+  for (const y of new Set(original.map(({ p }) => p.mesh.position.y))) {
+    const row = platforms.filter(p => p.isActive && p.mesh.position.y === y);
+    expect(Math.min(...row.map(p => p.mesh.position.x - p.width / 2))).toBeLessThan(-17);
+    expect(Math.max(...row.map(p => p.mesh.position.x + p.width / 2))).toBeGreaterThan(17);
+  }
+  const count = platforms.filter(p => p.isActive).length;
+  for (let i = 0; i < 60; i++) generator.fixedUpdate();
+  expect(platforms.filter(p => p.isActive)).toHaveLength(count);
 });

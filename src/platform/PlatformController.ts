@@ -1,3 +1,4 @@
+import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
 import { platformSpriteRow, debrisSpriteRect } from "./PlatformSpriteLayout";
 import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprites";
@@ -14,6 +15,7 @@ export interface PlatformActivationProperties {
   readonly strengthLevel: PlatformStrengthLevel;
   readonly routeKind?: PlatformRouteKind;
   readonly widthScale?: number;
+  readonly encounterTheme?: PlatformEncounterTheme;
   readonly isTrap?: boolean;
   readonly kind?: PlatformKind;
 }
@@ -34,6 +36,7 @@ export class PlatformController {
   #strengthLevel: PlatformStrengthLevel;
   #routeKind: PlatformRouteKind = "mandatory";
   #kind: PlatformKind = "standard";
+  #encounterTheme: PlatformEncounterTheme = "chaos";
   #approachState: ApproachState | null = null;
   #elapsed = 0;
 
@@ -56,6 +59,7 @@ export class PlatformController {
   public get strengthLevel(): PlatformStrengthLevel { return this.#strengthLevel; }
   public get routeKind(): PlatformRouteKind { return this.#routeKind; }
   public get kind(): PlatformKind { return this.#kind; }
+  public get encounterTheme(): PlatformEncounterTheme { return this.#encounterTheme; }
   public get width(): number { return this.size.width * this.mesh.scaling.x; }
   public get activationId(): number { return this.#activationId; }
   public get isBreaking(): boolean { return this.#isBreaking; }
@@ -104,7 +108,7 @@ export class PlatformController {
   public reactivate(position = this.#startPosition, properties?: PlatformActivationProperties): void {
     if (this.#isActive || this.#isBreaking) return;
     this.mesh.position.copyFrom(position); this.mesh.rotation.setAll(0); this.mesh.scaling.setAll(1);
-    this.#applyActivationProperties(properties ?? { strength: this.#strength, strengthLevel: this.#strengthLevel, kind: this.#kind, routeKind: this.#routeKind });
+    this.#applyActivationProperties(properties ?? { strength: this.#strength, strengthLevel: this.#strengthLevel, kind: this.#kind, routeKind: this.#routeKind, encounterTheme: this.#encounterTheme });
     this.mesh.visibility = 1; this.#sprite.mesh.visibility = 1;
     this.mesh.setEnabled(true); this.mesh.computeWorldMatrix(true);
     this.#createPhysicsResources(); this.#activationId++; this.#isActive = true;
@@ -121,10 +125,11 @@ export class PlatformController {
   #applyActivationProperties(properties: PlatformActivationProperties): void {
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
+    this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,
-      routeKind: this.#routeKind, kind: this.#kind, widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
+      routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
   }
 }

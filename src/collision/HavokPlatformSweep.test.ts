@@ -74,11 +74,12 @@ describe("HavokPlatformSweep", () => {
       .toBeCloseTo(platformConfig.size.width, 5);
     expect(platform.mesh.getBoundingInfo().boundingBox.extendSize.y * 2)
       .toBeCloseTo(platformConfig.size.height, 5);
+    const sweepPlatforms = [platform];
     const sweep = new HavokPlatformSweep(
       scene,
       plugin,
       gameConfig.ball.radius,
-      [platform],
+      sweepPlatforms,
     );
 
     expect(
@@ -181,6 +182,10 @@ describe("HavokPlatformSweep", () => {
     expect(sprite.metadata).toMatchObject({ spriteAtlas: "neon-rocks", idleFrames: 12 });
     expect({ textures: scene.textures.length, materials: scene.materials.length }).toEqual(allocated);
 
+    const sidePlatform = new PlatformController(scene, gameConfig, { ...platformConfig, id: "late-side-platform", position: { x: 22, y: 0 } });
+    sweepPlatforms.push(sidePlatform);
+    expect(sweep.cast({ x: 22, y: 4, z: 0 }, { x: 22, y: -2, z: 0 })?.id).toBe("late-side-platform");
+    sidePlatform.dispose();
     sweep.dispose();
     platform.dispose();
     scene.dispose();

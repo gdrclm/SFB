@@ -12,7 +12,9 @@ import type { PlatformSweep } from "./CollisionResolver";
 export class HavokPlatformSweep implements PlatformSweep {
   readonly #plugin: HavokPlugin;
   readonly #shape: PhysicsShapeSphere;
-  readonly #platformByTransform: ReadonlyMap<unknown, PlatformController>;
+  readonly #platformByTransform: Map<unknown, PlatformController>;
+  readonly #platforms: readonly PlatformController[];
+  #knownCount: number;
   readonly #rotation = Quaternion.Identity();
   readonly #start = Vector3.Zero();
   readonly #end = Vector3.Zero();
@@ -26,6 +28,7 @@ export class HavokPlatformSweep implements PlatformSweep {
     platforms: readonly PlatformController[],
   ) {
     this.#plugin = plugin;
+    this.#platforms = platforms; this.#knownCount = platforms.length;
     this.#shape = new PhysicsShapeSphere(Vector3.Zero(), ballRadius, scene);
     this.#platformByTransform = new Map(
       platforms.map((platform) => [platform.mesh, platform]),
@@ -33,6 +36,10 @@ export class HavokPlatformSweep implements PlatformSweep {
   }
 
   public cast(start: BallPosition, end: BallPosition): PlatformController | null {
+    while (this.#knownCount < this.#platforms.length) {
+      const platform = this.#platforms[this.#knownCount++];
+      if (platform) this.#platformByTransform.set(platform.mesh, platform);
+    }
     this.#start.set(start.x, start.y, start.z);
     this.#end.set(end.x, end.y, end.z);
     this.#plugin.shapeCast(

@@ -10,6 +10,7 @@ import {
 
 const THEME_RANDOM: Readonly<Record<PlatformEncounterTheme, number>> = {
   chaos: 0.01,
+  "break-run": 0.01,
   trap: 0.2,
   deception: 0.4,
   "rich-lane": 0.55,
@@ -34,11 +35,13 @@ function plannerFor(
   theme: PlatformEncounterTheme,
   variant = 0,
 ): PlatformRoutePlanner {
-  return new PlatformRoutePlanner(
+  const planner = new PlatformRoutePlanner(
     0,
     gameConfig,
     scriptedRandom([THEME_RANDOM[theme], variant / 4]),
   );
+  if (theme === "break-run") planner.queueEncounter(theme);
+  return planner;
 }
 
 function rowMembers(
@@ -228,4 +231,18 @@ it("keeps a scheduled zone recognizable until the next timed event", () => {
   for (let row = 0; row < 14; row++) expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("rich-lane");
   planner.queueEncounter("trap");
   expect(planner.planNext(20, 0, difficulty(10)).encounterTheme).toBe("trap");
+});
+
+
+it("spans the widened camera width with valid choices and a playable destruction cascade", () => {
+  const planner = plannerFor("break-run"); planner.setPlayfieldHalfWidth(18);
+  const plan = planner.planNext(40, 0, difficulty(15));
+  const members = rowMembers(plan);
+  expect(members.some(member => member.x < -5)).toBe(true);
+  expect(members.some(member => member.x > 5)).toBe(true);
+  for (const member of members) {
+    expect(Math.abs(member.x) + member.widthScale * 7.5 / 2).toBeLessThanOrEqual(18);
+    expect(member.strength).toBeLessThanOrEqual(40); expect(member.kind).toBe("standard");
+  }
+  expect(plan.encounterTheme).toBe("break-run"); expect(plan.coinTrail?.count).toBe(3);
 });

@@ -5,6 +5,7 @@ export const CHALLENGES = [
   { theme: "trap", title: "Зигзаг", text: "Проход меняет сторону. Планируйте следующий поворот заранее." },
   { theme: "death-tunnel", title: "Узкий коридор", text: "Держитесь внутри коридора: по краям сверхпрочные платформы." },
   { theme: "chaos", title: "Мозаика", text: "Несколько типов платформ в одном ряду. Сравнивайте прочность со скоростью." },
+  { theme: "break-run", title: "Каскад", text: "Пробивайте цепочку платформ и наращивайте комбо." },
 ] as const satisfies readonly { theme: PlatformEncounterTheme; title: string; text: string }[];
 export type Challenge = (typeof CHALLENGES)[number];
 

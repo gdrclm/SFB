@@ -29,7 +29,7 @@ export class BallController implements FixedSimulationSystem {
   readonly #input: HorizontalInput;
   readonly #config: GameConfig["ball"];
   readonly #bounceConfig: GameConfig["unsuccessfulHit"];
-  readonly #horizontalLimit: number;
+  #horizontalLimit: number;
   readonly #previousPosition = { x: 0, y: 0, z: 0 };
   #fallSpeed: number;
   #horizontalVelocity = 0;
@@ -74,6 +74,14 @@ export class BallController implements FixedSimulationSystem {
     transform.position.y = config.ball.startPosition.y;
     transform.position.z = config.playSpace.depth;
     this.#copyCurrentPositionToPrevious();
+  }
+
+  public get horizontalLimit(): number { return this.#horizontalLimit; }
+
+  public setPlayfieldHalfWidth(halfWidth: number): void {
+    if (!Number.isFinite(halfWidth) || halfWidth <= this.#config.radius) return;
+    this.#horizontalLimit = halfWidth - this.#config.radius;
+    this.#transform.position.x = Math.max(-this.#horizontalLimit, Math.min(this.#horizontalLimit, this.#transform.position.x));
   }
 
   public get fallSpeed(): number {

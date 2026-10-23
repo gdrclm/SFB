@@ -9,22 +9,28 @@ export class PlatformLabels {
   public get visiblePlatforms(): readonly PlatformController[] { return this.#visible; }
   readonly #scene: Scene;
   readonly #canvas: HTMLCanvasElement;
-  readonly #labels: readonly { platform: PlatformController; label: HTMLSpanElement }[];
+  readonly #platforms: readonly PlatformController[];
+  readonly #root: HTMLElement;
+  readonly #labels: { platform: PlatformController; label: HTMLSpanElement }[];
 
   public constructor(scene: Scene, canvas: HTMLCanvasElement, root: HTMLElement, platforms: readonly PlatformController[]) {
     this.#scene = scene;
     this.#canvas = canvas;
     root.replaceChildren();
-    this.#labels = platforms.map((platform) => {
-      const label = document.createElement("span");
-      label.className = "platform-strength-label";
-      label.hidden = true;
-      root.append(label);
-      return { platform, label };
-    });
+    this.#platforms = platforms; this.#root = root; this.#labels = [];
+    this.#syncLabels();
+  }
+
+  #syncLabels(): void {
+    for (let i = this.#labels.length; i < this.#platforms.length; i++) {
+      const platform = this.#platforms[i]; if (!platform) continue;
+      const label = document.createElement("span"); label.className = "platform-strength-label"; label.hidden = true;
+      this.#root.append(label); this.#labels.push({ platform, label });
+    }
   }
 
   public render(): void {
+    this.#syncLabels();
     this.#visible = [];
     const camera = this.#scene.activeCamera;
     if (camera === null) return;
@@ -37,7 +43,8 @@ export class PlatformLabels {
     for (const { platform, label } of this.#labels) {
       if (!platform.isActive) { label.hidden = true; continue; }
       const point = Vector3.Project(platform.mesh.getAbsolutePosition(), Matrix.IdentityReadOnly, transform, viewport);
-      const visible = point.z >= 0 && point.z <= 1 && point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height;
+      const projectedHalfWidth = platform.width / Math.max(.001, (camera.orthoRight ?? 5) - (camera.orthoLeft ?? -5)) * width / 2;
+      const visible = point.z >= 0 && point.z <= 1 && point.x + projectedHalfWidth >= 0 && point.x - projectedHalfWidth <= width && point.y >= 0 && point.y <= height;
       const numbers = document.body.dataset.platformNumbers === "true";
       label.hidden = !visible || !numbers && approachSymbol(platform.approachState) === "";
       if (!visible) continue;
@@ -46,7 +53,7 @@ export class PlatformLabels {
       const state = platform.approachState;
       label.textContent = numbers ? String(platform.strength) : approachSymbol(state);
       label.dataset.kind = platform.kind;
-      label.style.transform = `translate3d(${String(point.x / width * bounds.width)}px,${String(point.y / height * bounds.height)}px,0) translate(-50%,-50%)`;
+      label.style.transform = `translate3d(${String(Math.max(18, Math.min(bounds.width - 18, point.x / width * bounds.width)))}px,${String(point.y / height * bounds.height)}px,0) translate(-50%,-50%)`;
       label.dataset.approach = platform.approachState ?? "none";
     }
   }

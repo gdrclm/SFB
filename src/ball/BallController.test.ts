@@ -236,3 +236,14 @@ it("applies direct pointer movement before the simulation tick and preserves the
   expect(ball.position.x).toBe(-4.5);
   expect(ball.horizontalVelocity).toBe(0);
 });
+
+
+it("uses the expanded camera width for immediate steering and clamps safely on shrink", () => {
+  const transform = createTransform(), input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
+  const ball = new BallController(transform, input, gameConfig);
+  ball.setPlayfieldHalfWidth(18); ball.applyImmediateInput();
+  expect(ball.position.x).toBe(17.5);
+  input.normalizedPosition = -1; ball.applyImmediateInput(); expect(ball.position.x).toBe(-17.5);
+  ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
+  ball.setPlayfieldHalfWidth(NaN); expect(ball.horizontalLimit).toBe(5.5);
+});

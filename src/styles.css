@@ -2448,3 +2448,22 @@ body[data-developer-mode="true"] .ranked-mode { display: none; }
 /* Canvas wind remains visible on mobile quality tiers without CSS mask/filter compositing. */
 .canvas-wind .speed-streaks { display: none !important; }
 .speed-wind-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Encounter identity lives at the edges; no new HUD panels or safe-lane markers. */
+.encounter-feedback { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; --zone-color: 255, 148, 66; }
+.encounter-feedback[hidden] { display: none; }
+.encounter-feedback::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--zone-color), .19), transparent 16%, transparent 84%, rgba(var(--zone-color), .19)); }
+.encounter-rail { position: absolute; top: 22%; bottom: 22%; width: 14px; color: rgba(var(--zone-color), .8); }
+.encounter-left { left: 5px; } .encounter-right { right: 5px; }
+.encounter-rail i { position: absolute; top: calc(12% + var(--mark) * 28%); font-size: 20px; font-weight: 900; font-style: normal; opacity: .45; animation: encounter-mark 1.8s ease-in-out infinite; animation-delay: calc(var(--mark) * -.3s); }
+.encounter-feedback[data-zone="trap"] .encounter-rail, .encounter-feedback[data-zone="danger"] .encounter-rail { background: repeating-linear-gradient(135deg, transparent 0 19px, rgba(var(--zone-color), .25) 19px 24px, transparent 24px 38px); }
+.encounter-feedback[data-zone="danger"] { --zone-color: 255, 80, 100; }
+.encounter-feedback[data-zone="danger"] i { animation-duration: 1.2s; }
+.encounter-feedback[data-zone="reward"] { --zone-color: 255, 208, 65; }
+.encounter-feedback[data-zone="reward"] i { animation-name: encounter-reward; }
+.encounter-feedback[data-zone="shatter"] { --zone-color: 90, 245, 255; }
+.encounter-feedback[data-zone="shatter"] i { animation-name: encounter-shard; }
+@keyframes encounter-mark { 50% { opacity: .9; transform: translateY(5px); } }
+@keyframes encounter-reward { 50% { opacity: .95; transform: translateY(-12px) scale(1.2); } }
+@keyframes encounter-shard { 50% { opacity: .85; transform: rotate(30deg) scale(.75); } }
+@media (prefers-reduced-motion: reduce) { .encounter-rail i { animation: none !important; opacity: .65; } }

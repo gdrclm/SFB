@@ -1,5 +1,6 @@
-export type GameSound = "coin" | "boost" | "break" | "impact" | "heal";
+export type GameSound = "coin" | "boost" | "break" | "impact" | "heal" | "zone-trap" | "zone-reward" | "zone-shatter";
 const tones: Record<GameSound, readonly [number, number, number]> = {
+  "zone-trap": [240, 95, .3], "zone-reward": [620, 1240, .3], "zone-shatter": [330, 660, .18],
   coin: [880, 1760, .09], heal: [520, 1040, .24], boost: [100, 650, .22], break: [160, 40, .1], impact: [90, 35, .18],
 };
 export function coinPitch(step: number): number {
@@ -41,11 +42,11 @@ class GameSounds {
     const impactPitch = kind === "break" ? 1 / Math.sqrt(weight) : 1;
     const start = baseStart * pitch * impactPitch, end = baseEnd * pitch * impactPitch;
     const oscillator = context.createOscillator(), gain = context.createGain();
-    oscillator.type = kind === "break" || kind === "impact" ? "triangle" : "sine";
+    oscillator.type = kind === "break" || kind === "impact" || kind === "zone-trap" || kind === "zone-shatter" ? "triangle" : "sine";
     oscillator.frequency.setValueAtTime(start, now);
     oscillator.frequency.exponentialRampToValueAtTime(end, now + duration);
     gain.gain.setValueAtTime(.001, now);
-    gain.gain.linearRampToValueAtTime(kind === "coin" ? .1 : .16 * weight, now + .008);
+    gain.gain.linearRampToValueAtTime(kind.startsWith("zone-") ? .045 : kind === "coin" ? .1 : .16 * weight, now + .008);
     gain.gain.exponentialRampToValueAtTime(.001, now + duration);
     oscillator.connect(gain); gain.connect(context.destination);
     this.#voices.add(oscillator);

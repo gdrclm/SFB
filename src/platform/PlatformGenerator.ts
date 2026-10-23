@@ -15,7 +15,7 @@ type GeneratorBall = Pick<BallController, "fallSpeed" | "position">;
 type GeneratorPool = Pick<
   PlatformPool,
   "platforms" | "availableCount" | "acquire" | "release"
->;
+> & Partial<Pick<PlatformPool, "beginGeneration">>;
 type DifficultySource = Pick<PhaseOneController, "currentDifficulty">;
 export type PlatformGeneratedListener = (plan: PlannedPlatform) => void;
 
@@ -25,6 +25,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
   readonly #difficultySource: DifficultySource;
   readonly #config: GameConfig;
   #planner: PlatformRoutePlanner;
+  #halfWidth: number;
   readonly #random: () => number;
   public enabled = true;
   public allowSlowPlatforms = true;
@@ -42,6 +43,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
     this.#pool = pool;
     this.#difficultySource = difficultySource;
     this.#config = config;
+    this.#halfWidth = config.playSpace.halfWidth;
     const activeY = pool.platforms
       .filter((platform) => platform.isActive)
       .map((platform) => platform.mesh.position.y);
@@ -51,17 +53,26 @@ export class PlatformGenerator implements FixedSimulationSystem {
     this.#planner = new PlatformRoutePlanner(initialLowestY, config, random);
   }
 
+  public setPlayfieldHalfWidth(halfWidth: number): void {
+    if (!Number.isFinite(halfWidth)) return;
+    this.#halfWidth = Math.max(this.#config.playSpace.halfWidth, halfWidth);
+    this.#planner.setPlayfieldHalfWidth(this.#halfWidth);
+  }
+
   public queueEncounter(theme: PlatformEncounterTheme): void { this.#planner.queueEncounter(theme); }
 
   public resumeFromCurrentPosition(): void {
     this.#planner = new PlatformRoutePlanner(this.#ball.position.y, this.#config, this.#random);
+    this.#planner.setPlayfieldHalfWidth(this.#halfWidth);
     this.enabled = true;
   }
 
   public fixedUpdate(): void {
     if (!this.enabled) return;
+    this.#pool.beginGeneration?.();
     this.#recyclePlatformsAbovePlayWindow();
     this.#fillLookAheadWindow();
+    this.#fillSideSpace();
   }
 
   public onPlatformGenerated(listener: PlatformGeneratedListener): () => void {
@@ -103,6 +114,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       const platform = this.#pool.acquire(
         new Vector3(plan.x, plan.y, this.#config.playSpace.depth),
         {
+          encounterTheme: plan.encounterTheme,
           strength: plan.strength,
           strengthLevel: plan.strengthLevel,
           routeKind: plan.routeKind,
@@ -123,6 +135,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
             this.#config.playSpace.depth,
           ),
           {
+            encounterTheme: plan.encounterTheme,
             strength: choice.strength,
             strengthLevel: choice.strengthLevel,
             routeKind: choice.routeKind,
@@ -142,6 +155,38 @@ export class PlatformGenerator implements FixedSimulationSystem {
         (plan.choices ?? []).some((choice) => choice.routeKind !== "bypass")
       ) {
         mandatoryAheadCount += 1;
+      }
+    }
+  }
+
+  #fillSideSpace(): void {
+    const base = this.#config.playSpace.halfWidth;
+    if (this.#halfWidth <= base + .01) return;
+    const target = base + Math.ceil((this.#halfWidth - base) / base) * base - this.#config.platformGeneration.multiRowSideMargin;
+    const rows = new Map<string, PlatformController[]>();
+    for (const platform of this.#getActivePlatformsAhead()) {
+      const key = platform.mesh.position.y.toFixed(4);
+      const row = rows.get(key) ?? []; row.push(platform); rows.set(key, row);
+    }
+    const templateWidth = this.#config.platforms[0]?.size.width ?? 7.5;
+    const gap = this.#config.platformGeneration.multiRowGap;
+    for (const row of [...rows.values()].sort((a, b) => (b[0]?.mesh.position.y ?? 0) - (a[0]?.mesh.position.y ?? 0))) {
+      const sample = row[0]; if (!sample) continue;
+      const width = (platform: PlatformController): number => platform.width || templateWidth;
+      for (const side of [-1, 1]) {
+        const neighbor = row.reduce((outer, p) => side * p.mesh.position.x > side * outer.mesh.position.x ? p : outer, sample);
+        let edge = Math.max(base, ...row.map(p => side * p.mesh.position.x + width(p) / 2));
+        while (target - edge - gap >= 1.25) {
+          if (this.#pool.availableCount < 1) return;
+          const span = Math.min(base, target - edge - gap);
+          const platform = this.#pool.acquire(new Vector3(side * (edge + gap + span / 2), sample.mesh.position.y, this.#config.playSpace.depth), {
+            encounterTheme: neighbor.encounterTheme,
+            strength: neighbor.strength, strengthLevel: neighbor.strengthLevel, routeKind: neighbor.routeKind, isTrap: neighbor.routeKind !== "mandatory",
+            widthScale: span / templateWidth, kind: neighbor.kind === "time-slow" && !this.allowSlowPlatforms ? "standard" : neighbor.kind,
+          });
+          if (!platform) return;
+          row.push(platform); edge += gap + span;
+        }
       }
     }
   }

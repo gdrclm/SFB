@@ -1,3 +1,4 @@
+import { EncounterFeedback } from "../feedback/EncounterFeedback";
 import { acquireGameScene } from "../scene/GameSceneSession";
 import { LifeFeedback } from "../feedback/LifeFeedback";
 import { renderBankBalance } from "../shop/renderBankBalance";
@@ -211,6 +212,7 @@ export class GameApplication {
   #cameraController: CameraController | null = null;
   #boostController: BoostController | null = null;
   #speedFeedback: SpeedFeedback | null = null;
+  #encounterFeedback: EncounterFeedback | null = null;
   #boostButton: BoostButtonController | null = null;
   #coinCollectionController: CoinCollectionController | null = null;
   #coinGenerator: CoinGenerator | null = null;
@@ -359,6 +361,11 @@ export class GameApplication {
     else if (theme === "world-sunset") this.#scene.clearColor.set(.2, .12, .36, 1);
     else this.#scene.clearColor.set(.03, .55, .91, 1);
     this.#feel = new GameFeel(this.#scene, this.#canvas);
+    this.#encounterFeedback = new EncounterFeedback(this.#canvas.parentElement ?? document.body, mood => {
+      if (mood === "trap" || mood === "danger") getGameSounds().play("zone-trap");
+      else if (mood === "reward") getGameSounds().play("zone-reward");
+      else if (mood === "shatter") getGameSounds().play("zone-shatter");
+    });
     this.#defeatPending = false;
     this.#lifeFeedback = new LifeFeedback(mainScene.camera, requireMenuElement(document.body, "#life-feedback"), this.#reducedMotion);
     this.#lifeFeedback.setLives(this.#lives.remainingLives);
@@ -371,13 +378,13 @@ export class GameApplication {
     this.#runProgress.observeSpeed(this.#config.ball.startFallSpeed);
     this.#updateMission({ type: "run-start" });
 
-    const horizontalLimit = Math.max(.001, this.#config.playSpace.halfWidth - this.#config.ball.radius);
+    const horizontalLimit = (): number => Math.max(.001, this.#ballController?.horizontalLimit ?? this.#config.playSpace.halfWidth - this.#config.ball.radius);
     this.#horizontalInput = new PointerHorizontalInput(this.#canvas, {
-      getPosition: () => (this.#ballController?.position.x ?? this.#config.ball.startPosition.x) / horizontalLimit,
+      getPosition: () => (this.#ballController?.position.x ?? this.#config.ball.startPosition.x) / horizontalLimit(),
       mapPosition: screen => {
         const camera = mainScene.camera;
-        const left = camera.orthoLeft ?? -horizontalLimit, right = camera.orthoRight ?? horizontalLimit;
-        return (camera.globalPosition.x + left + (screen + 1) / 2 * (right - left)) / horizontalLimit;
+        const left = camera.orthoLeft ?? -horizontalLimit(), right = camera.orthoRight ?? horizontalLimit();
+        return (camera.globalPosition.x + left + (screen + 1) / 2 * (right - left)) / horizontalLimit();
       },
       onChange: () => {
         if (this.#runStarted && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial
@@ -435,6 +442,7 @@ export class GameApplication {
       this.#config,
     );
     this.#fixedStep.register(this.#cameraController);
+    this.#fixedStep.register({ fixedUpdate: () => { this.#syncPlayfieldWidth(); } });
     const coins = createCoins(this.#scene, this.#config);
     this.#coinCollectionController = new CoinCollectionController(
       this.#ballController,
@@ -477,6 +485,7 @@ export class GameApplication {
         this.#coinGenerator?.handlePlatformGenerated(plan);
       },
     );
+    this.#syncPlayfieldWidth();
     this.#platformGenerator.allowSlowPlatforms = false;
     this.#platformGenerator.queueEncounter("chaos");
     this.#fixedStep.register(this.#platformGenerator);
@@ -633,6 +642,7 @@ export class GameApplication {
     this.#feel?.dispose();
     this.#feel = null;
     this.#speedFeedback?.dispose();
+    this.#encounterFeedback?.dispose(); this.#encounterFeedback = null;
     this.#isDisposed = !keepScene;
     this.#runStarted = false;
     this.#fixedStep.clear();
@@ -732,6 +742,8 @@ export class GameApplication {
       if (this.#powers?.invulnerable) this.#slowModeButtonElement.disabled = true;
       this.#speedFeedback?.render(this.#ballController?.fallSpeed ?? 0, isPaused || this.#gameState.current === GameState.GameOver);
     }
+    this.#encounterFeedback?.render(this.#platformPool?.platforms ?? [], this.#ballController?.position.y ?? 0,
+      isPaused || this.#gameState.current === GameState.GameOver, realDeltaSeconds);
     this.#speedFeedback?.draw(realDeltaSeconds);
     if (!isPaused && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
     const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
@@ -761,6 +773,14 @@ export class GameApplication {
     }
   };
 
+  #syncPlayfieldWidth(): void {
+    const camera = this.#mainScene?.camera;
+    if (!camera || camera.orthoLeft === null || camera.orthoRight === null) return;
+    const halfWidth = Math.max(this.#config.playSpace.halfWidth, (camera.orthoRight - camera.orthoLeft) / 2);
+    this.#ballController?.setPlayfieldHalfWidth(halfWidth);
+    this.#platformGenerator?.setPlayfieldHalfWidth(halfWidth);
+  }
+
   readonly #resize = (): void => {
     this.#quality?.resize();
     this.#engine?.resize();
@@ -771,6 +791,7 @@ export class GameApplication {
       this.#cameraController?.setBallScreenRatio((top + Math.max(0, bottom - top) * .38) / height);
     }
     this.#cameraController?.resizeViewport();
+    this.#syncPlayfieldWidth();
   };
 
   #setStatus(renderer: RendererKind): void {

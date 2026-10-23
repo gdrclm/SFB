@@ -7,11 +7,16 @@ import {
 } from "./PlatformController";
 
 export class PlatformPool {
-  public readonly platforms: readonly PlatformController[];
+  readonly #platforms: PlatformController[];
+  readonly #factory: (() => PlatformController) | undefined;
+  readonly #maximum: number;
+  #growthBudget = 4;
+  public get platforms(): readonly PlatformController[] { return this.#platforms; }
+  public beginGeneration(): void { this.#growthBudget = 4; }
   readonly #available: PlatformController[] = [];
 
-  public constructor(platforms: readonly PlatformController[]) {
-    this.platforms = platforms;
+  public constructor(platforms: readonly PlatformController[], factory?: () => PlatformController, maximum = platforms.length) {
+    this.#platforms = [...platforms]; this.#factory = factory; this.#maximum = maximum;
     for (const platform of platforms) {
       if (!platform.isActive && !platform.isBreaking) {
         this.#available.push(platform);
@@ -20,7 +25,7 @@ export class PlatformPool {
   }
 
   public get availableCount(): number {
-    return this.#available.length;
+    return this.#available.length + (this.#factory ? Math.min(this.#growthBudget, this.#maximum - this.#platforms.length) : 0);
   }
 
   public release(platform: PlatformController): boolean {
@@ -52,6 +57,9 @@ export class PlatformPool {
     position?: Vector3,
     properties?: PlatformActivationProperties,
   ): PlatformController | null {
+    if (this.#available.length === 0 && this.#factory && this.#growthBudget > 0 && this.#platforms.length < this.#maximum) {
+      const created = this.#factory(); this.#platforms.push(created); this.#available.push(created); this.#growthBudget--;
+    }
     const platform = this.#available.pop();
     if (platform === undefined) {
       return null;
@@ -99,5 +107,11 @@ export function createStaticPlatformPool(scene: Scene, config: GameConfig): Plat
     platforms.push(controller);
   }
 
-  return new PlatformPool(platforms);
+  let nextIndex = platforms.length;
+  return new PlatformPool(platforms, () => {
+    const index = nextIndex++;
+    const template = config.platforms[index % config.platforms.length];
+    if (!template) throw new Error("Platform pool template is missing.");
+    return new PlatformController(scene, config, { ...template, id: `platform-pooled-${String(index)}` }, false);
+  }, config.platformGeneration.poolSize * 4);
 }

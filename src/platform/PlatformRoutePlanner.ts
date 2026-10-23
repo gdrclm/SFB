@@ -7,6 +7,7 @@ import type { PhaseOneDifficulty } from "../progression/PhaseOneController";
 import type { PlatformRouteKind } from "./PlatformController";
 
 export type PlatformEncounterTheme =
+  | "break-run"
   | "chaos"
   | "trap"
   | "deception"
@@ -98,6 +99,7 @@ const SAFE_TIME_SLOW: RowMember = Object.freeze({
 
 export class PlatformRoutePlanner {
   readonly #config: GameConfig;
+  #halfWidth: number;
   readonly #random: () => number;
   #nextY: number;
   #lastTheme: PlatformEncounterTheme | null = null;
@@ -118,7 +120,12 @@ export class PlatformRoutePlanner {
 
     this.#nextY = initialLowestY;
     this.#config = config;
+    this.#halfWidth = config.playSpace.halfWidth;
     this.#random = random;
+  }
+
+  public setPlayfieldHalfWidth(halfWidth: number): void {
+    if (Number.isFinite(halfWidth)) this.#halfWidth = Math.max(this.#config.playSpace.halfWidth, halfWidth);
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void {
@@ -278,6 +285,9 @@ export class PlatformRoutePlanner {
     rowIndex: number,
   ): RowBlueprint {
     switch (theme) {
+      case "break-run":
+        return { lanes: [SAFE_STANDARD, SAFE_STANDARD, SAFE_STANDARD], primaryLaneIndex: rowIndex % 3,
+          coinLaneIndex: rowIndex % 3, coinTrail: { count: 3, spacing: .65 } };
       case "chaos":
         return this.#createChaosBlueprint();
       case "trap":
@@ -486,12 +496,12 @@ export class PlatformRoutePlanner {
   #getLanePositions(count: number): readonly number[] {
     const generation = this.#config.platformGeneration;
     const usableWidth =
-      this.#config.playSpace.halfWidth * 2 -
+      this.#halfWidth * 2 -
       generation.multiRowSideMargin * 2;
     const platformWidth =
       (usableWidth - generation.multiRowGap * (count - 1)) / count;
     const firstCenter =
-      -this.#config.playSpace.halfWidth +
+      -this.#halfWidth +
       generation.multiRowSideMargin +
       platformWidth / 2;
     return Array.from(
@@ -508,7 +518,7 @@ export class PlatformRoutePlanner {
     }
     const generation = this.#config.platformGeneration;
     const usableWidth =
-      this.#config.playSpace.halfWidth * 2 -
+      this.#halfWidth * 2 -
       generation.multiRowSideMargin * 2;
     const width =
       (usableWidth - generation.multiRowGap * (count - 1)) / count;
