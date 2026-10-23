@@ -1,3 +1,4 @@
+import { BallCrystalGlow } from "./BallCrystalGlow";
 import { getBallLimbs } from "./BallLimbs";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -50,6 +51,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #speedColor: Color3;
   readonly #phaseColor: Color3;
   readonly #baseOutlineColor: Color3;
+  readonly #crystalOutlineColor = new Color3(.08, .92, 1);
   readonly #baseTrailColor = new Color3(.25, .9, 1);
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;
@@ -61,6 +63,8 @@ export class BallVisualController implements FixedSimulationSystem {
   #boostStrength = 0;
   readonly #expression = new BallExpressionState();
   readonly #fx: BallDynamicsFX;
+  readonly #crystalGlow: BallCrystalGlow;
+  #crystalBlend = 0;
   #slowActive = false;
   #impactElapsed = 1;
   #contactAnchored = false;
@@ -105,6 +109,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trail.material = this.#trailMaterial;
     this.#fx = new BallDynamicsFX(ball, config.ball.radius,
       typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches, config.ball.startFallSpeed);
+    this.#crystalGlow = new BallCrystalGlow(ball, config.ball.radius);
     this.#applyMaterial(0);
   }
 
@@ -152,6 +157,14 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#ball.scaling.z += (this.#baseScale.z / Math.sqrt(sy) - this.#ball.scaling.z) * amount;
     this.#ball.rotation.z += (.18 + Math.sin(age * 8) * .05 * Math.exp(-age * 2) - this.#ball.rotation.z) * amount;
     this.#fx.update(dt, { speed: 0, look: 0, boost: 0, anticipating: false, slow: false, danger: false });
+  }
+
+  public setCrystalBlend(blend: number): void {
+    const weight = Number.isFinite(blend) ? clamp01(blend) : 0;
+    if (weight === this.#crystalBlend) return;
+    this.#crystalBlend = weight;
+    this.#crystalGlow.setBlend(weight);
+    this.#applyMaterial(this.#speedIntensity);
   }
 
   public setSlow(active: boolean): void { this.#slowActive = active; }
@@ -232,6 +245,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trailIntensity = 0;
     this.#phaseTransitionBlend = 0;
     this.#phaseTransitionTarget = 0;
+    this.#crystalBlend = 0;
     this.#boostElapsedSeconds = null;
     this.#boostStrength = 0;
     this.#applyMaterial(0);
@@ -239,6 +253,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#trail.dispose();
     this.#trailMaterial.dispose();
     this.#fx.dispose();
+    this.#crystalGlow.dispose();
   }
 
   #anchorContact(active: boolean): void {
@@ -304,7 +319,8 @@ export class BallVisualController implements FixedSimulationSystem {
         this.#phaseTransitionBlend,
       ),
     );
-    this.#ball.outlineWidth = lerp(
+    Color3.LerpToRef(this.#ball.outlineColor, this.#crystalOutlineColor, this.#crystalBlend, this.#ball.outlineColor);
+    this.#ball.outlineWidth = this.#crystalBlend * .012 + lerp(
       this.#config.baseOutlineWidth,
       this.#config.maximumOutlineWidth,
       speedIntensity,

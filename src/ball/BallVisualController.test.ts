@@ -257,3 +257,39 @@ describe("BallVisualController", () => {
     engine.dispose();
   });
 });
+
+
+it("blends crystal light with the location, preserves the face and reuses its halo", () => {
+  const { engine, scene, ball, controller } = createFixture();
+  const halo = scene.getMeshByName("BallCrystalHalo");
+  const blue = scene.getMaterialByName("BallBlueDetails") as StandardMaterial;
+  const face = scene.getMaterialByName("BallFaceDetails") as StandardMaterial;
+  const originalFace = face.emissiveColor.clone();
+  const baseOutline = ball.outlineColor.clone(), baseWidth = ball.outlineWidth;
+  const meshes = scene.meshes.length, materials = scene.materials.length, textures = scene.textures.length;
+  expect(halo?.isEnabled()).toBe(false);
+  controller.setCrystalBlend(.5);
+  expect(halo?.visibility).toBe(.5);
+  expect(halo?.isEnabled()).toBe(true);
+  const partial = ball.outlineColor.clone();
+  controller.setCrystalBlend(1);
+  expect(ball.outlineColor.g).toBeGreaterThan(partial.g);
+  expect(ball.outlineWidth).toBeGreaterThan(baseWidth);
+  expect(blue.emissiveColor.g).toBeCloseTo(.8);
+  expect(face.emissiveColor.equals(originalFace)).toBe(true);
+  controller.react("hurt"); controller.fixedUpdate(1 / 60);
+  expect(halo?.parent).toBe(ball);
+  expect(halo?.isEnabled()).toBe(true);
+  for (let i = 0; i < 100; i++) controller.setCrystalBlend(i % 2);
+  expect(scene.meshes.length).toBe(meshes);
+  expect(scene.materials.length).toBe(materials);
+  expect(scene.textures.length).toBe(textures);
+  controller.setCrystalBlend(0);
+  expect(halo?.isEnabled()).toBe(false);
+  expect(ball.outlineColor.equals(baseOutline)).toBe(true);
+  expect(blue.emissiveColor.g).toBeCloseTo(.18);
+  controller.dispose();
+  expect(scene.getMeshByName("BallCrystalHalo")).toBeNull();
+  expect(scene.getMaterialByName("BallCrystalHaloMaterial")).toBeNull();
+  scene.dispose(); engine.dispose();
+});

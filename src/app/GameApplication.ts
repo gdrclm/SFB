@@ -755,6 +755,7 @@ export class GameApplication {
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = hideNotices || !this.#boostCoach.visible;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
     this.#backdrop?.update(this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
+    this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
     if (this.#defeatPending && !isPaused) {
