@@ -1,3 +1,4 @@
+import { worldProgression } from "../progression/WorldProgression";
 import { BaitZoneController } from "../challenges/BaitZoneController";
 import { EncounterFeedback } from "../feedback/EncounterFeedback";
 import { acquireGameScene } from "../scene/GameSceneSession";
@@ -508,13 +509,12 @@ export class GameApplication {
     );
     this.#syncPlayfieldWidth();
     this.#platformGenerator.allowSlowPlatforms = false;
-    this.#platformGenerator.queueEncounter("chaos");
     this.#fixedStep.register(this.#platformGenerator);
     this.#baitZone = new BaitZoneController(this.#ballController, coins, this.#platformPool, this.#config, () => {
       const camera = mainScene.camera;
       return { halfWidth: Math.max(this.#config.playSpace.halfWidth, ((camera.orthoRight ?? 5) - (camera.orthoLeft ?? -5)) / 2),
         spaceBelow: Math.max(7, (this.#ballController?.position.y ?? 0) - (camera.globalPosition.y + (camera.orthoBottom ?? -7))) };
-    }, () => { this.#platformGenerator?.queueEncounter("chaos"); });
+    }, () => { this.#platformGenerator?.queueEncounter("breather"); });
     this.#fixedStep.register(this.#baitZone);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
       this.#baitZone?.cancel();
@@ -525,7 +525,7 @@ export class GameApplication {
       requireMenuElement(notice, "strong").textContent = challenge.title;
       requireMenuElement(notice, "span").textContent = challenge.text;
       this.#challengeRemaining = 7;
-    });
+    }, Math.random, () => worldProgression(this.#runProgress.depth));
     this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
       () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),
       kind => {
@@ -1314,7 +1314,7 @@ export class GameApplication {
         for (const platform of pool.platforms) if (platform.isActive) pool.release(platform);
         for (const coin of coins) coin.deactivate();
         this.#platformGenerator?.resumeFromCurrentPosition();
-        this.#platformGenerator?.queueEncounter("chaos");
+        this.#platformGenerator?.queueEncounter("breather");
         document.body.dataset.guideStage = "free";
       },
       complete: () => {

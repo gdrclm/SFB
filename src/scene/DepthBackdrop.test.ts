@@ -64,7 +64,7 @@ it("does not turn a delayed frame into an instant switch and keeps pages touchin
   } finally { world.dispose(); }
 });
 
-it.each([[500, "crystal"], [1500, "lava"], [4000, "abyss"]] as const)("opens the correct backdrop immediately at %s metres", (depth, name) => {
+it.each([[500, "crystal"], [3000, "lava"], [12000, "abyss"]] as const)("opens the correct backdrop immediately at %s metres", (depth, name) => {
   const world = setup(false, depth);
   try {
     expect(world.scene.getMeshByName("sky")).toBeNull();

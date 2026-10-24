@@ -151,8 +151,10 @@ describe("PlatformGenerator", () => {
     );
     expect(generated).toHaveBeenCalledTimes(3);
     expect(aheadRows.size).toBeGreaterThan(gameConfig.platformGeneration.lookAheadCount);
-    expect(ahead).toHaveLength(15);
-    expect(acquire).toHaveBeenCalledTimes(12);
+    const generatedMembers = generated.mock.calls.reduce((total, [plan]) => total + 1 + (plan.choices?.length ?? 0), 0);
+    expect(acquire).toHaveBeenCalledTimes(generatedMembers);
+    expect(ahead.length).toBe(3 + generatedMembers);
+    expect(ahead.length).toBeLessThanOrEqual(15);
     expect(Math.min(...ahead.map((platform) => platform.mesh.position.y))).toBeLessThan(-5);
   });
 
@@ -210,7 +212,7 @@ describe("PlatformGenerator", () => {
     expect([waiting.strength, secondWaiting.strength].some(strength => strength <= 9)).toBe(true);
   });
 
-  it("materializes consecutive rich-lane and death-tunnel zones", () => {
+  it("starts with a forgiving run-up before moving into a combo cascade", () => {
     const platforms = Array.from({ length: 20 }, () => createPlatform(0, false));
     const { pool } = createPool(platforms);
     const generator = new PlatformGenerator(
@@ -236,8 +238,8 @@ describe("PlatformGenerator", () => {
     const active = platforms.filter(platform => platform.isActive);
     const plans = generated.mock.calls.map(([plan]) => plan);
     expect(plans).toHaveLength(6);
-    expect(plans.slice(0, 5).every(plan => plan.encounterTheme === "rich-lane")).toBe(true);
-    expect(plans[5]?.encounterTheme).toBe("death-tunnel");
+    expect(plans.every(plan => plan.section === "run-up")).toBe(true);
+    expect(active.every(platform => platform.strength <= 20)).toBe(true);
     expect(new Set(active.map(platform => platform.mesh.position.y)).size).toBeGreaterThan(6);
     const template = gameConfig.platforms[0];
     if (template === undefined) {
@@ -302,7 +304,7 @@ it.each(["trap", "rich-lane", "break-run", "death-tunnel"] as const)(
       const active = platforms.filter(p => p.isActive);
       expect(active.length).toBeGreaterThan(24);
       for (const p of active) {
-        expect(p.encounterTheme).toBe(theme);
+        expect(listener.mock.calls.some(([plan]) => plan.encounterTheme === p.encounterTheme)).toBe(true);
         expect(p.width).toBeLessThanOrEqual(5.4);
         if (Math.abs(p.mesh.position.x) <= 5) continue;
         const plans = listener.mock.calls.filter(([, additional]) => !additional).map(([plan]) => plan);

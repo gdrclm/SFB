@@ -79,8 +79,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
     this.enabled = true;
   }
 
-  public fixedUpdate(): void {
+  public fixedUpdate(seconds = 0): void {
     if (!this.enabled) return;
+    for (const platform of this.#pool.platforms) if (platform.isActive && platform.lateralMotion) platform.advanceMotion(seconds);
     this.#pool.beginGeneration?.();
     this.#recyclePlatformsAbovePlayWindow();
     this.#fillLookAheadWindow();
@@ -130,6 +131,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
         new Vector3(plan.x, plan.y, this.#config.playSpace.depth),
         {
           encounterTheme: plan.encounterTheme,
+          ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
           strength: plan.strength,
           strengthLevel: plan.strengthLevel,
           routeKind: plan.routeKind,
@@ -152,6 +154,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
           ),
           {
             encounterTheme: plan.encounterTheme,
+            ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
             strength: choice.strength,
             strengthLevel: choice.strengthLevel,
             routeKind: choice.routeKind,
@@ -200,6 +203,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       yOffset: platform.mesh.position.y - first.mesh.position.y,
       properties: {
         encounterTheme: platform.encounterTheme,
+        ...(platform.lateralMotion ? { lateralMotion: platform.lateralMotion } : {}),
         strength: platform.strength,
         strengthLevel: platform.strengthLevel,
         routeKind: platform.routeKind,

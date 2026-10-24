@@ -15,6 +15,7 @@ export function atStartDepth(config: GameConfig, depth: number): GameConfig {
   if (depth === 0) return config;
   return {
     ...config,
+    startDepth: depth,
     ball: { ...config.ball, startPosition: { ...config.ball.startPosition, y: config.ball.startPosition.y - depth } },
     platforms: config.platforms.map(platform => ({ ...platform, position: { ...platform.position, y: platform.position.y - depth } })),
     coins: { ...config.coins, positions: config.coins.positions.map(position => ({ ...position, y: position.y - depth })) },

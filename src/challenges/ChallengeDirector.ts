@@ -1,6 +1,10 @@
+import type { WorldProgression } from "../progression/WorldProgression";
 import type { PlatformEncounterTheme } from "../platform/PlatformRoutePlanner";
 
 export const CHALLENGES = [
+  { theme: "run-up", title: "Разгон", text: "Лови ритм и набирай скорость." },
+  { theme: "breather", title: "Передышка", text: "Восстанови контроль и сохрани разгон." },
+  { theme: "climax", title: "Кульминация", text: "Каскад, повороты и рискованная добыча." },
   { theme: "rich-lane", title: "Золотая развилка", text: "Больше монет за прочной платформой. Сверьте скорость и цену BOOST перед входом." },
   { theme: "trap", title: "Зигзаг", text: "Проход меняет сторону. Планируйте следующий поворот заранее." },
   { theme: "bait", title: "Приманка", text: "Монеты зовут на другую сторону. Под последней группой — ловушка." },
@@ -16,7 +20,9 @@ export class ChallengeDirector {
   readonly #start: (challenge: Challenge) => void;
   #remaining: number;
   #next = 0;
-  public constructor(start: (challenge: Challenge) => void, random = Math.random) {
+  readonly #progression: (() => WorldProgression) | undefined;
+  public constructor(start: (challenge: Challenge) => void, random = Math.random, progression?: () => WorldProgression) {
+    this.#progression = progression;
     this.#start = start; this.#random = random; this.#remaining = this.#interval();
   }
   #interval(): number {
@@ -26,7 +32,13 @@ export class ChallengeDirector {
   public fixedUpdate(delta: number): void {
     this.#remaining -= delta;
     while (this.#remaining <= 1e-9) {
-      const challenge = CHALLENGES[this.#next % CHALLENGES.length];
+      const phase = this.#progression?.().phase;
+      const themes: readonly PlatformEncounterTheme[] = phase === "introduction" ? ["break-run", "run-up", "rich-lane", "breather"]
+        : phase === "development" ? ["trap", "rich-lane", "break-run", "bait", "death-tunnel", "breather"]
+        : phase === "climax" ? ["climax", "breather", "death-tunnel", "rich-lane", "break-run", "breather"]
+        : ["rich-lane", "trap", "bait", "death-tunnel", "chaos", "break-run"];
+      const theme = themes[this.#next % themes.length];
+      const challenge = CHALLENGES.find(candidate => candidate.theme === theme);
       if (challenge !== undefined) this.#start(challenge);
       this.#next++;
       this.#remaining += this.#interval();

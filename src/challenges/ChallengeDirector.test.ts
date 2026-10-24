@@ -18,3 +18,19 @@ it("increases physical challenge frequency during a long run without removing re
   expect(events.slice(3, 6)).toEqual([150, 180, 210]);
   expect(events.slice(6)).toEqual([235, 260]);
 });
+
+it("keeps world introductions gentle even late in a run and allows the complex challenges later", async () => {
+  const { worldProgression } = await import("../progression/WorldProgression");
+  let depth = 3000;
+  const start = vi.fn<(challenge: Challenge) => void>();
+  const director = new ChallengeDirector(start, () => 0, () => worldProgression(depth));
+  for (let i = 0; i < 8; i++) director.fixedUpdate(20);
+  expect(start.mock.calls.every(([c]) => !["bait", "trap", "death-tunnel", "climax"].includes(c.theme))).toBe(true);
+  depth = 6000; start.mockClear();
+  for (let i = 0; i < 6; i++) director.fixedUpdate(20);
+  expect(start.mock.calls.some(([c]) => c.theme === "bait")).toBe(true);
+  depth = 10000; start.mockClear();
+  for (let i = 0; i < 6; i++) director.fixedUpdate(20);
+  expect(start.mock.calls.some(([c]) => c.theme === "climax")).toBe(true);
+  expect(start.mock.calls.some(([c]) => c.theme === "breather")).toBe(true);
+});

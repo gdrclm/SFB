@@ -223,3 +223,27 @@ it("lets a ball-sized Havok sweep fly through generated openings and hit the act
   }
   scene.dispose(); engine.dispose();
 });
+
+it("moves the real Havok collider with the platform group without recreating meshes or leaking motion on reuse", async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const wasm = await readFile(new URL("../../node_modules/@babylonjs/havok/lib/esm/HavokPhysics.wasm", import.meta.url));
+  const plugin = new HavokPlugin(true, await HavokPhysics({ wasmBinary: Uint8Array.from(wasm).buffer }));
+  scene.enablePhysics(Vector3.Zero(), plugin);
+  const template = gameConfig.platforms[0]; if (!template) throw Error("Missing template");
+  const platform = new PlatformController(scene, gameConfig, template, false);
+  platform.reactivate(new Vector3(0, 0, 0), { strength: 10, strengthLevel: "low", widthScale: 1 / 7.5,
+    lateralMotion: { amplitude: .35, period: 4, phase: 0 } });
+  const sweep = new HavokPlatformSweep(scene, plugin, gameConfig.ball.radius, [platform]);
+  const cast = (x: number) => sweep.cast({ x, y: 2, z: 0 }, { x, y: -2, z: 0 });
+  expect(cast(-.9)?.id).toBe(platform.id); expect(cast(1.2)?.id).toBeUndefined();
+  const counts = [scene.meshes.length, scene.materials.length, scene.textures.length];
+  platform.advanceMotion(1);
+  expect(platform.mesh.position.x).toBeCloseTo(.35);
+  scene.getPhysicsEngine()?._step(1 / 60);
+  expect(cast(-.9)?.id).toBeUndefined(); expect(cast(1.2)?.id).toBe(platform.id);
+  for (let i = 0; i < 1000; i++) platform.advanceMotion(1 / 60);
+  expect([scene.meshes.length, scene.materials.length, scene.textures.length]).toEqual(counts);
+  platform.deactivate(); platform.reactivate(new Vector3(2, -2, 0), { strength: 10, strengthLevel: "low", widthScale: 1 / 7.5 });
+  platform.advanceMotion(1); expect(platform.mesh.position.x).toBe(2); expect(platform.lateralMotion).toBeUndefined();
+  sweep.dispose(); platform.dispose(); scene.dispose(); engine.dispose();
+});

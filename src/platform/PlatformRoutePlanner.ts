@@ -1,3 +1,6 @@
+import { worldProgression, type WorldProgression, type WorldPhase } from "../progression/WorldProgression";
+import type { DepthLocation } from "../scene/DepthLocations";
+import { cascadeVariant, climaxTheme, courseSectionAt, sectionForTheme, sectionRows, sectionTheme, type CourseSection, type CascadeVariant } from "./CourseSections";
 import { speedAfterBreak } from "../collision/BreakResistance";
 import { createEncounterLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
@@ -9,6 +12,9 @@ import type { PhaseOneDifficulty } from "../progression/PhaseOneController";
 import type { PlatformRouteKind } from "./PlatformController";
 
 export type PlatformEncounterTheme =
+  | "run-up"
+  | "breather"
+  | "climax"
   | "bait"
   | "break-run"
   | "chaos"
@@ -39,6 +45,11 @@ export interface PlannedPlatform {
   readonly reactionWindowSeconds: number;
   readonly stageNumber: number;
   readonly kind: PlatformKind;
+  readonly section?: CourseSection;
+  readonly worldPhase?: WorldPhase;
+  readonly location?: DepthLocation;
+  readonly cascadeVariant?: CascadeVariant;
+  readonly lateralMotion?: Readonly<{ amplitude: number; period: number; phase: number }>;
   readonly encounterTheme: PlatformEncounterTheme;
   readonly encounterRowIndex: number;
   readonly passage?: Readonly<{ x: number; width: number }>;
@@ -76,15 +87,6 @@ interface PlannedRowMember extends PlannedPlatformChoice {
   readonly isPrimaryLane: boolean;
 }
 
-const ENCOUNTER_THEMES: readonly PlatformEncounterTheme[] = Object.freeze([
-  "chaos",
-  "trap",
-  "deception",
-  "rich-lane",
-  "danger-lane",
-  "death-tunnel",
-]);
-
 const SAFE_STANDARD: RowMember = Object.freeze({
   kind: "standard",
   role: "safe",
@@ -113,9 +115,12 @@ export class PlatformRoutePlanner {
   #previousPassageX: number | null = null;
   #previousBandDepth = 0;
   #zoneCycle = 0;
-  #lastTheme: PlatformEncounterTheme | null = null;
   #activeTheme: PlatformEncounterTheme | null = null;
-  #scheduledTheme: PlatformEncounterTheme | null = null;
+  #externalEncounter = false;
+  #progress: WorldProgression;
+  #progressKey = "";
+  #sectionCursor = 0;
+  #section: CourseSection = "run-up";
   #encounterRowIndex = 0;
   #encounterVariant = 0;
   #pendingBlueprint: RowBlueprint | null = null;
@@ -132,11 +137,12 @@ export class PlatformRoutePlanner {
     this.#nextY = initialLowestY;
     this.#config = config;
     this.#random = random;
+    this.#progress = worldProgression(config.startDepth + config.ball.startPosition.y - initialLowestY);
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void {
-    this.#scheduledTheme = theme;
-    this.#activeTheme = theme;
+    this.#syncProgression();
+    this.#activeTheme = theme; this.#externalEncounter = true; this.#section = sectionForTheme(theme);
     this.#encounterVariant = this.#randomIndex(4);
     this.#encounterRowIndex = 0;
     this.#pendingBlueprint = null;
@@ -168,20 +174,28 @@ export class PlatformRoutePlanner {
 
     const theme = this.#getActiveTheme();
     const themeRowIndex = this.#encounterRowIndex;
+    const layoutTheme = theme === "climax" ? climaxTheme(themeRowIndex) : theme;
     const blueprint = this.#getPendingBlueprint();
     const generation = this.#config.platformGeneration;
     const worldSpeed = ballSpeed * this.#config.ball.movementScale;
-    const layout = createEncounterLayout(theme, themeRowIndex + this.#zoneCycle * 3,
+    const cascading = layoutTheme === "break-run";
+    const variant = cascadeVariant(this.#progress.phase);
+    const movingAmplitude = !this.#externalEncounter && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
+      && (this.#section === "maneuver" || cascading) && themeRowIndex % 3 === 1 ? .35 : 0;
+    const layout = createEncounterLayout(layoutTheme, themeRowIndex + this.#zoneCycle * 3,
       this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
-      this.#config.ball.radius, generation.multiRowSideMargin);
+      this.#config.ball.radius, generation.multiRowSideMargin, {
+        passageExtra: this.#progress.passageExtra + (this.#section === "breather" ? .5 : 0),
+        routeScale: this.#progress.routeScale * (cascading && variant === "wide" ? .6 : 1), movingAmplitude,
+      });
     const turnDistance = this.#previousPassageX === null ? 0 : Math.abs(layout.passage.x - this.#previousPassageX);
     // Leave time to steer out of the preceding band's lowest island.
     const travelTime = .24 + turnDistance / this.#config.ball.horizontalMaxSpeed;
     const clearance = this.#config.ball.radius * 2 + Math.max(...this.#config.platforms.map(platform => platform.size.height)) + .15;
     const clearSpacing = Math.max(generation.minimumSpacing,
-      clearance + worldSpeed * Math.max(travelTime, difficulty.reactionWindowSeconds * .55 * layout.rhythm));
+      clearance + worldSpeed * Math.max(travelTime, difficulty.reactionWindowSeconds * .55 * layout.rhythm * this.#progress.spacingScale * (this.#section === "run-up" ? .9 : 1)));
     this.#nextY -= clearSpacing + this.#previousBandDepth;
-    const bandDepth = Math.min(3, Math.max(1.15, worldSpeed * .20));
+    const bandDepth = Math.min(3, Math.max(1.15, worldSpeed * .20)) * this.#progress.staggerScale;
     this.#previousBandDepth = bandDepth;
     this.#previousPassageX = layout.passage.x;
 
@@ -219,7 +233,10 @@ export class PlatformRoutePlanner {
       reactionWindowSeconds,
       stageNumber: difficulty.stageNumber,
       kind: primary.kind,
-      encounterTheme: theme,
+      encounterTheme: layoutTheme,
+      section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
+      ...(cascading ? { cascadeVariant: variant } : {}),
+      ...(movingAmplitude > 0 ? { lateralMotion: { amplitude: movingAmplitude, period: 3.8, phase: 0 } } : {}),
       encounterRowIndex: themeRowIndex,
       ...(coinTrail === undefined ? {} : { coinTrail }),
       choices: row
@@ -277,18 +294,21 @@ export class PlatformRoutePlanner {
     return this.#pendingBlueprint;
   }
 
+  #syncProgression(): void {
+    const progress = worldProgression(this.#config.startDepth + this.#config.ball.startPosition.y - this.#nextY);
+    const key = `${progress.location}:${progress.phase}`;
+    if (key === this.#progressKey) return;
+    this.#progress = progress; this.#progressKey = key; this.#sectionCursor = 0;
+    this.#activeTheme = null; this.#pendingBlueprint = null; this.#encounterRowIndex = 0;
+    this.#externalEncounter = false;
+  }
+
   #getActiveTheme(): PlatformEncounterTheme {
+    this.#syncProgression();
     if (this.#activeTheme === null) {
-      const candidates = ENCOUNTER_THEMES.filter(
-        (theme) => theme !== this.#lastTheme,
-      );
-      const selected = this.#scheduledTheme ?? candidates[this.#randomIndex(candidates.length)];
-      if (selected === undefined) {
-        throw new Error("At least one encounter theme must be available.");
-      }
-      this.#activeTheme = selected;
-      this.#zoneCycle += 1;
-      this.#encounterVariant = this.#randomIndex(4);
+      this.#section = courseSectionAt(this.#progress.phase, this.#sectionCursor++);
+      this.#activeTheme = sectionTheme(this.#section); this.#externalEncounter = false;
+      this.#zoneCycle += 1; this.#encounterVariant = this.#randomIndex(4);
     }
     return this.#activeTheme;
   }
@@ -298,12 +318,24 @@ export class PlatformRoutePlanner {
     rowIndex: number,
   ): RowBlueprint {
     switch (theme) {
+      case "climax": return this.#createBlueprint(climaxTheme(rowIndex), rowIndex % 4);
+      case "run-up": {
+        const count = rowIndex % 3 === 2 ? 3 : 2;
+        return { lanes: Array.from({ length: count }, () => SAFE_STANDARD), primaryLaneIndex: rowIndex % count,
+          coinLaneIndex: rowIndex % count, coinTrail: { count: 4, spacing: .6 } };
+      }
+      case "breather": return { lanes: [rowIndex === 1 ? SAFE_VITALITY : SAFE_STANDARD], primaryLaneIndex: 0,
+        coinLaneIndex: 0, coinTrail: { count: 2, spacing: .8 } };
       case "bait":
         return { lanes: [SAFE_STANDARD], primaryLaneIndex: 0 };
       case "break-run": {
         const count = rowIndex % 4 === 3 ? 1 : rowIndex % 2 === 0 ? 3 : 2;
-        return { lanes: Array.from({ length: count }, () => SAFE_STANDARD), primaryLaneIndex: rowIndex % count,
-          coinLaneIndex: rowIndex % count, coinTrail: { count: 3, spacing: .65 } };
+        const risky = this.#progress.phase === "climax" && rowIndex % 3 === 2;
+        const lanes: RowMember[] = Array.from({ length: count }, () => SAFE_STANDARD);
+        if (risky && count > 1) lanes[(rowIndex + 1) % count] = BOOST_STANDARD;
+        return { lanes, primaryLaneIndex: rowIndex % count,
+          coinLaneIndex: risky && count > 1 ? (rowIndex + 1) % count : rowIndex % count,
+          coinTrail: { count: risky ? 7 : 3, spacing: .65 } };
       }
       case "chaos":
         return this.#createChaosBlueprint();
@@ -461,7 +493,8 @@ export class PlatformRoutePlanner {
       };
     }
 
-    const strength = Math.max(1, Math.floor(Math.min(baseStrength, predictedSpeedAtCollision)));
+    const ratio = this.#section === "run-up" ? .5 : this.#section === "breather" ? .45 : this.#progress.safeStrengthRatio;
+    const strength = Math.max(1, Math.floor(Math.min(baseStrength, predictedSpeedAtCollision * ratio)));
     return {
       strength,
       strengthLevel: this.#getStrengthLevel(strength),
@@ -480,15 +513,14 @@ export class PlatformRoutePlanner {
     if (this.#encounterRowIndex < this.#getEncounterLength(theme)) {
       return;
     }
-    this.#lastTheme = theme;
     this.#activeTheme = null;
     this.#encounterRowIndex = 0;
   }
 
   #getEncounterLength(theme: PlatformEncounterTheme): number {
-    return theme === "rich-lane" || theme === "death-tunnel"
-      ? this.#config.platformGeneration.extendedEncounterRows
-      : this.#config.platformGeneration.encounterRows;
+    if (!this.#externalEncounter) return sectionRows(this.#section, this.#progress);
+    return theme === "climax" ? 20 : theme === "rich-lane" || theme === "death-tunnel"
+      ? this.#config.platformGeneration.extendedEncounterRows : this.#config.platformGeneration.encounterRows;
   }
 
   #randomIndex(length: number): number {

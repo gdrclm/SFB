@@ -102,12 +102,13 @@ describe("flight encounters", () => {
     }
   });
 
-  it("switches pending layouts before allocation and keeps the scheduled theme", () => {
+  it("switches pending layouts before allocation and consumes a requested theme once", () => {
     const planner = plannerFor("death-tunnel");
     expect(planner.getNextRowPlatformCount()).toBe(4);
     planner.queueEncounter("rich-lane");
     expect(planner.getNextRowPlatformCount()).toBe(2);
-    for (let i = 0; i < 14; i++) expect(planner.planNext(20, 0, difficulty).encounterTheme).toBe("rich-lane");
+    for (let i = 0; i < 5; i++) expect(planner.planNext(20, 0, difficulty).encounterTheme).toBe("rich-lane");
+    expect(planner.planNext(20, 0, difficulty).section).toBe("run-up");
     planner.queueEncounter("trap");
     expect(planner.planNext(20, 0, difficulty).encounterRowIndex).toBe(0);
   });

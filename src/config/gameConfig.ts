@@ -5,6 +5,7 @@ export interface RgbColor {
 }
 
 export interface GameConfig {
+  readonly startDepth: number;
   readonly simulation: {
     readonly fixedStepSeconds: number;
     readonly maxFrameSeconds: number;
@@ -175,6 +176,7 @@ export interface StaticPlatformConfig {
 }
 
 export const gameConfig: GameConfig = Object.freeze({
+  startDepth: 0,
   simulation: Object.freeze({
     fixedStepSeconds: 1 / 60,
     maxFrameSeconds: 0.25,

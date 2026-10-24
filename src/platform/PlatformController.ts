@@ -5,7 +5,7 @@ import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprit
 import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { PhysicsBody, PhysicsMotionType, PhysicsShapeBox } from "@babylonjs/core/Physics";
+import { HavokPlugin, PhysicsBody, PhysicsMotionType, PhysicsShapeBox } from "@babylonjs/core/Physics";
 import type { Scene } from "@babylonjs/core/scene";
 import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformConfig } from "../config/gameConfig";
 
@@ -17,6 +17,7 @@ export interface PlatformActivationProperties {
   readonly widthScale?: number;
   readonly encounterTheme?: PlatformEncounterTheme;
   readonly isTrap?: boolean;
+  readonly lateralMotion?: Readonly<{ amplitude: number; period: number; phase: number }>;
   readonly tutorialDanger?: boolean;
   readonly kind?: PlatformKind;
 }
@@ -41,6 +42,9 @@ export class PlatformController {
   #approachState: ApproachState | null = null;
   #elapsed = 0;
   #tutorialDanger = false;
+  #motion: PlatformActivationProperties["lateralMotion"];
+  #motionAge = 0;
+  #motionStartX = 0;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
@@ -55,6 +59,16 @@ export class PlatformController {
     this.#isActive = active;
     this.mesh.setEnabled(active);
     if (active) this.#createPhysicsResources();
+  }
+  public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
+  public advanceMotion(seconds: number): void {
+    if (!this.#isActive || !this.#motion) return;
+    this.#motionAge += Math.max(0, seconds);
+    this.mesh.position.x = this.#motionStartX + this.#motion.amplitude * Math.sin(this.#motionAge * Math.PI * 2 / this.#motion.period + this.#motion.phase);
+    this.mesh.computeWorldMatrix(true);
+    const plugin = this.#scene.getPhysicsEngine()?.getPhysicsPlugin();
+    // Update the existing Havok box; the regular scene step refreshes its broadphase. No bodies are rebuilt.
+    if (this.#body && plugin instanceof HavokPlugin) plugin.setPhysicsBodyTransformation(this.#body, this.mesh);
   }
   public get isActive(): boolean { return this.#isActive; }
   public get strength(): number { return this.#strength; }
@@ -120,6 +134,7 @@ export class PlatformController {
     this.#body = new PhysicsBody(this.mesh, PhysicsMotionType.STATIC, false, this.#scene);
     this.#shape = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), new Vector3(this.width, this.size.height, this.size.depth), this.#scene);
     this.#body.shape = this.#shape;
+    if (this.#motion) this.#body.disablePreStep = false;
   }
   #disposePhysicsResources(): void {
     this.#body?.dispose(); this.#shape?.dispose(); this.#body = null; this.#shape = null;
@@ -129,6 +144,7 @@ export class PlatformController {
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#tutorialDanger = properties.tutorialDanger === true;
+    this.#motion = properties.lateralMotion; this.#motionAge = 0; this.#motionStartX = this.mesh.position.x;
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
