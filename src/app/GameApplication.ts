@@ -1,3 +1,5 @@
+import { ActiveRunClock } from "../run/ActiveRunClock";
+import { WorldStep } from "../core/WorldStep";
 import { worldProgression } from "../progression/WorldProgression";
 import { BaitZoneController } from "../challenges/BaitZoneController";
 import { EncounterFeedback } from "../feedback/EncounterFeedback";
@@ -165,6 +167,7 @@ export class GameApplication {
   #challengeRemaining = 0;
   #boostCoach = new BoostCoach();
   #runSeconds = 0;
+  readonly #runClock = new ActiveRunClock();
   #sentResult: string | null = null;
   #lastDepthCheckpoint = 0;
   #energyHighWater = this.#config.economy.initialEnergy;
@@ -397,10 +400,6 @@ export class GameApplication {
         const left = camera.orthoLeft ?? -horizontalLimit(), right = camera.orthoRight ?? horizontalLimit();
         return (camera.globalPosition.x + left + (screen + 1) / 2 * (right - left)) / horizontalLimit();
       },
-      onChange: () => {
-        if (this.#runStarted && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial
-          && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
-      },
     });
     const ballMesh = createBallMesh(this.#scene, this.#config);
     this.#ballController = new BallController(ballMesh, this.#horizontalInput, this.#config);
@@ -410,13 +409,6 @@ export class GameApplication {
       requireMenuElement(document.body, "#boost-feedback"),
     );
     this.#fixedStep.register({ fixedUpdate: (delta: number, real = delta) => {
-      this.#runSeconds += real;
-      if (this.#actions.ranked && this.#runSeconds >= 120) {
-        this.#runSeconds = 120;
-        requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Демо пройдено!";
-        this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.setAttribute("hidden", "");
-        this.#showRunResults();
-      }
       this.#opening?.fixedUpdate(delta);
       if (this.#tutorialAvoidY !== null && this.#ballController !== null && this.#ballController.position.y < this.#tutorialAvoidY && !this.#ballController.isBouncing) {
         this.#contextGuide?.completed("fork"); this.#contextGuide?.completed("super-heavy"); this.#tutorialAvoidY = null;
@@ -429,8 +421,7 @@ export class GameApplication {
     } });
     requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Забег завершён";
     this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.removeAttribute("hidden");
-    this.#fixedStep.register(this.#ballController);
-    this.#fixedStep.register({ fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
+    const updateRunState = { fixedUpdate: (delta: number, realDeltaSeconds = delta) => {
       if (this.#missionRewardRemaining > 0) {
         this.#missionRewardRemaining = Math.max(0, this.#missionRewardRemaining - realDeltaSeconds);
         if (this.#missionRewardRemaining === 0) { this.#missionIntroRemaining = 0; this.#renderMission(); }
@@ -446,13 +437,12 @@ export class GameApplication {
       this.#challengeRemaining = Math.max(0, this.#challengeRemaining - delta);
       this.#contextGuide?.fixedUpdate(realDeltaSeconds);
       this.#boostCoach.fixedUpdate(delta, scripted && this.#gameState.current === GameState.Playing && !this.#contextGuide?.visible);
-    } });
+    } };
     this.#ballVisualController = new BallVisualController(
       ballMesh,
       this.#ballController,
       this.#config,
     );
-    this.#fixedStep.register(this.#ballVisualController);
     this.#cameraController = new CameraController(
       mainScene.camera,
       mainScene.cameraRig,
@@ -460,8 +450,6 @@ export class GameApplication {
       mainScene.getAspectRatio,
       this.#config,
     );
-    this.#fixedStep.register(this.#cameraController);
-    this.#fixedStep.register({ fixedUpdate: () => { this.#syncPlayfieldWidth(); } });
     const coins = createCoins(this.#scene, this.#config);
     this.#coinCollectionController = new CoinCollectionController(
       this.#ballController,
@@ -472,13 +460,11 @@ export class GameApplication {
     this.#unsubscribeCoinCollected = this.#coinCollectionController.onCollected(
       this.#handleCoinCollected,
     );
-    this.#fixedStep.register(this.#coinCollectionController);
     this.#coinGenerator = new CoinGenerator(
       this.#ballController,
       coins,
       this.#config,
     );
-    this.#fixedStep.register(this.#coinGenerator);
     this.#phaseOneController = new PhaseOneController(this.#config);
     this.#unsubscribeStageChanged = this.#phaseOneController.onStageChanged(
       this.#handleStageChanged,
@@ -509,7 +495,6 @@ export class GameApplication {
     );
     this.#syncPlayfieldWidth();
     this.#platformGenerator.allowSlowPlatforms = false;
-    this.#fixedStep.register(this.#platformGenerator);
     this.#baitZone = new BaitZoneController(this.#ballController, coins, this.#platformPool, this.#config, () => {
       const camera = mainScene.camera;
       return { halfWidth: Math.max(this.#config.playSpace.halfWidth, ((camera.orthoRight ?? 5) - (camera.orthoLeft ?? -5)) / 2),
@@ -579,7 +564,12 @@ export class GameApplication {
       this.#config,
     );
     this.#unsubscribeCollision = this.#collisionResolver.onCollision(this.#handleCollision);
-    this.#fixedStep.register(this.#collisionResolver);
+    this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
+      this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
+    this.#fixedStep.register(updateRunState);
+    this.#fixedStep.register(this.#ballVisualController);
+    this.#fixedStep.register(this.#cameraController);
+    this.#fixedStep.register({ fixedUpdate: () => { this.#syncPlayfieldWidth(); } });
     this.#fixedStep.register(this.#successfulHitEffects);
     this.#fixedStep.register(this.#unsuccessfulHitHandler);
     this.#fixedStep.register(this.#unsuccessfulHitEffects);
@@ -646,6 +636,7 @@ export class GameApplication {
     this.#lastCurrencyKey = "";
     this.#lastHudTime = -Infinity; this.#lastOverlayTime = -Infinity;
     this.#lastFrameTimeMs = performance.now();
+    this.#runClock.reset(this.#lastFrameTimeMs); this.#syncRunClock(this.#lastFrameTimeMs);
     engine.runRenderLoop(this.#renderFrame);
   }
 
@@ -654,6 +645,8 @@ export class GameApplication {
   }
 
   #clearRun(keepScene: boolean): void {
+    this.#runClock.setActive(false, performance.now());
+    this.#runSeconds = this.#actions.ranked ? Math.min(120, this.#runClock.seconds) : this.#runClock.seconds;
     if (this.#runStarted) this.#finishRun(this.#lives.remainingLives === 0 ? "completed" : "interrupted");
     this.#defeatPending = false;
     this.#lifeFeedback?.dispose(); this.#lifeFeedback = null;
@@ -750,6 +743,12 @@ export class GameApplication {
     this.#lifeFeedback?.removeShake();
     const nowMs = performance.now();
     const realDeltaSeconds = (nowMs - this.#lastFrameTimeMs) / 1_000;
+    this.#syncRunClock(nowMs);
+    if (this.#runStarted && this.#actions.ranked && this.#runSeconds >= 120 && this.#gameState.current !== GameState.GameOver) {
+      requireMenuElement(this.#gameOverElement, "#game-over-title").textContent = "Демо пройдено!";
+      this.#gameOverElement.querySelector<HTMLDetailsElement>(".result-impact")?.setAttribute("hidden", "");
+      this.#showRunResults();
+    }
     if (document.hidden) { this.#lastFrameTimeMs = nowMs; this.#quality?.update(0, false); this.#feel?.setPaused(true); return; }
     let isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     if (this.#powers?.invulnerable) this.#slowModeController?.cancelForBoost();
@@ -776,7 +775,6 @@ export class GameApplication {
     this.#encounterFeedback?.render(this.#platformPool?.platforms ?? [], this.#ballController?.position.y ?? 0,
       isPaused || this.#gameState.current === GameState.GameOver, realDeltaSeconds);
     this.#speedFeedback?.draw(realDeltaSeconds);
-    if (!isPaused && this.#gameState.current !== GameState.GameOver) this.#ballController?.applyImmediateInput();
     const platformAnimationPaused = isPaused || this.#gameState.current === GameState.GameOver;
     this.#elapsedPlatformSeconds = advanceIdleTime(this.#elapsedPlatformSeconds, realDeltaSeconds, platformAnimationPaused, this.#reducedMotion);
     if (isPaused) this.#comboView?.setPaused(true);
@@ -923,6 +921,7 @@ export class GameApplication {
       this.#comboView?.miss();
       this.#renderLives();
       if (this.#gameState.current === GameState.GameOver) {
+        this.#syncRunClock(performance.now());
         this.#ballVisualController?.react("defeat");
         this.#emitFailedImpact();
         this.#status.textContent = "Забег завершён · все жизни потеряны";
@@ -1000,9 +999,12 @@ export class GameApplication {
   };
 
   #showRunResults(): void {
+    this.#runProgress.observeDepth(this.#getDepth());
+    this.#pauseMenuElement.hidden = true;
     this.#defeatPending = false;
     this.#lifeFeedback?.hide();
     this.#gameState.transitionTo(GameState.GameOver);
+    this.#syncRunClock(performance.now());
     this.#pauseButtonElement.disabled = true;
     const previousBest = this.#history.top(1)[0]?.score ?? 0;
     const result = this.#finishRun("completed");
@@ -1142,6 +1144,7 @@ export class GameApplication {
     this.#haptics.cancel();
     this.#stateBeforePause = currentState;
     this.#gameState.transitionTo(GameState.Paused);
+    this.#syncRunClock(performance.now());
     this.#pauseMenuElement.hidden = false;
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");
     this.#pauseButtonElement.setAttribute("aria-expanded", "true");
@@ -1155,6 +1158,7 @@ export class GameApplication {
     }
 
     this.#gameState.transitionTo(this.#stateBeforePause);
+    this.#lastFrameTimeMs = performance.now(); this.#syncRunClock(this.#lastFrameTimeMs);
     this.#pauseMenuElement.hidden = true;
     this.#pauseButtonElement.setAttribute("aria-label", "Открыть меню паузы");
     this.#pauseButtonElement.setAttribute("aria-expanded", "false");
@@ -1341,6 +1345,7 @@ export class GameApplication {
     this.#contextGuide?.dispose(); this.#contextGuide = null;
     this.#boostCoach.dismiss();
     this.#gameState.transitionTo(GameState.GameOver);
+    this.#syncRunClock(performance.now());
     this.#pauseButtonElement.disabled = true;
     if (this.#platformGenerator) this.#platformGenerator.enabled = false;
     this.#interfaceLayerElement.classList.add("tutorial-finale");
@@ -1394,8 +1399,16 @@ export class GameApplication {
 
   readonly #dismissBoostCoach = (): void => { this.#boostCoach.dismiss(); };
 
+  #syncRunClock(now: number): void {
+    const state = this.#gameState.current;
+    this.#runClock.setActive(this.#runStarted && !document.hidden && state !== GameState.Loading && state !== GameState.Paused
+      && state !== GameState.Tutorial && state !== GameState.GameOver && state !== GameState.Results, now);
+    this.#runSeconds = this.#actions.ranked ? Math.min(120, this.#runClock.seconds) : this.#runClock.seconds;
+  }
+
   readonly #cancelHiddenCelebration = (): void => {
     this.#lastFrameTimeMs = performance.now();
+    this.#syncRunClock(this.#lastFrameTimeMs);
     this.#quality?.update(0, false);
     if ((document.hidden || !document.hasFocus()) && this.#recordHapticTimer !== null) {
       clearTimeout(this.#recordHapticTimer);

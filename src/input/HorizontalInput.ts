@@ -1,6 +1,7 @@
 export interface HorizontalInput {
   readonly isActive: boolean;
   readonly normalizedPosition: number;
+  /** Respond without acceleration easing; BallController still limits travel speed. */
   readonly isImmediate?: boolean;
 }
 interface PointerInputOptions {

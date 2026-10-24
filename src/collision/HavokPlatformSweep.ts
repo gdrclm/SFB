@@ -35,6 +35,8 @@ export class HavokPlatformSweep implements PlatformSweep {
     );
   }
 
+  public get hitFraction(): number { return Math.max(0, Math.min(1, this.#hitResult.hitFraction)); }
+
   public cast(start: BallPosition, end: BallPosition): PlatformController | null {
     while (this.#knownCount < this.#platforms.length) {
       const platform = this.#platforms[this.#knownCount++];

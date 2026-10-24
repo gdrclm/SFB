@@ -11,7 +11,7 @@ import {
 } from "./PlatformRoutePlanner";
 import type { PhaseOneController } from "../progression/PhaseOneController";
 
-type GeneratorBall = Pick<BallController, "fallSpeed" | "position">;
+type GeneratorBall = Pick<BallController, "fallSpeed" | "position"> & Partial<Pick<BallController, "previousPosition">>;
 type GeneratorPool = Pick<
   PlatformPool,
   "platforms" | "availableCount" | "acquire" | "release"
@@ -97,7 +97,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
 
   #recyclePlatformsAbovePlayWindow(): void {
     const recycleY =
-      this.#ball.position.y +
+      Math.max(this.#ball.position.y, this.#ball.previousPosition?.y ?? this.#ball.position.y) +
       this.#config.platformGeneration.recycleAboveBallDistance;
     for (const [key, row] of this.#rows) {
       if (row.lowestY > recycleY) this.#rows.delete(key);

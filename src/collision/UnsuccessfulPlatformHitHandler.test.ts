@@ -49,7 +49,7 @@ describe("UnsuccessfulPlatformHitHandler", () => {
     };
 
     expect(handler.handle(collision)).toBe(true);
-    expect(ball.startBounce).toHaveBeenCalledWith(-4.2);
+    expect(ball.startBounce).toHaveBeenCalledWith(-4.2, undefined);
     expect(lives.loseLife).toHaveBeenCalledOnce();
     expect(feedback.playErrorReaction).toHaveBeenCalledWith(platform);
     expect(state.current).toBe(GameState.BounceRecovery);

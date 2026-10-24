@@ -6,7 +6,7 @@ import type { PlatformCollision } from "./CollisionResolver";
 
 export interface SuccessfulHitBall {
   fallSpeed: number;
-  startBreakImpact?(contactY: number, resistance: number): void;
+  startBreakImpact?(contactY: number, resistance: number, contactX?: number): void;
 }
 
 export interface SuccessfulHitFeedback {
@@ -52,8 +52,8 @@ export class SuccessfulPlatformHitHandler {
     }, force);
 
     if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction, this.#maximumSpeedLoss);
-    if (!powered) this.#ball.startBreakImpact?.(collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
-      breakResistance(collision.ballSpeed, collision.platform.strength));
+    if (!powered) this.#ball.startBreakImpact?.(collision.contact?.y ?? collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
+      breakResistance(collision.ballSpeed, collision.platform.strength), collision.contact?.x);
     this.#feedback.playBallReaction();
     this.#feedback.playCameraReaction(force);
     return true;

@@ -101,7 +101,7 @@ it("barely slows a fast ball on a weak panel, preserves the run even on a near-l
     const pool = { beginRelease: () => true, completeRelease: () => true };
     const handler = new SuccessfulPlatformHitHandler(ball, pool, createFeedback().feedback, gameConfig);
     handler.handle({ platform, ballSpeed: 50, assessment: "sufficient" });
-    expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50);
+    expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50, undefined);
     return ball.fallSpeed;
   };
   expect(remaining(10)).toBeCloseTo(49.96);

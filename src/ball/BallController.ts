@@ -34,7 +34,6 @@ export class BallController implements FixedSimulationSystem {
   readonly #previousPosition = { x: 0, y: 0, z: 0 };
   #fallSpeed: number;
   #horizontalVelocity = 0;
-  #previewStartX: number | null = null;
   #bounceElapsedSeconds: number | null = null;
   #bounceContactY = 0;
   #bounceLaunchSpeed = 0;
@@ -51,10 +50,10 @@ export class BallController implements FixedSimulationSystem {
     if (this.#bounceElapsedSeconds !== null) return this.#bounceElapsedSeconds < .045 ? 1 : 0;
     return this.#breakElapsed !== null && this.#breakElapsed < this.#breakHold ? 1 : 0;
   }
-  public startBreakImpact(contactY: number, resistance: number): void {
+  public startBreakImpact(contactY: number, resistance: number, contactX?: number): void {
     if (!Number.isFinite(contactY) || this.isBouncing) return;
     this.#transform.position.y = contactY;
-    this.#copyCurrentPositionToPrevious();
+    if (contactX !== undefined) this.#transform.position.x = contactX;
     this.#breakElapsed = 0;
     const impact = breakImpactProfile(resistance);
     this.#breakHold = impact.hold;
@@ -100,6 +99,7 @@ export class BallController implements FixedSimulationSystem {
     }
 
     this.#fallSpeed = value;
+    if (this.#bounceElapsedSeconds !== null) this.#bounceRecoverySpeed = value;
   }
 
   public get horizontalVelocity(): number {
@@ -118,7 +118,7 @@ export class BallController implements FixedSimulationSystem {
     return this.#previousPosition;
   }
 
-  public startBounce(contactY: number): boolean {
+  public startBounce(contactY: number, contactX?: number): boolean {
     if (this.isBouncing || !Number.isFinite(contactY)) {
       return false;
     }
@@ -128,32 +128,23 @@ export class BallController implements FixedSimulationSystem {
     this.#breakElapsed = null;
     this.#verticalVelocity = 0;
     this.#transform.position.y = contactY;
-    this.#copyCurrentPositionToPrevious();
+    if (contactX !== undefined) this.#transform.position.x = contactX;
     this.#bounceRecoverySpeed = this.#config.startFallSpeed + Math.max(0, this.#fallSpeed - this.#config.startFallSpeed) * this.#impactRetention;
     this.#fallSpeed = this.#bounceRecoverySpeed;
     this.#bounceElapsedSeconds = 0;
     return true;
   }
 
-  /** Update the rendered pose on the input event, without waiting for a physics tick. */
-  public applyImmediateInput(): void {
-    if (!this.#input.isImmediate || !this.#input.isActive) return;
-    const x = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
-    if (x === this.#transform.position.x) return;
-    this.#previewStartX ??= this.#transform.position.x;
-    this.#transform.position.x = x;
-  }
-
   public fixedUpdate(
     fixedDeltaSeconds: number,
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
-    const previewStart = this.#previewStartX;
     this.#copyCurrentPositionToPrevious();
-    if (previewStart !== null) this.#previousPosition.x = previewStart;
-    this.#previewStartX = null;
     if (this.#input.isImmediate) {
-      if (this.#input.isActive) this.#transform.position.x = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
+      if (this.#input.isActive) {
+        const targetX = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
+        this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, this.#config.horizontalMaxSpeed * realFixedDeltaSeconds);
+      }
       this.#horizontalVelocity = (this.#transform.position.x - this.#previousPosition.x) / Math.max(.0001, realFixedDeltaSeconds);
     } else {
       this.#updateHorizontalVelocity(realFixedDeltaSeconds);

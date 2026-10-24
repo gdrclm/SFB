@@ -51,18 +51,18 @@ export class UnsuccessfulPlatformHitHandler implements FixedSimulationSystem {
     }
 
     const contactY =
-      collision.platform.mesh.position.y +
+      collision.contact?.y ?? collision.platform.mesh.position.y +
       collision.platform.size.height / 2 +
       this.#ballRadius;
     // A surviving obstacle remains solid; subsequent contacts rebound without another life charge.
     if (this.#damagedActivations.get(collision.platform) === collision.platform.activationId) {
-      if (this.#ball.startBounce(contactY)) {
+      if (this.#ball.startBounce(contactY, collision.contact?.x)) {
         this.#gameState.transitionTo(GameState.BounceRecovery);
         this.#feedback.playErrorReaction(collision.platform);
       }
       return false;
     }
-    if (!this.#ball.startBounce(contactY) || !this.#lives.loseLife()) {
+    if (!this.#ball.startBounce(contactY, collision.contact?.x) || !this.#lives.loseLife()) {
       return false;
     }
 

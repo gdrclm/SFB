@@ -218,32 +218,31 @@ it("preserves purchased impact speed through the entire bounce, while the base g
   }
 });
 
-it("applies direct pointer movement before the simulation tick and preserves the swept collision origin", () => {
-  const transform = createTransform();
+it("caps direct mouse and touch targets without smoothing or banking pointer events", () => {
   const input = { isActive: true, normalizedPosition: 1, isImmediate: true };
-  const ball = new BallController(transform, input, gameConfig);
-  ball.applyImmediateInput();
-  expect(ball.position.x).toBe(4.5);
+  const ball = new BallController(createTransform(), input, gameConfig);
+  for (let i = 0; i < 1000; i++) input.normalizedPosition = i % 2 === 0 ? -1 : 1;
+  expect(ball.position.x).toBe(0);
   ball.fixedUpdate(1 / 240);
-  expect(ball.position.x).toBe(4.5);
+  expect(ball.position.x).toBeCloseTo(16 / 240);
   expect(ball.previousPosition.x).toBe(0);
-  input.normalizedPosition = -1; ball.applyImmediateInput();
-  expect(ball.position.x).toBe(-4.5);
-  ball.fixedUpdate(1 / 240);
-  expect(ball.previousPosition.x).toBe(4.5);
-  input.isActive = false;
-  for (let i = 0; i < 10; i++) ball.fixedUpdate(1 / 60);
-  expect(ball.position.x).toBe(-4.5);
+  expect(ball.horizontalVelocity).toBeCloseTo(16);
+  input.normalizedPosition = -1; ball.fixedUpdate(1 / 240);
+  expect(ball.position.x).toBeCloseTo(0);
+  expect(ball.horizontalVelocity).toBeCloseTo(-16);
+  input.isActive = false; ball.fixedUpdate(1 / 60);
   expect(ball.horizontalVelocity).toBe(0);
 });
 
-
-it("uses the expanded camera width for immediate steering and clamps safely on shrink", () => {
-  const transform = createTransform(), input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
-  const ball = new BallController(transform, input, gameConfig);
-  ball.setPlayfieldHalfWidth(18); ball.applyImmediateInput();
-  expect(ball.position.x).toBe(17.5);
-  input.normalizedPosition = -1; ball.applyImmediateInput(); expect(ball.position.x).toBe(-17.5);
+it.each([30, 60, 240])("uses the same maximum horizontal speed at %s ticks and in slow motion", fps => {
+  const input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
+  const ball = new BallController(createTransform(), input, gameConfig);
+  ball.setPlayfieldHalfWidth(18);
+  for (let i = 0; i < fps / 2; i++) ball.fixedUpdate(.1 / fps, 1 / fps);
+  expect(ball.position.x).toBeCloseTo(8);
+  input.normalizedPosition = -1;
+  for (let i = 0; i < fps * 2; i++) ball.fixedUpdate(1 / fps);
+  expect(ball.position.x).toBe(-17.5);
   ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
   ball.setPlayfieldHalfWidth(NaN); expect(ball.horizontalLimit).toBe(5.5);
 });

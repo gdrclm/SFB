@@ -9,6 +9,7 @@ export interface CollisionBallState {
 }
 
 export interface PlatformSweep {
+  readonly hitFraction?: number;
   cast(start: BallPosition, end: BallPosition): PlatformController | null;
   dispose(): void;
 }
@@ -19,6 +20,7 @@ export interface PlatformCollision {
   readonly platform: PlatformController;
   readonly ballSpeed: number;
   readonly assessment: PlatformHitAssessment;
+  readonly contact?: BallPosition;
 }
 
 export type PlatformCollisionListener = (collision: PlatformCollision) => void;
@@ -54,26 +56,28 @@ export class CollisionResolver implements FixedSimulationSystem {
       this.#reportedActivations.clear();
       return;
     }
-    const platform = this.#sweep.cast(this.#ball.previousPosition, this.#ball.position);
-    if (platform === null) {
-      this.#reportedActivations.clear();
-      return;
-    }
-
-    if (
-      this.#reportedActivations.get(platform) === platform.activationId
-    ) {
-      return;
-    }
-
-    this.#reportedActivations.set(platform, platform.activationId);
-    const collision: PlatformCollision = {
-      platform,
-      ballSpeed: this.#ball.fallSpeed,
-      assessment: assessPlatformHit(this.#ball.fallSpeed, platform.strength),
-    };
-    for (const listener of this.#listeners) {
-      listener(collision);
+    const previous = this.#ball.previousPosition, current = this.#ball.position;
+    const start = { x: previous.x, y: previous.y, z: previous.z };
+    const end = { x: current.x, y: current.y, z: current.z };
+    // Each successful iteration removes one collider. A surviving/unchanged collider
+    // or a contact reaction stops the sweep, so no fixed iteration cap can hide a hit.
+    for (;;) {
+      const platform = this.#sweep.cast(start, end);
+      if (platform === null) { this.#reportedActivations.clear(); return; }
+      if (this.#reportedActivations.get(platform) === platform.activationId) return;
+      this.#reportedActivations.set(platform, platform.activationId);
+      const fraction = this.#sweep.hitFraction;
+      const collision: PlatformCollision = {
+        platform, ballSpeed: this.#ball.fallSpeed,
+        assessment: assessPlatformHit(this.#ball.fallSpeed, platform.strength),
+        ...(fraction === undefined ? {} : { contact: {
+          x: start.x + (end.x - start.x) * fraction,
+          y: start.y + (end.y - start.y) * fraction,
+          z: start.z + (end.z - start.z) * fraction,
+        } }),
+      };
+      for (const listener of this.#listeners) listener(collision);
+      if (platform.isActive || this.#ball.position.x !== end.x || this.#ball.position.y !== end.y || this.#ball.position.z !== end.z) return;
     }
   }
 
