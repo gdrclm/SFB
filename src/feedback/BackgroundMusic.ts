@@ -1,16 +1,19 @@
 type MusicMedia = Pick<HTMLAudioElement, "play" | "pause" | "loop" | "volume" | "currentTime">;
 interface MusicTrack { media: MusicMedia; requested: boolean; playing: boolean; failed: boolean; generation: number }
+interface MusicTransition { entering: boolean; elapsed: number; sky: number; crystal: number; introStarted: boolean }
 export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused">;
 
-/** Two persistent players; the visual transition drives an equal-power crossfade. */
+/** Enter crystal with two seconds of fade-out, then two seconds of fade-in. */
 export class BackgroundMusic {
   readonly #tracks: MusicTrack[];
   #enabled = false;
   #unlocked = false;
   #visible = true;
   #paused = false;
-  #targetBlend = 0;
-  #blend = 0;
+  #targetCrystal = false;
+  #skyGain = 1;
+  #crystalGain = 0;
+  #transition: MusicTransition | null = null;
 
   public constructor(media: MusicMedia, crystal?: MusicMedia) {
     this.#tracks = [media, ...(crystal === undefined ? [] : [crystal])].map(audio => {
@@ -32,30 +35,48 @@ export class BackgroundMusic {
   }
   public setCrystalBlend(blend: number): void {
     if (!Number.isFinite(blend)) return;
-    const next = Math.max(0, Math.min(1, blend));
-    if (next > 0 && this.#targetBlend === 0) {
-      const crystal = this.#tracks[1];
-      // The inaudible player is unlocked by the initial gesture. Enter at its intro.
-      if (crystal !== undefined) crystal.media.currentTime = 0;
-    }
-    this.#targetBlend = next;
+    const next = blend > 0;
+    if (next === this.#targetCrystal) return;
+    this.#targetCrystal = next;
+    // Repeated backdrop frames must not restart the musical transition.
+    this.#transition = { entering: next, elapsed: 0, sky: this.#skyGain, crystal: this.#crystalGain, introStarted: false };
   }
   public update(seconds: number): void {
     if (!this.#canPlay() || !Number.isFinite(seconds) || seconds <= 0) return;
-    const destination = this.#tracks[this.#targetBlend > this.#blend ? 1 : 0];
+    const transition = this.#transition;
+    if (transition === null) return;
+    const destination = this.#tracks[transition.entering ? 1 : 0];
     // Keep the outgoing music until the incoming player's play() has succeeded.
     if (destination?.playing !== true) return;
-    const step = Math.min(.1, seconds) / 2;
-    this.#blend += Math.max(-step, Math.min(step, this.#targetBlend - this.#blend));
+    transition.elapsed = Math.min(transition.entering ? 4 : 2, transition.elapsed + Math.min(.1, seconds));
+    if (transition.entering) {
+      const fadeOut = Math.cos(Math.min(1, transition.elapsed / 2) * Math.PI / 2);
+      this.#skyGain = transition.sky * fadeOut;
+      this.#crystalGain = transition.crystal * fadeOut;
+      if (transition.elapsed >= 2) {
+        if (!transition.introStarted) {
+          // Begin the intro when it becomes audible, not two seconds earlier.
+          destination.media.currentTime = 0;
+          transition.introStarted = true;
+        }
+        this.#skyGain = 0;
+        this.#crystalGain = Math.sin(Math.min(1, (transition.elapsed - 2) / 2) * Math.PI / 2);
+      }
+    } else {
+      const angle = transition.elapsed / 2 * Math.PI / 2;
+      this.#skyGain = transition.sky + (1 - transition.sky) * Math.sin(angle);
+      this.#crystalGain = transition.crystal * Math.cos(angle);
+    }
+    if (transition.elapsed >= (transition.entering ? 4 : 2)) this.#transition = null;
     this.#volumes();
   }
 
   #canPlay(): boolean { return this.#enabled && this.#unlocked && this.#visible && !this.#paused; }
   #volumes(): void {
-    const blend = this.#tracks[1]?.playing === true ? this.#blend : 0;
+    const crystalAvailable = this.#tracks[1]?.playing === true;
     const sky = this.#tracks[0];
-    if (sky !== undefined) sky.media.volume = .32 * Math.cos(blend * Math.PI / 2);
-    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = .32 * Math.sin(blend * Math.PI / 2);
+    if (sky !== undefined) sky.media.volume = .32 * (crystalAvailable ? this.#skyGain : 1);
+    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = .32 * (crystalAvailable ? this.#crystalGain : 0);
   }
 
   #apply(): void {
