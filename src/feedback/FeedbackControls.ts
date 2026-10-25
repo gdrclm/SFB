@@ -1,9 +1,9 @@
 import { FeedbackSettings, type FeedbackSetting } from "./FeedbackSettings";
 import { getHaptics } from "./Haptics";
-import { initializeBackgroundMusic } from "./BackgroundMusic";
+import { initializeBackgroundMusic, type BackgroundMusic } from "./BackgroundMusic";
 
 /** One settings owner for main menu and pause; audio channels never control haptics. */
-export function initializeFeedbackControls(): void {
+export function initializeFeedbackControls(): BackgroundMusic {
   const settings = new FeedbackSettings(() => window.localStorage);
   const haptics = getHaptics();
   const music = initializeBackgroundMusic();
@@ -39,4 +39,5 @@ export function initializeFeedbackControls(): void {
     haptics.request("menu");
   });
   apply();
+  return music;
 }

@@ -1,4 +1,5 @@
 import { ActiveRunClock } from "../run/ActiveRunClock";
+import type { SceneMusic } from "../feedback/BackgroundMusic";
 import { WorldStep } from "../core/WorldStep";
 import { worldProgression } from "../progression/WorldProgression";
 import { BaitZoneController } from "../challenges/BaitZoneController";
@@ -86,6 +87,7 @@ export interface PauseMenuElements {
 }
 
 export interface GameApplicationActions {
+  readonly music: SceneMusic;
   readonly guided?: boolean;
   readonly developerStartDepth?: number | undefined;
   readonly ranked?: boolean;
@@ -386,6 +388,8 @@ export class GameApplication {
     this.#backdrop = new DepthBackdrop(this.#scene, mainScene.cameraRig, {
       theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
     }, this.#actions.developerStartDepth ?? 0);
+    this.#actions.music.setPaused(false);
+    this.#actions.music.setCrystalBlend(this.#backdrop.crystalBlend);
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
@@ -645,6 +649,8 @@ export class GameApplication {
   }
 
   #clearRun(keepScene: boolean): void {
+    this.#actions.music.setCrystalBlend(0);
+    this.#actions.music.setPaused(false);
     this.#runClock.setActive(false, performance.now());
     this.#runSeconds = this.#actions.ranked ? Math.min(120, this.#runClock.seconds) : this.#runClock.seconds;
     if (this.#runStarted) this.#finishRun(this.#lives.remainingLives === 0 ? "completed" : "interrupted");
@@ -785,6 +791,8 @@ export class GameApplication {
     this.#contextGuide?.setPaused(hideNotices);
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
     this.#backdrop?.update(this.#guidedRun ? 0 : this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
+    this.#actions.music.setPaused(isPaused);
+    this.#actions.music.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
     this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
@@ -1144,6 +1152,7 @@ export class GameApplication {
     this.#haptics.cancel();
     this.#stateBeforePause = currentState;
     this.#gameState.transitionTo(GameState.Paused);
+    this.#actions.music.setPaused(true);
     this.#syncRunClock(performance.now());
     this.#pauseMenuElement.hidden = false;
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");
@@ -1158,6 +1167,7 @@ export class GameApplication {
     }
 
     this.#gameState.transitionTo(this.#stateBeforePause);
+    this.#actions.music.setPaused(false);
     this.#lastFrameTimeMs = performance.now(); this.#syncRunClock(this.#lastFrameTimeMs);
     this.#pauseMenuElement.hidden = true;
     this.#pauseButtonElement.setAttribute("aria-label", "Открыть меню паузы");
