@@ -67,14 +67,15 @@ If WebGPU is unavailable, the application falls back to WebGL2.
 ## Current controls
 
 Move the mouse cursor or swipe horizontally to steer the falling ball. Pointer
-input changes the target immediately. Horizontal travel remains at the original
-16 world units per active second, on every screen width, through twice the starting
-fall speed (20 by default). Above that, partial expanded-field compensation blends
-in smoothly through six times starting speed (60). Swipe sensitivity stays fixed;
-screen traversal never becomes faster than the original base-arena response.
-Above speed 35, near-target damping blends in and is fully active at 45,
-so small corrections remain precise at 60–80 and beyond. Mouse targets remain
-under the cursor. Direction
+input changes the target immediately. Touch/pen steering responds to gesture
+strength: slow drags and tiny corrections stay gentle; a broad fast swipe raises
+both displacement gain (0.75–2) and travel speed (0.85–3.5 times the base 16).
+Strength uses recent directional travel and speed as fractions of viewport width,
+independent of fall speed and camera zoom. It expires while held still and resets
+on reversal or a fresh touch. Near-target damping prevents overshoot even during
+strong swipes. Mouse targets remain under the cursor with the original opening
+response and near-target damping above speed 35–45. Partial expanded-field
+compensation blends in between fall speeds 20 and 60 for both input types. Direction
 changes respond immediately, with bounded movement and no positional teleport.
 Earn one **BOOST** with six consecutive platform breaks, then press the button
 for +50% fall speed. Its ring and counter show charge progress. Coins and waiting
@@ -89,8 +90,10 @@ until used. Only one charge can be held, with no saved overflow hits.
 отскок успокаивают движения, контакт по-прежнему поджимает конечности. Режим
 уменьшенного движения отключает быстрое покачивание и пульсацию тела.
 
-Новые механики вводятся парами внутри подготовленных участков. Первые разгонные
-ряды и обучение остаются без них. При первом появлении есть короткая подсказка;
+Новые механики вводятся парами внутри подготовленных участков. Начало первой
+локации и обучение остаются без них. В начале кристального каньона две обычные
+платформы предваряют движущуюся пару (ряды 3–4), затем следуют безопасные
+промежутки, ветер (ряды 11–12) и турель (ряды 19–20). При первом появлении есть короткая подсказка;
 описания также доступны в «Как играть».
 
 - **↔ Движущаяся платформа**: заметный боковой ход на ±0,9 единицы. Для всего
@@ -733,8 +736,9 @@ FX находятся в отдельной системе координат: �
 отскок, замедление и низкий FPS не растягивают лимит. Повтор сбрасывает часы.
 
 Курсор и относительные свайпы задают цель, но координата шара изменяется только
-в физическом шаге: не более horizontalMaxSpeed (16) × реальное время шага.
-Отклик на смену направления остаётся без разгона и сглаживания. Частые события
+в физическом шаге: предел скорости равен horizontalMaxSpeed (16), умноженному
+на компенсацию ширины и силу жеста для сенсорного ввода. Вблизи цели движение
+плавно замедляется без перелёта. Смена направления действует сразу. Частые события
 ввода не дают дополнительных перемещений между тактами.
 
 WorldStep фиксирует порядок: движение → столкновения → сбор монет → очистка

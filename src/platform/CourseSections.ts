@@ -12,8 +12,9 @@ const themes: Record<CourseSection, PlatformEncounterTheme> = {
   "run-up": "run-up", cascade: "break-run", maneuver: "trap", loot: "rich-lane",
   tension: "death-tunnel", breather: "breather", climax: "climax",
 };
-export function courseSectionAt(phase: WorldPhase, index: number): CourseSection {
-  const sequence = sequences[phase];
+const crystalIntroduction: readonly CourseSection[] = ["maneuver", "breather", "loot", "breather", "tension", "breather", "run-up", "cascade", "breather"];
+export function courseSectionAt(phase: WorldPhase, index: number, location: WorldProgression["location"] = "sky"): CourseSection {
+  const sequence = location === "crystal" && phase === "introduction" ? crystalIntroduction : sequences[phase];
   return sequence[index % sequence.length] ?? "breather";
 }
 export function sectionTheme(section: CourseSection): PlatformEncounterTheme { return themes[section]; }
@@ -31,6 +32,7 @@ export function climaxTheme(row: number): PlatformEncounterTheme {
   return (["break-run", "trap", "rich-lane", "death-tunnel", "breather"] as const)[Math.floor(row / 4)] ?? "breather";
 }
 export function sectionRows(section: CourseSection, progress: WorldProgression): number {
+  if (progress.location === "crystal" && progress.phase === "introduction" && ["maneuver", "loot", "tension"].includes(section)) return 4;
   if (section === "climax") return 20;
   if (section === "breather") return 4;
   if (section === "cascade") return progress.phase === "introduction" ? 8 : progress.phase === "development" ? 10 : 12;

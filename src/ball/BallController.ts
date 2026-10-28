@@ -174,10 +174,12 @@ export class BallController implements FixedSimulationSystem {
         // for the expanded field only after the ball has substantially sped up.
         const widthScale = steeringWidthScale(this.#horizontalLimit / this.#baseHorizontalLimit,
           this.#fallSpeed, this.#config.startFallSpeed);
-        const maxSpeed = this.#config.horizontalMaxSpeed * widthScale;
+        const effort = this.#input.steeringEffort;
+        const gestureScale = effort === undefined ? 1 : .85 + 2.65 * Math.max(0, Math.min(1, effort));
+        const maxSpeed = this.#config.horizontalMaxSpeed * widthScale * gestureScale;
         const step = maxSpeed * realFixedDeltaSeconds;
         const fineStep = Math.min(step, Math.abs(targetX - this.#transform.position.x) * (1 - Math.exp(-24 * realFixedDeltaSeconds)));
-        const precision = steeringPrecisionBlend(this.#fallSpeed, this.#config.startFallSpeed);
+        const precision = effort === undefined ? steeringPrecisionBlend(this.#fallSpeed, this.#config.startFallSpeed) : 1;
         this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, step + (fineStep - step) * precision);
       }
     } else {

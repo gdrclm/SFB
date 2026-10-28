@@ -2,10 +2,10 @@ import { expect, it } from "vitest";
 import { atStartDepth } from "../dev/DeveloperMode";
 import { gameConfig } from "../config/gameConfig";
 import { PlatformRoutePlanner, type PlannedPlatform } from "./PlatformRoutePlanner";
-function plansAt(depth: number, count = 50, speed = 20) {
+function plansAt(depth: number, count = 50, speed = 20, reactionWindowSeconds = .8) {
   const config = atStartDepth(gameConfig, depth);
   const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
-  return Array.from({ length: count }, () => planner.planNext(speed, 3, { stageNumber: 7, platformStrength: speed, reactionWindowSeconds: .8 }));
+  return Array.from({ length: count }, () => planner.planNext(speed, 3, { stageNumber: 7, platformStrength: speed, reactionWindowSeconds }));
 }
 function members(plan: PlannedPlatform) { return [{ ...plan, yOffset: 0 }, ...(plan.choices ?? [])]; }
 function planAt(plans: readonly PlannedPlatform[], index: number): PlannedPlatform {
@@ -67,7 +67,7 @@ it.each([600, 1400, 2500, 3500, 13000])("uses the actual start depth at %s metre
 });
 
 it("opens with a steady eight-row phrase, repeats geometry in pairs and gives cascades a four-beat rhythm", () => {
-  const plans = plansAt(600, 26);
+  const plans = plansAt(0, 26);
   expect(plans.slice(0, 8).every(p => p.section === "run-up")).toBe(true);
   expect(plans.slice(8, 16).every(p => p.section === "cascade")).toBe(true);
   expect(plans.slice(16, 20).every(p => p.section === "breather")).toBe(true);
@@ -85,7 +85,7 @@ it("opens with a steady eight-row phrase, repeats geometry in pairs and gives ca
 });
 
 it("waits for the full phrase and recovery before a timed challenge, then adds a recovery afterwards", () => {
-  const config = atStartDepth(gameConfig, 600);
+  const config = atStartDepth(gameConfig, 0);
   const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
   const difficulty = { stageNumber: 7, platformStrength: 20, reactionWindowSeconds: .8 };
   const plans = [planner.planNext(20, 3, difficulty), planner.planNext(20, 3, difficulty)];
@@ -101,7 +101,7 @@ it("waits for the full phrase and recovery before a timed challenge, then adds a
 });
 
 it("finishes a phrase across an internal difficulty threshold and develops the following one", () => {
-  const plans = plansAt(990, 12);
+  const plans = plansAt(150, 12);
   expect(plans.slice(0,8).every(p => p.section === "run-up" && p.worldPhase === "introduction")).toBe(true);
   expect(plans[8]?.worldPhase).toBe("development");
   expect(plans[8]?.section).toBe("cascade");
@@ -114,4 +114,34 @@ it("introduces shuttles, wind and turrets in authored pairs while keeping the op
   expect(plans.some(p=>p.mechanic?.startsWith("wind"))).toBe(true);
   expect(plans.some(p=>p.mechanic==="turret")).toBe(true);
   for(const plan of plans.filter(p=>p.mechanic)) expect([2,3]).toContain(plan.section==="climax"?plan.encounterRowIndex%4:plan.encounterRowIndex);
+});
+
+it.each([[20,.8],[45,.8],[80,.8],[80,1.8]])("introduces every new mechanic near the crystal entrance during continuous play at %s speed with %s reaction time", (speed, reaction) => {
+  const plans = plansAt(0, 400, speed, reaction);
+  const entrance = plans.findIndex(p => p.location === "crystal");
+  expect(entrance).toBeGreaterThan(0);
+  const opening = plans.slice(entrance, entrance + 20);
+  expect(opening[0]?.mechanic).toBeUndefined();
+  expect(opening[1]?.mechanic).toBeUndefined();
+  expect(opening[2]?.mechanic).toBe("moving");
+  expect(opening[3]?.mechanic).toBe("moving");
+  expect(opening[10]?.mechanic?.startsWith("wind")).toBe(true);
+  expect(opening[18]?.mechanic).toBe("turret");
+  for (const start of [4,12]) expect(opening.slice(start,start+4).every(p => p.section === "breather" && !p.mechanic)).toBe(true);
+});
+
+it("keeps timed challenges from replacing the three crystal introduction lessons", () => {
+  const config = atStartDepth(gameConfig, 500);
+  const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
+  const plans: PlannedPlatform[] = [];
+  for (let i = 0; i < 30; i++) {
+    planner.scheduleEncounter("break-run");
+    plans.push(planner.planNext(45, 3, { stageNumber: 7, platformStrength: 45, reactionWindowSeconds: .8 }));
+  }
+  expect(plans[2]?.mechanic).toBe("moving");
+  expect(plans[10]?.mechanic?.startsWith("wind")).toBe(true);
+  expect(plans[18]?.mechanic).toBe("turret");
+  expect(plans.slice(0,24).every(p => !p.externalEncounter)).toBe(true);
+  expect(plans[24]?.externalEncounter).toBe(true);
+  expect(plans[24]?.encounterTheme).toBe("break-run");
 });

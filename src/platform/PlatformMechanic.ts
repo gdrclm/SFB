@@ -9,6 +9,6 @@ export function courseMechanic(theme: PlatformEncounterTheme, location: DepthLoc
   if (row < 2 || row > 3 || (location === "sky" && phase === "introduction")) return undefined;
   if (theme === "trap") return "moving";
   if (theme === "rich-lane" && location !== "sky") return "wind-right";
-  if (theme === "death-tunnel" && phase !== "introduction") return "turret";
+  if (theme === "death-tunnel" && (phase !== "introduction" || location === "crystal")) return "turret";
   return undefined;
 }

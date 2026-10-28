@@ -344,3 +344,27 @@ it("keeps both weak and near-limit breaks moving while retaining a readable resi
   expect(distance(.98)).toBeGreaterThan(.7);
   expect(distance(.2)).toBeGreaterThan(distance(.98));
 });
+
+it.each([10, 45, 80])("uses gesture strength for fast traversals and gentle corrections at %s fall speed", speed => {
+  const distances: number[] = [];
+  for (const effort of [0, .5, 1]) {
+    const input = { isActive: true, isImmediate: true, normalizedPosition: 1, steeringEffort: effort };
+    const config = { ...gameConfig, ball: { ...gameConfig.ball, naturalAcceleration: 0 } };
+    const ball = new BallController(createTransform(), input, config);
+    ball.setPlayfieldHalfWidth(18); ball.fallSpeed = speed;
+    for (let i = 0; i < 6; i++) ball.fixedUpdate(1/60);
+    distances.push(ball.position.x);
+    input.normalizedPosition = -1;
+    const before = ball.position.x; ball.fixedUpdate(1/60);
+    expect(ball.position.x).toBeLessThan(before);
+    input.normalizedPosition = ball.position.x / ball.horizontalLimit + .002;
+    const target = input.normalizedPosition * ball.horizontalLimit;
+    ball.fixedUpdate(1/60);
+    expect(ball.position.x).toBeLessThan(target);
+    expect(ball.position.x).toBeGreaterThan(target - .04);
+  }
+  const [gentle = 0, medium = 0, strong = 0] = distances;
+  expect(strong).toBeGreaterThan(gentle * 3);
+  expect(medium).toBeGreaterThan(gentle);
+  expect(strong).toBeGreaterThan(medium);
+});
