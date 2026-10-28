@@ -2,6 +2,7 @@ import { breakImpactProfile } from "../collision/BreakResistance";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { HorizontalInput } from "../input/HorizontalInput";
+import { steeringSpeedScale } from "../input/SteeringResponse";
 
 interface BallTransform {
   readonly position: {
@@ -31,6 +32,7 @@ export class BallController implements FixedSimulationSystem {
   readonly #config: GameConfig["ball"];
   readonly #bounceConfig: GameConfig["unsuccessfulHit"];
   #horizontalLimit: number;
+  readonly #baseHorizontalLimit: number;
   readonly #previousPosition = { x: 0, y: 0, z: 0 };
   #fallSpeed: number;
   #horizontalVelocity = 0;
@@ -74,6 +76,7 @@ export class BallController implements FixedSimulationSystem {
     this.#impactRetention = config.powers.impactRetention;
     this.#fallSpeed = config.ball.startFallSpeed;
     this.#horizontalLimit = Math.max(0, config.playSpace.halfWidth - config.ball.radius);
+    this.#baseHorizontalLimit = Math.max(.001, this.#horizontalLimit);
 
     transform.position.x = config.ball.startPosition.x;
     transform.position.y = config.ball.startPosition.y;
@@ -143,7 +146,12 @@ export class BallController implements FixedSimulationSystem {
     if (this.#input.isImmediate) {
       if (this.#input.isActive) {
         const targetX = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
-        this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, this.#config.horizontalMaxSpeed * realFixedDeltaSeconds);
+        // Preserve screen traversal time as the viewport widens, then speed up
+        // corrections during fast falls. Still move a bounded distance per tick.
+        const widthScale = Math.max(1, this.#horizontalLimit / this.#baseHorizontalLimit);
+        const speedScale = steeringSpeedScale(this.#fallSpeed, this.#config.startFallSpeed);
+        const maxSpeed = this.#config.horizontalMaxSpeed * widthScale * speedScale;
+        this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, maxSpeed * realFixedDeltaSeconds);
       }
       this.#horizontalVelocity = (this.#transform.position.x - this.#previousPosition.x) / Math.max(.0001, realFixedDeltaSeconds);
     } else {

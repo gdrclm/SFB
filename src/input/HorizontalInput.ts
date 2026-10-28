@@ -9,6 +9,8 @@ interface PointerInputOptions {
   readonly getPosition?: () => number;
   /** Unclamped screen-to-arena mapping, including the current camera zoom. */
   readonly mapPosition?: (screenPosition: number) => number;
+  /** Live gain for relative touch/pen motion; absolute mouse targets stay precise. */
+  readonly getSwipeSensitivity?: () => number;
   readonly onChange?: () => void;
 }
 const clamp = (value: number): number => Math.max(-1, Math.min(1, value));
@@ -61,7 +63,8 @@ export class PointerHorizontalInput implements HorizontalInput {
       // Integrate displacement, not finger coordinates. Clamp each move so reversing
       // at an edge responds immediately instead of requiring the overshoot to be undone.
       const delta = this.#mapClientX(latest.clientX) - this.#mapClientX(this.#lastClientX);
-      this.#normalizedPosition = clamp(this.#normalizedPosition + delta);
+      const sensitivity = this.#options.getSwipeSensitivity?.() ?? 1;
+      this.#normalizedPosition = clamp(this.#normalizedPosition + delta * sensitivity);
       this.#lastClientX = latest.clientX;
     } else return;
     this.#options.onChange?.();

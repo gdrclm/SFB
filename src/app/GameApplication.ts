@@ -60,6 +60,7 @@ import { RunWallet } from "../currency/RunWallet";
 import { SuccessfulHitEffects } from "../effects/SuccessfulHitEffects";
 import { UnsuccessfulHitEffects } from "../effects/UnsuccessfulHitEffects";
 import { PointerHorizontalInput } from "../input/HorizontalInput";
+import { steeringSpeedScale } from "../input/SteeringResponse";
 import { PlatformLabels } from "../platform/PlatformLabels";
 import { nearestInCurrentLane } from "../platform/PlatformReadability";
 import { PlatformGenerator } from "../platform/PlatformGenerator";
@@ -399,6 +400,7 @@ export class GameApplication {
     const horizontalLimit = (): number => Math.max(.001, this.#ballController?.horizontalLimit ?? this.#config.playSpace.halfWidth - this.#config.ball.radius);
     this.#horizontalInput = new PointerHorizontalInput(this.#canvas, {
       getPosition: () => (this.#ballController?.position.x ?? this.#config.ball.startPosition.x) / horizontalLimit(),
+      getSwipeSensitivity: () => steeringSpeedScale(this.#ballController?.fallSpeed ?? this.#config.ball.startFallSpeed, this.#config.ball.startFallSpeed),
       mapPosition: screen => {
         const camera = mainScene.camera;
         const left = camera.orthoLeft ?? -horizontalLimit(), right = camera.orthoRight ?? horizontalLimit();

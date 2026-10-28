@@ -234,17 +234,46 @@ it("caps direct mouse and touch targets without smoothing or banking pointer eve
   expect(ball.horizontalVelocity).toBe(0);
 });
 
-it.each([30, 60, 240])("uses the same maximum horizontal speed at %s ticks and in slow motion", fps => {
+it.each([30, 60, 240])("preserves screen traversal speed across wide viewports and slow motion at %s ticks", fps => {
+  const distances: number[] = [];
+  const config = { ...gameConfig, ball: { ...gameConfig.ball, naturalAcceleration: 0 } };
+  for (const halfWidth of [5, 18, 48]) for (const timeScale of [1, .1]) {
+    const ball = new BallController(createTransform(), { isActive: true, isImmediate: true, normalizedPosition: 1 }, config);
+    ball.setPlayfieldHalfWidth(halfWidth);
+    for (let i = 0; i < fps / 10; i++) ball.fixedUpdate(timeScale / fps, 1 / fps);
+    distances.push(ball.position.x / ball.horizontalLimit);
+  }
+  for (const distance of distances) expect(distance).toBeCloseTo(16 * .1 / 4.5, 8);
+});
+
+it("tracks the cursor faster after boosts, stays bounded and reacts immediately to reversal and slowing", () => {
   const input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
-  const ball = new BallController(createTransform(), input, gameConfig);
-  ball.setPlayfieldHalfWidth(18);
-  for (let i = 0; i < fps / 2; i++) ball.fixedUpdate(.1 / fps, 1 / fps);
-  expect(ball.position.x).toBeCloseTo(8);
+  const config = { ...gameConfig, ball: { ...gameConfig.ball, naturalAcceleration: 0 } };
+  const ball = new BallController(createTransform(), input, config);
+  ball.setPlayfieldHalfWidth(48);
+  ball.fixedUpdate(1 / 60);
+  const initialStep = ball.position.x;
+  ball.fallSpeed = 40;
+  ball.fixedUpdate(1 / 60);
+  expect(ball.position.x - initialStep).toBeCloseTo(initialStep * 2);
   input.normalizedPosition = -1;
-  for (let i = 0; i < fps * 2; i++) ball.fixedUpdate(1 / fps);
-  expect(ball.position.x).toBe(-17.5);
+  const beforeReverse = ball.position.x;
+  ball.fixedUpdate(1 / 60);
+  expect(beforeReverse - ball.position.x).toBeCloseTo(initialStep * 2);
+  ball.fallSpeed = 10;
+  const beforeSlow = ball.position.x;
+  ball.fixedUpdate(1 / 60);
+  expect(beforeSlow - ball.position.x).toBeCloseTo(initialStep);
+  ball.fallSpeed = 6000;
+  const beforeExtreme = ball.position.x;
+  ball.fixedUpdate(1 / 60);
+  expect(beforeExtreme - ball.position.x).toBeCloseTo(initialStep * 3);
+  simulate(ball, 1, 60);
+  expect(ball.position.x).toBe(-47.5);
   ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
   ball.setPlayfieldHalfWidth(NaN); expect(ball.horizontalLimit).toBe(5.5);
+  input.isActive = false; ball.fixedUpdate(1 / 60);
+  expect(ball.horizontalVelocity).toBe(0);
 });
 
 

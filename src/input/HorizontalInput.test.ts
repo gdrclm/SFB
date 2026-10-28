@@ -9,10 +9,10 @@ class Canvas extends EventTarget {
   public setPointerCapture(): void { /* Pointer capture is exercised in the real-browser check. */ }
 }
 afterEach(() => { vi.unstubAllGlobals(); });
-function setup(position = 0, map: (x: number) => number = x => x) {
+function setup(position = 0, map: (x: number) => number = x => x, sensitivity: () => number = () => 1) {
   vi.stubGlobal("window", new EventTarget()); vi.stubGlobal("PointerEvent", TestPointer);
   const canvas = new Canvas();
-  const input = new PointerHorizontalInput(canvas as unknown as HTMLCanvasElement, { getPosition: () => position, mapPosition: map });
+  const input = new PointerHorizontalInput(canvas as unknown as HTMLCanvasElement, { getPosition: () => position, mapPosition: map, getSwipeSensitivity: sensitivity });
   const send = (type: string, x: number, pointerType = "touch", id = 1): void => { canvas.dispatchEvent(new TestPointer(type, x, pointerType, id)); };
   return { input, send };
 }
@@ -51,5 +51,31 @@ it("ignores a second touch so steering can coexist with a held ability button", 
   expect(input.normalizedPosition).toBe(0);
   send("pointermove", 140, "touch", 1); expect(input.normalizedPosition).toBeCloseTo(.2);
   send("pointercancel", 140, "touch", 1); expect(input.isActive).toBe(false);
+  input.dispose();
+});
+
+it("increases swipe gain mid-gesture without jumping, and reverses immediately at an edge", () => {
+  let sensitivity = 1;
+  const { input, send } = setup(0, x => x, () => sensitivity);
+  send("pointerdown", 100); send("pointermove", 140);
+  expect(input.normalizedPosition).toBeCloseTo(.2);
+  sensitivity = 3;
+  expect(input.normalizedPosition).toBeCloseTo(.2);
+  send("pointermove", 180);
+  expect(input.normalizedPosition).toBeCloseTo(.8);
+  send("pointermove", 250);
+  expect(input.normalizedPosition).toBe(1);
+  send("pointermove", 240);
+  expect(input.normalizedPosition).toBeCloseTo(.85);
+  sensitivity = 1;
+  send("pointermove", 220);
+  expect(input.normalizedPosition).toBeCloseTo(.75);
+  input.dispose();
+});
+
+it("keeps the mouse target accurate regardless of swipe sensitivity", () => {
+  const { input, send } = setup(0, x => x, () => 3);
+  send("pointermove", 300, "mouse");
+  expect(input.normalizedPosition).toBeCloseTo(.5);
   input.dispose();
 });
