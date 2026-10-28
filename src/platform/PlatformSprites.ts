@@ -7,6 +7,7 @@ import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./Platfo
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
 import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
 import { prepareMechanicSkin } from "./PlatformMechanicSkin";
+import { prepareSkyPlatformSkin } from "./SkyPlatformSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Material } from "@babylonjs/core/Materials/material";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -60,6 +61,7 @@ export function createAtlasSprite(name: string, scene: Scene, kind: AtlasKind = 
 /** Create once, before the run-resource snapshot, so retry keeps the GPU atlases. */
 export function preparePlatformSprites(scene: Scene): void {
   prepareMechanicSkin(scene);
+  prepareSkyPlatformSkin(scene);
   for (const kind of ["idle", "destroy", "debris"] as const) atlasMaterial(scene, kind);
 }
 

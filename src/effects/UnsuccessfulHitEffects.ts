@@ -37,7 +37,7 @@ export class UnsuccessfulHitEffects
   }
 
   public playErrorReaction(platform: Pick<PlatformController, "mesh"> & Partial<Pick<PlatformController, "playImpact">>): void {
-    platform.playImpact?.(1.4);
+    platform.playImpact?.(1.4,this.#ball.position.x);
     this.#resetVisuals();
     this.#platform = platform.mesh;
     this.#platformBaseVisibility = platform.mesh.visibility;

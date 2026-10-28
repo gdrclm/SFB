@@ -1,6 +1,9 @@
 import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
 import type { PlatformMechanic } from "./PlatformMechanic";
 import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
+import { SkyPlatformSkin } from "./SkyPlatformSkin";
+import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
+import { locationAtDepth } from "../progression/WorldProgression";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
 import { platformSpriteRow, debrisSpriteRect } from "./PlatformSpriteLayout";
 import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprites";
@@ -13,6 +16,7 @@ import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformCon
 
 export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
 export interface PlatformActivationProperties {
+  readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly strength: number;
   readonly strengthLevel: PlatformStrengthLevel;
@@ -50,6 +54,8 @@ export class PlatformController {
   #motionStartX = 0;
   #mechanic: PlatformMechanic | undefined;
   #machine: PlatformMechanicSkin | null = null;
+  #sky: SkyPlatformSkin | null = null;
+  #appearance: SkyPlatformAppearance | undefined;
   readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
@@ -61,7 +67,9 @@ export class PlatformController {
     this.mesh.position.copyFrom(this.#startPosition);
     this.mesh.isVisible = false; this.mesh.isPickable = false;
     this.#sprite = new PlatformSprite(this.mesh, this.size.height, this.size.depth, scene);
-    this.#applyActivationProperties({ strength: platform.strength, strengthLevel: platform.strengthLevel });
+    const initialAppearance=skyPlatformAppearance(locationAtDepth(config.startDepth+config.ball.startPosition.y-platform.position.y),"standard",undefined,config.platforms.indexOf(platform));
+    this.#applyActivationProperties({ strength: platform.strength, strengthLevel: platform.strengthLevel,
+      ...(initialAppearance===undefined?{}:{appearance:initialAppearance}) });
     this.#isActive = active;
     this.mesh.setEnabled(active);
     if (active) this.#createPhysicsResources();
@@ -69,6 +77,7 @@ export class PlatformController {
   public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
   public get motionCenterX(): number { return this.#motionStartX; }
   public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
+  public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
   public setMechanicAim(x: number, y: number): void { this.#machine?.aim(x,y); }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;
@@ -101,6 +110,9 @@ export class PlatformController {
     if(this.#mechanic) {
       this.#machine?.render(this.#mechanic,this.width,this.#approachState,elapsedSeconds,this.#reduced);
       this.#sprite.mesh.isVisible=false;
+    } else if(this.#appearance) {
+      this.#sky?.render(this.#appearance,this.width,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sprite.mesh.isVisible=false;
     }
   }
 
@@ -118,13 +130,20 @@ export class PlatformController {
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
     this.#sprite.renderBreak(this.width, 0);
-    if(this.#mechanic)this.#sprite.mesh.isVisible=false;
+    if(this.#mechanic||this.#appearance)this.#sprite.mesh.isVisible=false;
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
-  public playImpact(force = 1): void { this.#sprite.impact(this.#elapsed, force); }
+  public playImpact(force = 1, contactX = this.mesh.position.x): void {
+    this.#sprite.impact(this.#elapsed, force);
+    if(this.#appearance)this.#sky?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
+  }
 
-  public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); this.#machine?.renderBreak(progress); }
+  public renderBreak(progress: number): void {
+    this.#sprite.renderBreak(this.width, progress);
+    if(this.#mechanic)this.#machine?.renderBreak(progress);
+    if(this.#appearance)this.#sky?.renderBreak(progress);
+  }
   public finishBreak(): boolean {
     if (!this.#isBreaking) return false;
     this.mesh.setEnabled(false); this.#isBreaking = false;
@@ -157,19 +176,25 @@ export class PlatformController {
     this.#mechanic = properties.mechanic;
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
+    this.#appearance=this.#kind==="standard"&&this.#mechanic===undefined?properties.appearance:undefined;
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#tutorialDanger = properties.tutorialDanger === true;
     this.#motion = properties.lateralMotion; this.#motionAge = 0; this.#motionStartX = this.mesh.position.x;
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
-    this.#sprite.mesh.isVisible=this.#mechanic===undefined;
+    this.#sprite.mesh.isVisible=this.#mechanic===undefined&&this.#appearance===undefined;
     this.#machine?.reset();
+    this.#sky?.reset();
     if(this.#mechanic) {
       this.#machine??=new PlatformMechanicSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
       this.#machine.render(this.#mechanic,this.width,null,this.#elapsed,this.#reduced);
     } else this.#machine?.hide();
+    if(this.#appearance){
+      this.#sky??=new SkyPlatformSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
+      this.#sky.render(this.#appearance,this.width,null,this.#elapsed,this.#reduced);
+    }
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,
-      routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
+      routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, appearance:this.#appearance??"island", widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
   }
 }

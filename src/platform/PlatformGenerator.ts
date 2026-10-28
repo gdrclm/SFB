@@ -133,6 +133,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
         {
           encounterTheme: plan.encounterTheme,
           ...(plan.mechanic === undefined ? {} : { mechanic: plan.mechanic }),
+          ...(plan.appearance === undefined ? {} : { appearance: plan.appearance }),
           ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
           strength: plan.strength,
           strengthLevel: plan.strengthLevel,
@@ -157,6 +158,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
           {
             encounterTheme: plan.encounterTheme,
             ...(choice.mechanic === undefined ? {} : { mechanic: choice.mechanic }),
+            ...(choice.appearance === undefined ? {} : { appearance: choice.appearance }),
             ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
             strength: choice.strength,
             strengthLevel: choice.strengthLevel,
@@ -207,6 +209,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       properties: {
         encounterTheme: platform.encounterTheme,
         ...(platform.mechanic === undefined ? {} : { mechanic: platform.mechanic }),
+        ...(platform.appearance === undefined ? {} : { appearance: platform.appearance }),
         ...(platform.lateralMotion ? { lateralMotion: platform.lateralMotion } : {}),
         strength: platform.strength,
         strengthLevel: platform.strengthLevel,

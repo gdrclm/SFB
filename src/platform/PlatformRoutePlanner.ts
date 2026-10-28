@@ -3,6 +3,7 @@ import type { DepthLocation } from "../scene/DepthLocations";
 import { cascadeVariant, climaxTheme, courseSectionAt, sectionForTheme, sectionRows, sectionTheme, type CourseSection, type CascadeVariant } from "./CourseSections";
 import { speedAfterBreak } from "../collision/BreakResistance";
 import { courseMechanic, type PlatformMechanic } from "./PlatformMechanic";
+import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { createEncounterLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
@@ -36,6 +37,7 @@ export interface PlannedCoinTrail {
 }
 
 export interface PlannedPlatform {
+  readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly x: number;
   readonly y: number;
@@ -62,6 +64,7 @@ export interface PlannedPlatform {
 }
 
 export interface PlannedPlatformChoice {
+  readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly x: number;
   readonly yOffset?: number;
@@ -231,12 +234,15 @@ export class PlatformRoutePlanner {
         Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction, this.#config.successfulHit.maximumSpeedLoss);
     }
     const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
-    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map(member => ({
+    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map((member,index) => {
+      const appearance=skyPlatformAppearance(this.#progress.location,member.kind,mechanic,this.#zoneCycle*8+Math.floor(themeRowIndex/2)+index);
+      return {
       ...member,
+      ...(appearance===undefined?{}:{appearance}),
       ...(mechanic === undefined || (mechanic !== "moving" && !member.isPrimaryLane) ? {} : {
         mechanic: mechanic === "wind-right" && member.x > layout.passage.x ? "wind-left" as const : mechanic,
       }),
-    }));
+    };});
     const primary = row.find((member) => member.isPrimaryLane);
     if (primary === undefined) {
       throw new Error("A generated encounter row must contain a primary lane.");
@@ -265,6 +271,7 @@ export class PlatformRoutePlanner {
       stageNumber: difficulty.stageNumber,
       kind: primary.kind,
       ...(primary.mechanic === undefined ? {} : { mechanic: primary.mechanic }),
+      ...(primary.appearance === undefined ? {} : { appearance: primary.appearance }),
       encounterTheme: layoutTheme,
       section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
       ...(cascading ? { cascadeVariant: variant } : {}),
@@ -283,6 +290,7 @@ export class PlatformRoutePlanner {
           widthScale: member.widthScale,
           kind: member.kind,
           ...(member.mechanic === undefined ? {} : { mechanic: member.mechanic }),
+          ...(member.appearance === undefined ? {} : { appearance: member.appearance }),
           isTrap: member.isTrap,
         })),
     };

@@ -145,3 +145,13 @@ it("keeps timed challenges from replacing the three crystal introduction lessons
   expect(plans[36]?.externalEncounter).toBe(true);
   expect(plans[36]?.encounterTheme).toBe("break-run");
 });
+
+it("keeps sky appearances on ordinary platforms while retaining islands and the existing routes",()=>{
+ const sky=plansAt(0,60,10).filter(p=>p.location==="sky");
+ const choices=sky.flatMap(members);
+ expect(choices.some(p=>p.appearance==="cloud")).toBe(true);
+ expect(choices.some(p=>p.appearance==="bubble")).toBe(true);
+ expect(choices.some(p=>!p.appearance&&p.kind==="standard")).toBe(true);
+ for(const p of choices.filter(p=>p.appearance)){expect(p.kind).toBe("standard");expect(p.mechanic).toBeUndefined();}
+ for(const depth of [600,1400,6000,14000])expect(plansAt(depth).flatMap(members).some(p=>p.appearance)).toBe(false);
+});
