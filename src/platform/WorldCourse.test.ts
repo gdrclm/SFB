@@ -14,7 +14,7 @@ function planAt(plans: readonly PlannedPlatform[], index: number): PlannedPlatfo
   return plan;
 }
 it("varies the physical course from a wide cascade to a winding combo route and optional risky branches", () => {
-  const intro = plansAt(600).filter(p => p.section === "cascade" && p.worldPhase === "introduction");
+  const intro = plansAt(600,70).filter(p => p.section === "cascade" && p.worldPhase === "introduction");
   const middle = plansAt(1400).filter(p => p.section === "cascade" && p.worldPhase === "development");
   const peak = plansAt(2400).filter(p => p.section === "cascade" && p.worldPhase === "climax");
   expect(intro.length).toBeGreaterThanOrEqual(8);
@@ -113,35 +113,35 @@ it("introduces shuttles, wind and turrets in authored pairs while keeping the op
   expect(plans.some(p=>p.mechanic==="moving" && (p.lateralMotion?.amplitude??0)>=.9)).toBe(true);
   expect(plans.some(p=>p.mechanic?.startsWith("wind"))).toBe(true);
   expect(plans.some(p=>p.mechanic==="turret")).toBe(true);
-  for(const plan of plans.filter(p=>p.mechanic)) expect([2,3]).toContain(plan.section==="climax"?plan.encounterRowIndex%4:plan.encounterRowIndex);
+  for(const plan of plans.filter(p=>p.mechanic)) expect([2,5]).toContain(plan.section==="climax"?plan.encounterRowIndex%4:plan.encounterRowIndex);
 });
 
 it.each([[20,.8],[45,.8],[80,.8],[80,1.8]])("introduces every new mechanic near the crystal entrance during continuous play at %s speed with %s reaction time", (speed, reaction) => {
   const plans = plansAt(0, 400, speed, reaction);
   const entrance = plans.findIndex(p => p.location === "crystal");
   expect(entrance).toBeGreaterThan(0);
-  const opening = plans.slice(entrance, entrance + 20);
+  const opening = plans.slice(entrance, entrance + 32);
   expect(opening[0]?.mechanic).toBeUndefined();
   expect(opening[1]?.mechanic).toBeUndefined();
   expect(opening[2]?.mechanic).toBe("moving");
-  expect(opening[3]?.mechanic).toBe("moving");
-  expect(opening[10]?.mechanic?.startsWith("wind")).toBe(true);
-  expect(opening[18]?.mechanic).toBe("turret");
-  for (const start of [4,12]) expect(opening.slice(start,start+4).every(p => p.section === "breather" && !p.mechanic)).toBe(true);
+  expect(opening[5]?.mechanic).toBe("moving");
+  expect(opening[14]?.mechanic?.startsWith("wind")).toBe(true);
+  expect(opening[26]?.mechanic).toBe("turret");
+  for (const start of [8,20]) expect(opening.slice(start,start+4).every(p => p.section === "breather" && !p.mechanic)).toBe(true);
 });
 
 it("keeps timed challenges from replacing the three crystal introduction lessons", () => {
   const config = atStartDepth(gameConfig, 500);
   const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
   const plans: PlannedPlatform[] = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 42; i++) {
     planner.scheduleEncounter("break-run");
     plans.push(planner.planNext(45, 3, { stageNumber: 7, platformStrength: 45, reactionWindowSeconds: .8 }));
   }
   expect(plans[2]?.mechanic).toBe("moving");
-  expect(plans[10]?.mechanic?.startsWith("wind")).toBe(true);
-  expect(plans[18]?.mechanic).toBe("turret");
-  expect(plans.slice(0,24).every(p => !p.externalEncounter)).toBe(true);
-  expect(plans[24]?.externalEncounter).toBe(true);
-  expect(plans[24]?.encounterTheme).toBe("break-run");
+  expect(plans[14]?.mechanic?.startsWith("wind")).toBe(true);
+  expect(plans[26]?.mechanic).toBe("turret");
+  expect(plans.slice(0,36).every(p => !p.externalEncounter)).toBe(true);
+  expect(plans[36]?.externalEncounter).toBe(true);
+  expect(plans[36]?.encounterTheme).toBe("break-run");
 });

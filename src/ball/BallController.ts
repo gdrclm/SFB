@@ -51,6 +51,10 @@ export class BallController implements FixedSimulationSystem {
   #impulseDuration = 1;
   #lateralDrift = 0;
   #wasInputActive = false;
+  #encounterTravelScale = 1;
+  public setEncounterTravelScale(scale: number): void {
+    this.#encounterTravelScale=Number.isFinite(scale)?Math.max(.01,Math.min(1,scale)):1;
+  }
 
   public applyLateralImpulse(velocity: number, duration = .4): void {
     if (!Number.isFinite(velocity) || !Number.isFinite(duration) || duration <= 0) return;
@@ -73,7 +77,7 @@ export class BallController implements FixedSimulationSystem {
     this.#breakHold = impact.hold;
     this.#breakRecovery = impact.recovery;
     this.#breakTransmission = impact.minimumTransmission;
-    this.#verticalVelocity = -this.#fallSpeed * this.#config.movementScale * this.#breakTransmission;
+    this.#verticalVelocity = -this.#fallSpeed * this.#config.movementScale * this.#breakTransmission * this.#encounterTravelScale;
   }
 
   public constructor(
@@ -207,7 +211,7 @@ export class BallController implements FixedSimulationSystem {
       transmission = t >= 1 ? 1 : this.#breakTransmission + (1 - this.#breakTransmission) * t * t * (3 - 2 * t);
       if (t >= 1) this.#breakElapsed = null;
     }
-    this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission;
+    this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission * this.#encounterTravelScale;
     this.#transform.position.y += this.#verticalVelocity * fixedDeltaSeconds;
   }
 

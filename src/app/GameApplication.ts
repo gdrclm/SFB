@@ -62,6 +62,7 @@ import { UnsuccessfulHitEffects } from "../effects/UnsuccessfulHitEffects";
 import { PointerHorizontalInput } from "../input/HorizontalInput";
 import { PlatformMechanics } from "../platform/PlatformMechanics";
 import { PlatformMechanicsView } from "../platform/PlatformMechanicsView";
+import { MechanicPacing } from "../platform/MechanicPacing";
 import { PlatformLabels } from "../platform/PlatformLabels";
 import { nearestInCurrentLane } from "../platform/PlatformReadability";
 import { PlatformGenerator } from "../platform/PlatformGenerator";
@@ -240,7 +241,7 @@ export class GameApplication {
   #platformGenerator: PlatformGenerator | null = null;
   #platformMechanics: PlatformMechanics | null = null;
   #platformMechanicsView: PlatformMechanicsView | null = null;
-  readonly #seenMechanics=new Set<string>();
+  #mechanicPacing: MechanicPacing | null = null;
   #phaseOneController: PhaseOneController | null = null;
   #collisionResolver: CollisionResolver | null = null;
   #successfulHitHandler: SuccessfulPlatformHitHandler | null = null;
@@ -512,17 +513,6 @@ export class GameApplication {
             this.#challengeRemaining = 7;
           }
         }
-        if(!additionalCell && plan.mechanic) {
-          const kind=plan.mechanic.startsWith("wind")?"wind":plan.mechanic;
-          if(!this.#seenMechanics.has(kind)) {
-            this.#seenMechanics.add(kind);
-            const notice=requireMenuElement(this.#interfaceLayerElement,"#challenge-notice");
-            notice.dataset.theme="trap";
-            requireMenuElement(notice,"strong").textContent=kind==="moving"?"↔ Подвижные платформы":kind==="wind"?"➜ Боковой ветер":"⊕ Турель";
-            requireMenuElement(notice,"span").textContent=kind==="moving"?"Следи за ходом платформы; проход учитывает её движение.":kind==="wind"?"Стрелка показывает направление порыва. Корректируй движение в ответ.":"Уходи с линии прицеливания или разбивай турель до выстрела.";
-            this.#challengeRemaining=7;
-          }
-        }
       },
     );
     this.#syncPlayfieldWidth();
@@ -589,14 +579,24 @@ export class GameApplication {
       this.#config,
     );
     this.#unsubscribeCollision = this.#collisionResolver.onCollision(this.#handleCollision);
+    const mechanicViewport=()=>{
+      const camera=mainScene.camera,p=camera.globalPosition;
+      return {left:p.x+(camera.orthoLeft??-5),right:p.x+(camera.orthoRight??5),bottom:p.y+(camera.orthoBottom??-6),top:p.y+(camera.orthoTop??6)};
+    };
+    this.#mechanicPacing=new MechanicPacing(this.#ballController,()=>this.#platformPool?.platforms??[],mechanicViewport,
+      this.#config.ball.movementScale,()=>!this.#guidedRun&&!this.#powers?.invulnerable,kind=>{
+        const wind=kind.startsWith("wind"),notice=requireMenuElement(this.#interfaceLayerElement,"#challenge-notice");
+        notice.dataset.theme="trap";
+        requireMenuElement(notice,"strong").textContent=kind==="moving"?"↔ Подвижная каретка":wind?"➜ Ветровая турбина":"⊕ Бронированная турель";
+        requireMenuElement(notice,"span").textContent=kind==="moving"?"Посмотри на ход по направляющим. Затем пройди мимо или разбей каретку.":wind?"Струи показывают направление ветра. Удерживай траекторию против порыва.":"Ствол фиксирует цель перед выстрелом. Сместись с линии прицеливания.";
+        this.#challengeRemaining=6;
+      });
+    this.#fixedStep.register(this.#mechanicPacing);
     this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
       this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
     const mechanicBall=this.#ballController;
-    this.#platformMechanics=new PlatformMechanics(mechanicBall,()=>this.#platformPool?.platforms??[],()=>{
-      const camera=mainScene.camera, p=camera.globalPosition;
-      return {left:p.x+(camera.orthoLeft??-5),right:p.x+(camera.orthoRight??5),
-        bottom:p.y+(camera.orthoBottom??-6),top:p.y+(camera.orthoTop??6)};
-    },this.#config.ball.movementScale,this.#config.ball.radius,direction=>{
+    this.#platformMechanics=new PlatformMechanics(mechanicBall,()=>this.#platformPool?.platforms??[],mechanicViewport,
+      this.#config.ball.movementScale,this.#config.ball.radius,direction=>{
       if(this.#powers?.invulnerable||this.#powers?.covers(mechanicBall.position)||mechanicBall.isBouncing)return;
       mechanicBall.applyLateralImpulse(direction*6,.4);
       getGameSounds().play("zone-trap");
@@ -699,7 +699,6 @@ export class GameApplication {
     this.#haptics.cancel();
     this.#platformMechanicsView?.dispose();this.#platformMechanicsView=null;
     this.#platformMechanics?.clear();this.#platformMechanics=null;
-    this.#seenMechanics.clear();
     this.#contextGuide?.dispose();
     this.#tutorialFinish?.remove(); this.#tutorialFinish = null; this.#tutorialFinishAge = null;
     this.#interfaceLayerElement.classList.remove("tutorial-finale");
@@ -763,6 +762,7 @@ export class GameApplication {
     }
     this.#horizontalInput = null;
     this.#ballController = null;
+    this.#mechanicPacing = null;
     this.#ballVisualController = null;
     this.#cameraController = null;
     this.#boostController = null;

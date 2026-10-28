@@ -249,7 +249,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
             if (this.#pool.availableCount < 1) return;
             const platform = this.#pool.acquire(
               new Vector3(member.x * mirror + offset, row.y + member.yOffset + depthShift, this.#config.playSpace.depth),
-              member.properties,
+              mirror < 0 && member.properties.mechanic?.startsWith("wind") ? {
+                ...member.properties, mechanic: member.properties.mechanic === "wind-left" ? "wind-right" : "wind-left",
+              } : member.properties,
             );
             if (!platform) return;
             row.generated.add(key);

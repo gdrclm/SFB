@@ -1,5 +1,6 @@
 import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
 import type { PlatformMechanic } from "./PlatformMechanic";
+import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
 import { platformSpriteRow, debrisSpriteRect } from "./PlatformSpriteLayout";
 import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprites";
@@ -48,6 +49,8 @@ export class PlatformController {
   #motionAge = 0;
   #motionStartX = 0;
   #mechanic: PlatformMechanic | undefined;
+  #machine: PlatformMechanicSkin | null = null;
+  readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
@@ -64,7 +67,9 @@ export class PlatformController {
     if (active) this.#createPhysicsResources();
   }
   public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
+  public get motionCenterX(): number { return this.#motionStartX; }
   public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
+  public setMechanicAim(x: number, y: number): void { this.#machine?.aim(x,y); }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;
     this.#motionAge += Math.max(0, seconds);
@@ -93,6 +98,10 @@ export class PlatformController {
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.
     this.#sprite.mesh.visibility = 1;
+    if(this.#mechanic) {
+      this.#machine?.render(this.#mechanic,this.width,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sprite.mesh.isVisible=false;
+    }
   }
 
   public createBreakFragment(index: number, fragmentWidth: number): Mesh {
@@ -109,12 +118,13 @@ export class PlatformController {
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
     this.#sprite.renderBreak(this.width, 0);
+    if(this.#mechanic)this.#sprite.mesh.isVisible=false;
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
   public playImpact(force = 1): void { this.#sprite.impact(this.#elapsed, force); }
 
-  public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); }
+  public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); this.#machine?.renderBreak(progress); }
   public finishBreak(): boolean {
     if (!this.#isBreaking) return false;
     this.mesh.setEnabled(false); this.#isBreaking = false;
@@ -153,6 +163,12 @@ export class PlatformController {
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
+    this.#sprite.mesh.isVisible=this.#mechanic===undefined;
+    this.#machine?.reset();
+    if(this.#mechanic) {
+      this.#machine??=new PlatformMechanicSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
+      this.#machine.render(this.#mechanic,this.width,null,this.#elapsed,this.#reduced);
+    } else this.#machine?.hide();
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,
       routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
   }

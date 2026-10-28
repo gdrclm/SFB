@@ -132,6 +132,7 @@ export class PlatformRoutePlanner {
   #encounterRowIndex = 0;
   #encounterVariant = 0;
   #pendingBlueprint: RowBlueprint | null = null;
+  #previousMechanic = false;
 
   public constructor(
     initialLowestY: number,
@@ -215,7 +216,9 @@ export class PlatformRoutePlanner {
     const clearance = this.#config.ball.radius * 2 + Math.max(...this.#config.platforms.map(platform => platform.size.height)) + .15;
     const beat = structured ? Math.max(.6, difficulty.reactionWindowSeconds * .65) : difficulty.reactionWindowSeconds * .55;
     const clearSpacing = Math.max(generation.minimumSpacing,
-      clearance + worldSpeed * Math.max(travelTime, beat * layout.rhythm * this.#progress.spacingScale));
+      clearance + worldSpeed * Math.max(travelTime, beat * layout.rhythm * this.#progress.spacingScale,
+        mechanic ? 1.65 : this.#previousMechanic ? 1.1 : 0));
+    this.#previousMechanic=mechanic!==undefined;
     this.#nextY -= clearSpacing + this.#previousBandDepth;
     const bandDepth = (structured ? Math.min(1.5, Math.max(.65, worldSpeed * .08))
       : Math.min(3, Math.max(1.15, worldSpeed * .20))) * this.#progress.staggerScale;
@@ -231,7 +234,7 @@ export class PlatformRoutePlanner {
     const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map(member => ({
       ...member,
       ...(mechanic === undefined || (mechanic !== "moving" && !member.isPrimaryLane) ? {} : {
-        mechanic: mechanic === "wind-right" && member.x < layout.passage.x ? "wind-left" as const : mechanic,
+        mechanic: mechanic === "wind-right" && member.x > layout.passage.x ? "wind-left" as const : mechanic,
       }),
     }));
     const primary = row.find((member) => member.isPrimaryLane);
@@ -265,7 +268,7 @@ export class PlatformRoutePlanner {
       encounterTheme: layoutTheme,
       section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
       ...(cascading ? { cascadeVariant: variant } : {}),
-      ...(movingAmplitude > 0 ? { lateralMotion: { amplitude: movingAmplitude, period: 3.8, phase: 0 } } : {}),
+      ...(movingAmplitude > 0 ? { lateralMotion: { amplitude: movingAmplitude, period: Math.max(1.35,Math.min(3.8,3.8*(20/Math.max(20,ballSpeed))**.35)), phase: 0 } } : {}),
       encounterRowIndex: themeRowIndex,
       externalEncounter: this.#externalEncounter,
       ...(coinTrail === undefined ? {} : { coinTrail }),
@@ -324,9 +327,9 @@ export class PlatformRoutePlanner {
         structured ? Math.floor(this.#encounterRowIndex / 2) : this.#encounterRowIndex,
       );
       const layoutTheme=theme==="climax"?climaxTheme(this.#encounterRowIndex):theme;
-      if(structured && courseMechanic(layoutTheme,this.#progress.location,this.#progress.phase,theme==="climax"?this.#encounterRowIndex%4:this.#encounterRowIndex)==="moving") {
+      if(structured && courseMechanic(layoutTheme,this.#progress.location,this.#progress.phase,theme==="climax"?this.#encounterRowIndex%4:this.#encounterRowIndex)!==undefined) {
         // Reserve room for the full shuttle sweep, instead of squeezing tiny cells.
-        this.#pendingBlueprint={lanes:[SAFE_STANDARD,DEADLY_BLACK],primaryLaneIndex:0};
+        this.#pendingBlueprint={...this.#pendingBlueprint,lanes:[SAFE_STANDARD,DEADLY_BLACK],primaryLaneIndex:0,coinLaneIndex:0};
       }
     }
     return this.#pendingBlueprint;

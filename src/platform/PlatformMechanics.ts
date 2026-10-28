@@ -6,9 +6,13 @@ export interface MechanicBall {
   readonly position: MechanicPoint;
   readonly previousPosition: MechanicPoint;
   readonly fallSpeed: number;
+  readonly verticalVelocity?: number;
 }
 export type MechanicPlatform = Pick<PlatformController, "isActive" | "activationId" | "mechanic" | "width"> & {
   readonly mesh: { readonly position: MechanicPoint };
+  readonly motionCenterX?: number;
+  readonly lateralMotion?: {readonly amplitude: number} | undefined;
+  setMechanicAim?(x: number, y: number): void;
 };
 export interface MechanicViewport { left: number; right: number; bottom: number; top: number }
 export interface MechanicCue { platform: MechanicPlatform; kind: PlatformMechanic; charge: number; aimX: number; aimY: number }
@@ -17,7 +21,7 @@ export interface PlatformProjectile {
   source: MechanicPlatform | null; activation: number;
 }
 interface TrapState { activation: number; windAge: number; triggered: boolean }
-interface Charge { platform: MechanicPlatform; activation: number; age: number; aimX: number; aimY: number }
+interface Charge { platform: MechanicPlatform; activation: number; age: number; duration: number; aimX: number; aimY: number }
 
 /** Continuous relative sweep, including a fast ball crossing a small projectile. */
 export function projectileHitsBall(px: number, py: number, x: number, y: number, previous: MechanicPoint, current: MechanicPoint, radius: number): boolean {
@@ -52,7 +56,7 @@ export class PlatformMechanics {
     const dt=Math.max(0,Math.min(.1,seconds));
     this.#age+=dt; this.#cooldown=Math.max(0,this.#cooldown-dt);
     const view=this.viewport(), ball=this.ball.position;
-    const worldSpeed=Math.max(1,this.ball.fallSpeed*this.movementScale);
+    const worldSpeed=Math.max(1,this.ball.verticalVelocity===undefined?this.ball.fallSpeed*this.movementScale:Math.abs(this.ball.verticalVelocity));
     const visible=(p:MechanicPlatform):boolean => p.isActive && p.mesh.position.y>=view.bottom && p.mesh.position.y<=view.top
       && p.mesh.position.x+p.width/2>=view.left && p.mesh.position.x-p.width/2<=view.right;
     let candidate: MechanicPlatform | null=null, candidateDistance=Infinity;
@@ -67,13 +71,16 @@ export class PlatformMechanics {
       }
       const gap=ball.y-platform.mesh.position.y;
       let charge=0;
-      if (kind.startsWith("wind") && gap>0 && gap/worldSpeed<1.6 && Math.abs(ball.x-platform.mesh.position.x)<platform.width/2+this.radius+.3) {
+      const direction=kind==="wind-left"?-1:1;
+      const windDistance=(ball.x-platform.mesh.position.x)*direction;
+      if (kind.startsWith("wind") && gap>0 && gap/worldSpeed<1.8 && windDistance> -platform.width/2-this.radius
+        && windDistance<platform.width/2+this.radius+2.2) {
         state.windAge+=dt;charge=Math.min(1,state.windAge/.45);
-        if (!state.triggered && state.windAge>=.45 && gap<Math.max(2.2,worldSpeed*.35)) {
+        if (!state.triggered && state.windAge>=.45 && gap<Math.max(2.2,worldSpeed*.6)) {
           state.triggered=true;this.onWind(kind==="wind-left"?-1:1);
         }
       }
-      if (kind==="turret" && !state.triggered && gap/worldSpeed>=.9 && gap/worldSpeed<=2.5 && Math.abs(ball.x-platform.mesh.position.x)<10) {
+      if (kind==="turret" && !state.triggered && gap/worldSpeed>=.65 && gap/worldSpeed<=3 && Math.abs(ball.x-platform.mesh.position.x)<10) {
         const distance=gap+Math.abs(ball.x-platform.mesh.position.x)*2;
         if (distance<candidateDistance) {candidate=platform;candidateDistance=distance;}
       }
@@ -82,15 +89,17 @@ export class PlatformMechanics {
     if (this.#charging && (!visible(this.#charging.platform) || this.#charging.platform.activationId!==this.#charging.activation
       || this.#charging.platform.mesh.position.y>ball.y || !this.cues.some(c=>c.platform===this.#charging?.platform))) this.#charging=null;
     if (!this.#charging && candidate && this.#cooldown===0) {
-      this.#charging={platform:candidate,activation:candidate.activationId,age:0,aimX:ball.x,aimY:ball.y-worldSpeed*.65};
+      const duration=Math.max(.45,Math.min(.85,(ball.y-candidate.mesh.position.y)/worldSpeed*.55));
+      this.#charging={platform:candidate,activation:candidate.activationId,age:0,duration,aimX:ball.x,aimY:ball.y-worldSpeed*duration};
     }
     const charging=this.#charging;
     if (charging) {
       charging.age+=dt;
       const cue=this.cues.find(c=>c.platform===charging.platform);
-      if (cue) {cue.charge=Math.min(1,charging.age/.65);cue.aimX=charging.aimX;cue.aimY=charging.aimY;}
+      if (cue) {cue.charge=Math.min(1,charging.age/charging.duration);cue.aimX=charging.aimX;cue.aimY=charging.aimY;}
+      charging.platform.setMechanicAim?.(charging.aimX,charging.aimY);
       if(cue && this.cues[0]!==cue){this.cues.splice(this.cues.indexOf(cue),1);this.cues.unshift(cue);}
-      if (charging.age>=.65) {
+      if (charging.age>=charging.duration) {
         const shot=this.projectiles.find(p=>!p.active);
         const source=charging.platform.mesh.position;
         if (shot) {
