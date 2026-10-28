@@ -307,6 +307,28 @@ it.each([45, 60, 80])("keeps small corrections precise and follows without overs
   expect(ball.position.x).toBeGreaterThan(-target);
 });
 
+it("integrates a brief lateral gust without teleporting, preserves the swept path and lets steering counter it",()=>{
+  const input={isActive:false,isImmediate:true,normalizedPosition:-1};
+  const ball=new BallController(createTransform(),input,gameConfig);
+  ball.applyLateralImpulse(6,.4);
+  expect(ball.position.x).toBe(0);
+  ball.fixedUpdate(1/60);
+  expect(ball.previousPosition.x).toBe(0);
+  expect(ball.position.x).toBeGreaterThan(0);expect(ball.position.x).toBeLessThan(.11);
+  const pushed=ball.position.x;
+  input.isActive=true;ball.fixedUpdate(1/60);
+  expect(ball.position.x).toBeLessThan(pushed);
+  simulate(ball,2,60);expect(Math.abs(ball.position.x)).toBeLessThanOrEqual(ball.horizontalLimit);
+});
+
+it("lets a gust visibly displace a held trajectory, then restores accurate targeting smoothly",()=>{
+  const ball=new BallController(createTransform(),{isActive:true,isImmediate:true,normalizedPosition:0},gameConfig);
+  ball.applyLateralImpulse(6,.4);simulate(ball,.4,60);
+  expect(ball.position.x).toBeGreaterThan(1);
+  expect(ball.position.x).toBeLessThanOrEqual(1.5);
+  simulate(ball,1,60);expect(Math.abs(ball.position.x)).toBeLessThan(.02);
+});
+
 
 it("keeps both weak and near-limit breaks moving while retaining a readable resistance difference", () => {
   const distance = (resistance: number): number => {

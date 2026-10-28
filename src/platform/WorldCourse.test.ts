@@ -106,3 +106,12 @@ it("finishes a phrase across an internal difficulty threshold and develops the f
   expect(plans[8]?.worldPhase).toBe("development");
   expect(plans[8]?.section).toBe("cascade");
 });
+
+it("introduces shuttles, wind and turrets in authored pairs while keeping the opening clear",()=>{
+  expect(plansAt(0,8).every(p=>!p.mechanic)).toBe(true);
+  const plans=[600,1400,2400,6000,14000].flatMap(depth=>plansAt(depth,60));
+  expect(plans.some(p=>p.mechanic==="moving" && (p.lateralMotion?.amplitude??0)>=.9)).toBe(true);
+  expect(plans.some(p=>p.mechanic?.startsWith("wind"))).toBe(true);
+  expect(plans.some(p=>p.mechanic==="turret")).toBe(true);
+  for(const plan of plans.filter(p=>p.mechanic)) expect([2,3]).toContain(plan.section==="climax"?plan.encounterRowIndex%4:plan.encounterRowIndex);
+});

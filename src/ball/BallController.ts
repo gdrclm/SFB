@@ -46,6 +46,18 @@ export class BallController implements FixedSimulationSystem {
   #breakRecovery = .12;
   #breakTransmission = 0;
   #verticalVelocity = 0;
+  #lateralImpulse = 0;
+  #impulseRemaining = 0;
+  #impulseDuration = 1;
+  #lateralDrift = 0;
+  #wasInputActive = false;
+
+  public applyLateralImpulse(velocity: number, duration = .4): void {
+    if (!Number.isFinite(velocity) || !Number.isFinite(duration) || duration <= 0) return;
+    this.#lateralImpulse = Math.max(-8, Math.min(8, velocity));
+    this.#impulseDuration = Math.min(.8, duration);
+    this.#impulseRemaining = this.#impulseDuration;
+  }
 
   public get verticalVelocity(): number { return this.#verticalVelocity; }
   public get impactCompression(): number {
@@ -82,6 +94,9 @@ export class BallController implements FixedSimulationSystem {
     transform.position.y = config.ball.startPosition.y;
     transform.position.z = config.playSpace.depth;
     this.#copyCurrentPositionToPrevious();
+    // A fresh swipe is anchored at the already-displaced ball position.
+    if(this.#input.isActive && !this.#wasInputActive)this.#lateralDrift=0;
+    this.#wasInputActive=this.#input.isActive;
   }
 
   public get horizontalLimit(): number { return this.#horizontalLimit; }
@@ -143,9 +158,18 @@ export class BallController implements FixedSimulationSystem {
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
     this.#copyCurrentPositionToPrevious();
+    const previousDrift=this.#lateralDrift;
+    const gustActive=this.#impulseRemaining>0;
+    if(gustActive) {
+      const dt=Math.min(fixedDeltaSeconds,this.#impulseRemaining);
+      const average=(this.#impulseRemaining-dt/2)/this.#impulseDuration;
+      this.#lateralDrift=Math.max(-1.5,Math.min(1.5,this.#lateralDrift+this.#lateralImpulse*average*dt));
+      this.#impulseRemaining=Math.max(0,this.#impulseRemaining-dt);
+    } else this.#lateralDrift*=Math.exp(-6*fixedDeltaSeconds);
     if (this.#input.isImmediate) {
       if (this.#input.isActive) {
-        const targetX = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
+        const targetX = Math.max(-this.#horizontalLimit,Math.min(this.#horizontalLimit,
+          Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit+this.#lateralDrift));
         // Retain the original opening response even on wide screens. Compensate
         // for the expanded field only after the ball has substantially sped up.
         const widthScale = steeringWidthScale(this.#horizontalLimit / this.#baseHorizontalLimit,
@@ -156,7 +180,6 @@ export class BallController implements FixedSimulationSystem {
         const precision = steeringPrecisionBlend(this.#fallSpeed, this.#config.startFallSpeed);
         this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, step + (fineStep - step) * precision);
       }
-      this.#horizontalVelocity = (this.#transform.position.x - this.#previousPosition.x) / Math.max(.0001, realFixedDeltaSeconds);
     } else {
       this.#updateHorizontalVelocity(realFixedDeltaSeconds);
       const nextX = this.#transform.position.x + this.#horizontalVelocity * realFixedDeltaSeconds;
@@ -164,6 +187,11 @@ export class BallController implements FixedSimulationSystem {
       if (clampedX !== nextX) this.#horizontalVelocity = 0;
       this.#transform.position.x = clampedX;
     }
+    if (gustActive && !this.#input.isActive) {
+      this.#transform.position.x = Math.max(-this.#horizontalLimit, Math.min(this.#horizontalLimit,
+        this.#transform.position.x + this.#lateralDrift-previousDrift));
+    }
+    if (this.#input.isImmediate) this.#horizontalVelocity = (this.#transform.position.x - this.#previousPosition.x) / Math.max(.0001, realFixedDeltaSeconds);
     if (this.#bounceElapsedSeconds !== null) {
       this.#updateBounce(fixedDeltaSeconds);
       return;

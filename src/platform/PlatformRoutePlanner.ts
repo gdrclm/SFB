@@ -2,6 +2,7 @@ import { worldProgression, type WorldProgression, type WorldPhase } from "../pro
 import type { DepthLocation } from "../scene/DepthLocations";
 import { cascadeVariant, climaxTheme, courseSectionAt, sectionForTheme, sectionRows, sectionTheme, type CourseSection, type CascadeVariant } from "./CourseSections";
 import { speedAfterBreak } from "../collision/BreakResistance";
+import { courseMechanic, type PlatformMechanic } from "./PlatformMechanic";
 import { createEncounterLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
@@ -35,6 +36,7 @@ export interface PlannedCoinTrail {
 }
 
 export interface PlannedPlatform {
+  readonly mechanic?: PlatformMechanic;
   readonly x: number;
   readonly y: number;
   readonly strength: number;
@@ -60,6 +62,7 @@ export interface PlannedPlatform {
 }
 
 export interface PlannedPlatformChoice {
+  readonly mechanic?: PlatformMechanic;
   readonly x: number;
   readonly yOffset?: number;
   readonly strength: number;
@@ -195,7 +198,8 @@ export class PlatformRoutePlanner {
     const cascading = layoutTheme === "break-run";
     const variant = cascadeVariant(this.#progress.phase);
     const structured = !this.#externalEncounter || this.#scheduledActive;
-    const movingAmplitude = structured && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
+    const mechanic = structured ? courseMechanic(layoutTheme, this.#progress.location, this.#progress.phase, theme==="climax"?themeRowIndex%4:themeRowIndex) : undefined;
+    const movingAmplitude = mechanic === "moving" ? .9 : structured && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
       && (this.#section === "maneuver" || cascading) && Math.floor(themeRowIndex / 2) % 3 === 1 ? .35 : 0;
     const layout = createEncounterLayout(layoutTheme, structured ? themeRowIndex : themeRowIndex + this.#zoneCycle * 3,
       this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
@@ -224,7 +228,12 @@ export class PlatformRoutePlanner {
         Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction, this.#config.successfulHit.maximumSpeedLoss);
     }
     const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
-    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty);
+    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map(member => ({
+      ...member,
+      ...(mechanic === undefined || (mechanic !== "moving" && !member.isPrimaryLane) ? {} : {
+        mechanic: mechanic === "wind-right" && member.x < layout.passage.x ? "wind-left" as const : mechanic,
+      }),
+    }));
     const primary = row.find((member) => member.isPrimaryLane);
     if (primary === undefined) {
       throw new Error("A generated encounter row must contain a primary lane.");
@@ -252,6 +261,7 @@ export class PlatformRoutePlanner {
       reactionWindowSeconds,
       stageNumber: difficulty.stageNumber,
       kind: primary.kind,
+      ...(primary.mechanic === undefined ? {} : { mechanic: primary.mechanic }),
       encounterTheme: layoutTheme,
       section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
       ...(cascading ? { cascadeVariant: variant } : {}),
@@ -269,6 +279,7 @@ export class PlatformRoutePlanner {
           routeKind: member.routeKind,
           widthScale: member.widthScale,
           kind: member.kind,
+          ...(member.mechanic === undefined ? {} : { mechanic: member.mechanic }),
           isTrap: member.isTrap,
         })),
     };
@@ -312,6 +323,11 @@ export class PlatformRoutePlanner {
         structured && theme === "climax" ? climaxTheme(this.#encounterRowIndex) : theme,
         structured ? Math.floor(this.#encounterRowIndex / 2) : this.#encounterRowIndex,
       );
+      const layoutTheme=theme==="climax"?climaxTheme(this.#encounterRowIndex):theme;
+      if(structured && courseMechanic(layoutTheme,this.#progress.location,this.#progress.phase,theme==="climax"?this.#encounterRowIndex%4:this.#encounterRowIndex)==="moving") {
+        // Reserve room for the full shuttle sweep, instead of squeezing tiny cells.
+        this.#pendingBlueprint={lanes:[SAFE_STANDARD,DEADLY_BLACK],primaryLaneIndex:0};
+      }
     }
     return this.#pendingBlueprint;
   }

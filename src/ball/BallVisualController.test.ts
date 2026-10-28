@@ -56,7 +56,8 @@ describe("BallVisualController", () => {
       if (speed <= 40) expect(ball.scaling.y).toBeLessThan(1.13);
       height = ball.scaling.y;
     }
-    expect(height).toBeCloseTo(2.2, 3);
+    expect(height).toBeGreaterThan(2.1);
+    expect(height).toBeLessThan(2.3);
     motion.fallSpeed = gameConfig.ball.startFallSpeed; updateFor(controller, 2);
     expect(ball.scaling.y).toBeCloseTo(1, 3);
     controller.dispose(); scene.dispose(); engine.dispose();

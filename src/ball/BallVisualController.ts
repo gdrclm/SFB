@@ -1,4 +1,5 @@
 import { BallCrystalGlow } from "./BallCrystalGlow";
+import { ballActivity } from "./BallActivity";
 import { getBallLimbs } from "./BallLimbs";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -71,6 +72,8 @@ export class BallVisualController implements FixedSimulationSystem {
   #impactKind: "hurt" | "break" = "break";
   #danger = false;
   #tutorialLaunchStart: Vector3 | null = null;
+  #activityAge = 0;
+  readonly #reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(ball: Mesh, motion: BallMotion, config: GameConfig) {
     const material = ball.material;
@@ -192,15 +195,22 @@ export class BallVisualController implements FixedSimulationSystem {
   }
 
   public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
-    getBallLimbs(this.#ball)?.update(realDeltaSeconds, this.#motion.fallSpeed);
+    const activitySpeed = this.#motion.isBouncing || this.#slowActive ? this.#ballConfig.startFallSpeed : this.#motion.fallSpeed;
+    const activity = ballActivity(activitySpeed, this.#ballConfig.startFallSpeed);
+    this.#activityAge += Math.min(.1, Math.max(0, realDeltaSeconds)) * activity.cadence * Math.PI * 2;
+    getBallLimbs(this.#ball)?.update(realDeltaSeconds, activitySpeed);
+    (this.#ball.metadata as { activity: string }).activity = this.#slowActive ? "slow" : this.#motion.isBouncing ? "recovery" : activity.mode;
     this.#expression.update(realDeltaSeconds, this.#motion.fallSpeed >= 45, this.#danger, this.#motion.fallSpeed >= 16);
     const faceExpression = this.#slowActive && ["neutral", "focus", "fall"].includes(this.#expression.current) ? "slow" : this.#expression.current;
     (this.#ball.metadata as { expression: BallExpression }).expression = faceExpression;
     const look = Math.max(-1, Math.min(1, (this.#motion.horizontalVelocity ?? 0) / 9));
     const blinking = getBallFace(this.#ball)?.update(faceExpression, realDeltaSeconds, look, (this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1) || (this.#expression.current === "break" && this.#impactElapsed < .07)) ?? false;
     const poseAmount = smoothFactor(10, realDeltaSeconds);
-    this.#ball.rotation.z += (-look * .35 - this.#ball.rotation.z) * poseAmount;
+    const activePose = !this.#reducedMotion && !this.#slowActive && !this.#motion.isBouncing && this.#impactElapsed > .2;
+    const flutter = activePose ? Math.sin(this.#activityAge) * activity.energy : 0;
+    this.#ball.rotation.z += (-look * .35 + flutter * .065 - this.#ball.rotation.z) * poseAmount;
     this.#ball.rotation.y += (look * .35 - this.#ball.rotation.y) * poseAmount;
+    this.#ball.rotation.x += ((activePose ? Math.cos(this.#activityAge * .5) * activity.energy * .12 : 0) - this.#ball.rotation.x) * poseAmount;
     this.#fx.update(realDeltaSeconds, { speed: this.#motion.isBouncing ? 0 : this.#motion.fallSpeed, look,
       boost: this.#motion.isBouncing || this.#boostElapsedSeconds === null ? 0 : this.#boostStrength,
       anticipating: this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1,
@@ -240,7 +250,8 @@ export class BallVisualController implements FixedSimulationSystem {
       ? Math.sin((this.#impactElapsed - .045) / .145 * Math.PI) * (this.#impactKind === "hurt" ? .35 : .6) : 0;
     const targetVerticalScale = contact > 0 ? (this.#impactKind === "hurt" ? .56 : .66)
       : airborne ? 1 + Math.min(.35, (this.#motion.verticalVelocity ?? 0) * .045)
-      : Math.max(.55, movementStretch + boostStretch + rebound + Math.abs(look) * .08) * (blinking ? .9 : 1);
+      : Math.max(.55, movementStretch + boostStretch + rebound + Math.abs(look) * .08
+        + (activePose ? Math.sin(this.#activityAge) * activity.pulse : 0)) * (blinking ? .9 : 1);
     this.#anchorContact(contact > 0);
     const scaleAmount = smoothFactor(this.#config.scaleSharpness, fixedDeltaSeconds);
     const verticalScale = lerp(this.#ball.scaling.y / this.#baseScale.y, targetVerticalScale, scaleAmount);

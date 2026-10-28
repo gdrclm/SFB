@@ -60,6 +60,8 @@ import { RunWallet } from "../currency/RunWallet";
 import { SuccessfulHitEffects } from "../effects/SuccessfulHitEffects";
 import { UnsuccessfulHitEffects } from "../effects/UnsuccessfulHitEffects";
 import { PointerHorizontalInput } from "../input/HorizontalInput";
+import { PlatformMechanics } from "../platform/PlatformMechanics";
+import { PlatformMechanicsView } from "../platform/PlatformMechanicsView";
 import { PlatformLabels } from "../platform/PlatformLabels";
 import { nearestInCurrentLane } from "../platform/PlatformReadability";
 import { PlatformGenerator } from "../platform/PlatformGenerator";
@@ -236,6 +238,9 @@ export class GameApplication {
   #platformPool: PlatformPool | null = null;
   #platformLabels: PlatformLabels | null = null;
   #platformGenerator: PlatformGenerator | null = null;
+  #platformMechanics: PlatformMechanics | null = null;
+  #platformMechanicsView: PlatformMechanicsView | null = null;
+  readonly #seenMechanics=new Set<string>();
   #phaseOneController: PhaseOneController | null = null;
   #collisionResolver: CollisionResolver | null = null;
   #successfulHitHandler: SuccessfulPlatformHitHandler | null = null;
@@ -507,6 +512,17 @@ export class GameApplication {
             this.#challengeRemaining = 7;
           }
         }
+        if(!additionalCell && plan.mechanic) {
+          const kind=plan.mechanic.startsWith("wind")?"wind":plan.mechanic;
+          if(!this.#seenMechanics.has(kind)) {
+            this.#seenMechanics.add(kind);
+            const notice=requireMenuElement(this.#interfaceLayerElement,"#challenge-notice");
+            notice.dataset.theme="trap";
+            requireMenuElement(notice,"strong").textContent=kind==="moving"?"↔ Подвижные платформы":kind==="wind"?"➜ Боковой ветер":"⊕ Турель";
+            requireMenuElement(notice,"span").textContent=kind==="moving"?"Следи за ходом платформы; проход учитывает её движение.":kind==="wind"?"Стрелка показывает направление порыва. Корректируй движение в ответ.":"Уходи с линии прицеливания или разбивай турель до выстрела.";
+            this.#challengeRemaining=7;
+          }
+        }
       },
     );
     this.#syncPlayfieldWidth();
@@ -575,6 +591,24 @@ export class GameApplication {
     this.#unsubscribeCollision = this.#collisionResolver.onCollision(this.#handleCollision);
     this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
       this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
+    const mechanicBall=this.#ballController;
+    this.#platformMechanics=new PlatformMechanics(mechanicBall,()=>this.#platformPool?.platforms??[],()=>{
+      const camera=mainScene.camera, p=camera.globalPosition;
+      return {left:p.x+(camera.orthoLeft??-5),right:p.x+(camera.orthoRight??5),
+        bottom:p.y+(camera.orthoBottom??-6),top:p.y+(camera.orthoTop??6)};
+    },this.#config.ball.movementScale,this.#config.ball.radius,direction=>{
+      if(this.#powers?.invulnerable||this.#powers?.covers(mechanicBall.position)||mechanicBall.isBouncing)return;
+      mechanicBall.applyLateralImpulse(direction*6,.4);
+      getGameSounds().play("zone-trap");
+      this.#status.textContent=direction<0?"Порыв ветра ← · удерживай траекторию":"Порыв ветра → · удерживай траекторию";
+    },platform=>{
+      if(this.#powers?.invulnerable||this.#powers?.covers(mechanicBall.position)||mechanicBall.isBouncing)return;
+      const source=this.#platformPool?.platforms.find(candidate=>candidate===platform);
+      if(source)this.#handleCollision({platform:source,ballSpeed:mechanicBall.fallSpeed,assessment:"insufficient",contact:{...mechanicBall.position}},true);
+    },()=>!this.#guidedRun && this.#gameState.current!==GameState.GameOver);
+    this.#platformMechanicsView=new PlatformMechanicsView(this.#scene,this.#platformMechanics);
+    this.#fixedStep.register(this.#platformMechanics);
+    this.#fixedStep.register(this.#platformMechanicsView);
     this.#fixedStep.register(updateRunState);
     this.#fixedStep.register(this.#ballVisualController);
     this.#fixedStep.register(this.#cameraController);
@@ -663,6 +697,9 @@ export class GameApplication {
     this.#lifeFeedback?.dispose(); this.#lifeFeedback = null;
     if (this.#recordHapticTimer !== null) clearTimeout(this.#recordHapticTimer);
     this.#haptics.cancel();
+    this.#platformMechanicsView?.dispose();this.#platformMechanicsView=null;
+    this.#platformMechanics?.clear();this.#platformMechanics=null;
+    this.#seenMechanics.clear();
     this.#contextGuide?.dispose();
     this.#tutorialFinish?.remove(); this.#tutorialFinish = null; this.#tutorialFinishAge = null;
     this.#interfaceLayerElement.classList.remove("tutorial-finale");
@@ -884,12 +921,13 @@ export class GameApplication {
     }
   }
 
-  readonly #handleCollision = (collision: PlatformCollision): void => {
+  readonly #handleCollision = (collision: PlatformCollision, projectile = false): void => {
     if (this.#lives.remainingLives === 0) return;
     const boostWasAvailable = this.#boostController?.canBoost ?? false;
     if (this.#powers?.covers(collision.platform.mesh.position)) { this.#sweepAnnihilation(); return; }
     const powered = this.#powers?.invulnerable ?? false;
-    const destroyed = this.#successfulHitHandler?.handle(collision, powered) ?? false;
+    if(projectile && powered)return;
+    const destroyed = !projectile && (this.#successfulHitHandler?.handle(collision, powered) ?? false);
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
@@ -939,9 +977,9 @@ export class GameApplication {
         this.#emitFailedImpact();
         this.#status.textContent = "Забег завершён · все жизни потеряны";
         this.#pauseButtonElement.disabled = true;
-        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
+        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = projectile ? "Попадание снаряда платформы-турели" : describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
-        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
+        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = projectile ? "Уходи с линии прицеливания или разрушай турель до выстрела." : boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
         this.#defeatPending = true;
         this.#lifeFeedback?.beginDefeat();
         return;
@@ -949,7 +987,7 @@ export class GameApplication {
 
       this.#opening?.discover("life");
       this.#emitFailedImpact();
-      this.#status.textContent = `Ошибка · отскок · скорость ${collision.ballSpeed.toFixed(1)} ниже прочности ${strength} · сброс до ${this.#config.ball.startFallSpeed.toFixed(1)}`;
+      this.#status.textContent = projectile ? "Попадание снаряда · потеря жизни и отскок" : `Ошибка · отскок · скорость ${collision.ballSpeed.toFixed(1)} ниже прочности ${strength} · сброс до ${this.#config.ball.startFallSpeed.toFixed(1)}`;
       return;
     }
 

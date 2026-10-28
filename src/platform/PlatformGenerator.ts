@@ -132,6 +132,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
         new Vector3(plan.x, plan.y, this.#config.playSpace.depth),
         {
           encounterTheme: plan.encounterTheme,
+          ...(plan.mechanic === undefined ? {} : { mechanic: plan.mechanic }),
           ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
           strength: plan.strength,
           strengthLevel: plan.strengthLevel,
@@ -155,6 +156,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
           ),
           {
             encounterTheme: plan.encounterTheme,
+            ...(choice.mechanic === undefined ? {} : { mechanic: choice.mechanic }),
             ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
             strength: choice.strength,
             strengthLevel: choice.strengthLevel,
@@ -204,6 +206,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       yOffset: platform.mesh.position.y - first.mesh.position.y,
       properties: {
         encounterTheme: platform.encounterTheme,
+        ...(platform.mechanic === undefined ? {} : { mechanic: platform.mechanic }),
         ...(platform.lateralMotion ? { lateralMotion: platform.lateralMotion } : {}),
         strength: platform.strength,
         strengthLevel: platform.strengthLevel,

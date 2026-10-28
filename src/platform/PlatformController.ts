@@ -1,4 +1,5 @@
 import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
+import type { PlatformMechanic } from "./PlatformMechanic";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
 import { platformSpriteRow, debrisSpriteRect } from "./PlatformSpriteLayout";
 import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprites";
@@ -11,6 +12,7 @@ import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformCon
 
 export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
 export interface PlatformActivationProperties {
+  readonly mechanic?: PlatformMechanic;
   readonly strength: number;
   readonly strengthLevel: PlatformStrengthLevel;
   readonly routeKind?: PlatformRouteKind;
@@ -45,6 +47,7 @@ export class PlatformController {
   #motion: PlatformActivationProperties["lateralMotion"];
   #motionAge = 0;
   #motionStartX = 0;
+  #mechanic: PlatformMechanic | undefined;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
@@ -61,6 +64,7 @@ export class PlatformController {
     if (active) this.#createPhysicsResources();
   }
   public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
+  public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;
     this.#motionAge += Math.max(0, seconds);
@@ -140,6 +144,7 @@ export class PlatformController {
     this.#body?.dispose(); this.#shape?.dispose(); this.#body = null; this.#shape = null;
   }
   #applyActivationProperties(properties: PlatformActivationProperties): void {
+    this.#mechanic = properties.mechanic;
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
