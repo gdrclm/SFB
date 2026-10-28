@@ -71,6 +71,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void { this.#planner.queueEncounter(theme); }
+  public scheduleEncounter(theme: PlatformEncounterTheme): void { this.#planner.scheduleEncounter(theme); }
 
   public resumeFromCurrentPosition(): void {
     this.#planner = new PlatformRoutePlanner(this.#ball.position.y, this.#config, this.#random);

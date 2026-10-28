@@ -136,6 +136,7 @@ it.each(themes)("mixes broad joined ledges and short islands regularly in %s", t
     expect(widths.filter(width => width >= 3.5).length).toBeGreaterThanOrEqual(2);
     expect(widths.some(width => platformSpriteSlices(width + .6, platformSpriteRect(0, 0)).length >= 5)).toBe(true);
     expect(widths.filter(width => width < 2).length).toBeGreaterThanOrEqual(6);
-    expect(plans.slice(0, 6).some(plan => members(plan).some(member => member.widthScale * 7.5 >= 3.5))).toBe(true);
+    // The opening phrase is eight rows; long ledges may follow its first pair.
+    expect(plans.slice(0, 9).some(plan => members(plan).some(member => member.widthScale * 7.5 >= 3.5))).toBe(true);
   }
 });

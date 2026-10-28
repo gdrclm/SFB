@@ -8,6 +8,11 @@ function plansAt(depth: number, count = 50, speed = 20) {
   return Array.from({ length: count }, () => planner.planNext(speed, 3, { stageNumber: 7, platformStrength: speed, reactionWindowSeconds: .8 }));
 }
 function members(plan: PlannedPlatform) { return [{ ...plan, yOffset: 0 }, ...(plan.choices ?? [])]; }
+function planAt(plans: readonly PlannedPlatform[], index: number): PlannedPlatform {
+  const plan = plans[index];
+  if (plan === undefined) throw new Error(`Missing course row ${String(index)}`);
+  return plan;
+}
 it("varies the physical course from a wide cascade to a winding combo route and optional risky branches", () => {
   const intro = plansAt(600).filter(p => p.section === "cascade" && p.worldPhase === "introduction");
   const middle = plansAt(1400).filter(p => p.section === "cascade" && p.worldPhase === "development");
@@ -59,4 +64,45 @@ it.each([600, 1400, 2500, 3500, 13000])("uses the actual start depth at %s metre
   const plans = plansAt(depth, 1);
   expect(plans[0]?.location).toBe(depth < 3000 ? "crystal" : depth < 12000 ? "lava" : "abyss");
   expect(plans[0]?.worldPhase).toBe(depth === 1400 ? "development" : depth === 2500 ? "climax" : "introduction");
+});
+
+it("opens with a steady eight-row phrase, repeats geometry in pairs and gives cascades a four-beat rhythm", () => {
+  const plans = plansAt(600, 26);
+  expect(plans.slice(0, 8).every(p => p.section === "run-up")).toBe(true);
+  expect(plans.slice(8, 16).every(p => p.section === "cascade")).toBe(true);
+  expect(plans.slice(16, 20).every(p => p.section === "breather")).toBe(true);
+  for (let i = 0; i < 8; i += 2) {
+    const a=planAt(plans,i), b=planAt(plans,i+1);
+    expect(a.passage).toEqual(b.passage);
+    expect(members(a).map(m => [m.x,m.widthScale,m.kind])).toEqual(members(b).map(m => [m.x,m.widthScale,m.kind]));
+  }
+  for (const plan of plans.slice(1, 8)) expect(plan.reactionWindowSeconds).toBeCloseTo(planAt(plans,0).reactionWindowSeconds, 8);
+  const cascade = plans.slice(8, 16);
+  expect(planAt(cascade,0).reactionWindowSeconds).toBeCloseTo(planAt(cascade,1).reactionWindowSeconds, 8);
+  expect(planAt(cascade,1).reactionWindowSeconds).toBeCloseTo(planAt(cascade,2).reactionWindowSeconds, 8);
+  expect(planAt(cascade,3).reactionWindowSeconds).toBeGreaterThan(planAt(cascade,2).reactionWindowSeconds);
+  expect(planAt(cascade,7).reactionWindowSeconds).toBeCloseTo(planAt(cascade,3).reactionWindowSeconds, 8);
+});
+
+it("waits for the full phrase and recovery before a timed challenge, then adds a recovery afterwards", () => {
+  const config = atStartDepth(gameConfig, 600);
+  const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
+  const difficulty = { stageNumber: 7, platformStrength: 20, reactionWindowSeconds: .8 };
+  const plans = [planner.planNext(20, 3, difficulty), planner.planNext(20, 3, difficulty)];
+  planner.scheduleEncounter("trap");
+  planner.scheduleEncounter("chaos"); // No growing backlog or replacement of the announced request.
+  for (let i=2;i<33;i++) plans.push(planner.planNext(20,3,difficulty));
+  expect(plans.slice(0,20).every(p => !p.externalEncounter)).toBe(true);
+  expect(plans.slice(16,20).every(p => p.section === "breather")).toBe(true);
+  expect(plans[20]?.encounterTheme).toBe("trap");
+  expect(plans[20]?.encounterRowIndex).toBe(0);
+  expect(plans.slice(20,28).every(p => p.externalEncounter && p.encounterTheme === "trap")).toBe(true);
+  expect(plans.slice(28,32).every(p => !p.externalEncounter && p.section === "breather")).toBe(true);
+});
+
+it("finishes a phrase across an internal difficulty threshold and develops the following one", () => {
+  const plans = plansAt(990, 12);
+  expect(plans.slice(0,8).every(p => p.section === "run-up" && p.worldPhase === "introduction")).toBe(true);
+  expect(plans[8]?.worldPhase).toBe("development");
+  expect(plans[8]?.section).toBe("cascade");
 });

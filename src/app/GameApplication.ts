@@ -20,7 +20,7 @@ import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
 import { getGameSounds } from "../feedback/GameSounds";
-import { ChallengeDirector } from "../challenges/ChallengeDirector";
+import { CHALLENGES, ChallengeDirector } from "../challenges/ChallengeDirector";
 import { BoostCoach } from "../boost/BoostCoach";
 import { describeFailedImpact } from "../run/FailedImpact";
 import { tutorialVisuals as tutorialArt } from "./TutorialController";
@@ -497,6 +497,18 @@ export class GameApplication {
     this.#unsubscribePlatformGenerated = this.#platformGenerator.onPlatformGenerated(
       (plan, additionalCell) => {
         this.#coinGenerator?.handlePlatformGenerated(plan, additionalCell);
+        if (!additionalCell && plan.externalEncounter && plan.encounterRowIndex === 0) {
+          this.#baitZone?.cancel();
+          if (plan.encounterTheme === "bait") this.#baitZone?.arm();
+          const challenge = CHALLENGES.find(candidate => candidate.theme === plan.encounterTheme);
+          if (challenge !== undefined) {
+            const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
+            notice.dataset.theme = challenge.theme;
+            requireMenuElement(notice, "strong").textContent = challenge.title;
+            requireMenuElement(notice, "span").textContent = challenge.text;
+            this.#challengeRemaining = 7;
+          }
+        }
       },
     );
     this.#syncPlayfieldWidth();
@@ -508,14 +520,7 @@ export class GameApplication {
     }, () => { this.#platformGenerator?.queueEncounter("breather"); });
     this.#fixedStep.register(this.#baitZone);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
-      this.#baitZone?.cancel();
-      if (challenge.theme === "bait") this.#baitZone?.arm();
-      this.#platformGenerator?.queueEncounter(challenge.theme);
-      const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
-      notice.dataset.theme = challenge.theme;
-      requireMenuElement(notice, "strong").textContent = challenge.title;
-      requireMenuElement(notice, "span").textContent = challenge.text;
-      this.#challengeRemaining = 7;
+      this.#platformGenerator?.scheduleEncounter(challenge.theme);
     }, Math.random, () => worldProgression(this.#runProgress.depth));
     this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
       () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),

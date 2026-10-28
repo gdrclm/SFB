@@ -52,6 +52,7 @@ export interface PlannedPlatform {
   readonly lateralMotion?: Readonly<{ amplitude: number; period: number; phase: number }>;
   readonly encounterTheme: PlatformEncounterTheme;
   readonly encounterRowIndex: number;
+  readonly externalEncounter?: boolean;
   readonly passage?: Readonly<{ x: number; width: number }>;
   readonly bandDepth?: number;
   readonly coinTrail?: PlannedCoinTrail;
@@ -117,6 +118,10 @@ export class PlatformRoutePlanner {
   #zoneCycle = 0;
   #activeTheme: PlatformEncounterTheme | null = null;
   #externalEncounter = false;
+  #scheduledTheme: PlatformEncounterTheme | null = null;
+  #scheduledActive = false;
+  #needsRecovery = false;
+  #sectionAnchorX = 0;
   #progress: WorldProgression;
   #progressKey = "";
   #sectionCursor = 0;
@@ -143,9 +148,18 @@ export class PlatformRoutePlanner {
   public queueEncounter(theme: PlatformEncounterTheme): void {
     this.#syncProgression();
     this.#activeTheme = theme; this.#externalEncounter = true; this.#section = sectionForTheme(theme);
+    this.#scheduledActive = false;
     this.#encounterVariant = this.#randomIndex(4);
     this.#encounterRowIndex = 0;
     this.#pendingBlueprint = null;
+  }
+
+  /** Timer requests wait for a completed phrase and a recovery passage. */
+  public scheduleEncounter(theme: PlatformEncounterTheme): void {
+    // Recovery is already part of every course cycle; do not stack timer breathers.
+    if (theme === "breather") return;
+    this.#syncProgression();
+    this.#scheduledTheme ??= theme;
   }
 
   public getNextRowPlatformCount(): number {
@@ -180,22 +194,27 @@ export class PlatformRoutePlanner {
     const worldSpeed = ballSpeed * this.#config.ball.movementScale;
     const cascading = layoutTheme === "break-run";
     const variant = cascadeVariant(this.#progress.phase);
-    const movingAmplitude = !this.#externalEncounter && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
-      && (this.#section === "maneuver" || cascading) && themeRowIndex % 3 === 1 ? .35 : 0;
-    const layout = createEncounterLayout(layoutTheme, themeRowIndex + this.#zoneCycle * 3,
+    const structured = !this.#externalEncounter || this.#scheduledActive;
+    const movingAmplitude = structured && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
+      && (this.#section === "maneuver" || cascading) && Math.floor(themeRowIndex / 2) % 3 === 1 ? .35 : 0;
+    const layout = createEncounterLayout(layoutTheme, structured ? themeRowIndex : themeRowIndex + this.#zoneCycle * 3,
       this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
       this.#config.ball.radius, generation.multiRowSideMargin, {
         passageExtra: this.#progress.passageExtra + (this.#section === "breather" ? .5 : 0),
         routeScale: this.#progress.routeScale * (cascading && variant === "wide" ? .6 : 1), movingAmplitude,
+        structured, ...(structured ? { routeAnchor: this.#sectionAnchorX,
+          ...(this.#previousPassageX === null ? {} : { previousPassageX: this.#previousPassageX }) } : {}),
       });
     const turnDistance = this.#previousPassageX === null ? 0 : Math.abs(layout.passage.x - this.#previousPassageX);
     // Leave time to steer out of the preceding band's lowest island.
     const travelTime = .24 + turnDistance / this.#config.ball.horizontalMaxSpeed;
     const clearance = this.#config.ball.radius * 2 + Math.max(...this.#config.platforms.map(platform => platform.size.height)) + .15;
+    const beat = structured ? Math.max(.6, difficulty.reactionWindowSeconds * .65) : difficulty.reactionWindowSeconds * .55;
     const clearSpacing = Math.max(generation.minimumSpacing,
-      clearance + worldSpeed * Math.max(travelTime, difficulty.reactionWindowSeconds * .55 * layout.rhythm * this.#progress.spacingScale * (this.#section === "run-up" ? .9 : 1)));
+      clearance + worldSpeed * Math.max(travelTime, beat * layout.rhythm * this.#progress.spacingScale));
     this.#nextY -= clearSpacing + this.#previousBandDepth;
-    const bandDepth = Math.min(3, Math.max(1.15, worldSpeed * .20)) * this.#progress.staggerScale;
+    const bandDepth = (structured ? Math.min(1.5, Math.max(.65, worldSpeed * .08))
+      : Math.min(3, Math.max(1.15, worldSpeed * .20))) * this.#progress.staggerScale;
     this.#previousBandDepth = bandDepth;
     this.#previousPassageX = layout.passage.x;
 
@@ -238,6 +257,7 @@ export class PlatformRoutePlanner {
       ...(cascading ? { cascadeVariant: variant } : {}),
       ...(movingAmplitude > 0 ? { lateralMotion: { amplitude: movingAmplitude, period: 3.8, phase: 0 } } : {}),
       encounterRowIndex: themeRowIndex,
+      externalEncounter: this.#externalEncounter,
       ...(coinTrail === undefined ? {} : { coinTrail }),
       choices: row
         .filter((member) => member !== primary)
@@ -286,9 +306,11 @@ export class PlatformRoutePlanner {
 
   #getPendingBlueprint(): RowBlueprint {
     if (this.#pendingBlueprint === null) {
+      const theme = this.#getActiveTheme();
+      const structured = !this.#externalEncounter || this.#scheduledActive;
       this.#pendingBlueprint = this.#createBlueprint(
-        this.#getActiveTheme(),
-        this.#encounterRowIndex,
+        structured && theme === "climax" ? climaxTheme(this.#encounterRowIndex) : theme,
+        structured ? Math.floor(this.#encounterRowIndex / 2) : this.#encounterRowIndex,
       );
     }
     return this.#pendingBlueprint;
@@ -298,16 +320,32 @@ export class PlatformRoutePlanner {
     const progress = worldProgression(this.#config.startDepth + this.#config.ball.startPosition.y - this.#nextY);
     const key = `${progress.location}:${progress.phase}`;
     if (key === this.#progressKey) return;
+    // A difficulty phase may develop the next phrase, but never cut this one off.
+    if (progress.location === this.#progress.location && this.#activeTheme !== null) return;
+    if (progress.location !== this.#progress.location) {
+      this.#scheduledTheme = null; this.#needsRecovery = false;
+    } else if (["cascade", "maneuver", "tension", "climax"].includes(this.#section)) this.#needsRecovery = true;
     this.#progress = progress; this.#progressKey = key; this.#sectionCursor = 0;
     this.#activeTheme = null; this.#pendingBlueprint = null; this.#encounterRowIndex = 0;
     this.#externalEncounter = false;
+    this.#scheduledActive = false;
   }
 
   #getActiveTheme(): PlatformEncounterTheme {
     this.#syncProgression();
     if (this.#activeTheme === null) {
-      this.#section = courseSectionAt(this.#progress.phase, this.#sectionCursor++);
-      this.#activeTheme = sectionTheme(this.#section); this.#externalEncounter = false;
+      this.#sectionAnchorX = this.#previousPassageX ?? 0;
+      if (this.#needsRecovery) {
+        this.#needsRecovery = false; this.#section = "breather";
+        this.#activeTheme = "breather"; this.#externalEncounter = false;
+      } else if (this.#scheduledTheme !== null && this.#section === "breather") {
+        this.#activeTheme = this.#scheduledTheme; this.#scheduledTheme = null;
+        this.#section = sectionForTheme(this.#activeTheme);
+        this.#externalEncounter = true; this.#scheduledActive = true;
+      } else {
+        this.#section = courseSectionAt(this.#progress.phase, this.#sectionCursor++);
+        this.#activeTheme = sectionTheme(this.#section); this.#externalEncounter = false;
+      }
       this.#zoneCycle += 1; this.#encounterVariant = this.#randomIndex(4);
     }
     return this.#activeTheme;
@@ -514,11 +552,13 @@ export class PlatformRoutePlanner {
       return;
     }
     this.#activeTheme = null;
+    if (this.#scheduledActive) this.#needsRecovery = true;
+    this.#scheduledActive = false;
     this.#encounterRowIndex = 0;
   }
 
   #getEncounterLength(theme: PlatformEncounterTheme): number {
-    if (!this.#externalEncounter) return sectionRows(this.#section, this.#progress);
+    if (!this.#externalEncounter || this.#scheduledActive) return sectionRows(this.#section, this.#progress);
     return theme === "climax" ? 20 : theme === "rich-lane" || theme === "death-tunnel"
       ? this.#config.platformGeneration.extendedEncounterRows : this.#config.platformGeneration.encounterRows;
   }

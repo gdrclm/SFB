@@ -4,9 +4,9 @@ import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
 export type CourseSection = "run-up" | "cascade" | "maneuver" | "loot" | "tension" | "breather" | "climax";
 export type CascadeVariant = "wide" | "winding" | "risky";
 const sequences: Record<WorldPhase, readonly CourseSection[]> = {
-  introduction: ["run-up", "cascade", "breather", "loot", "maneuver", "breather"],
-  development: ["cascade", "maneuver", "loot", "cascade", "tension", "breather"],
-  climax: ["climax", "breather", "cascade", "tension", "loot", "breather"],
+  introduction: ["run-up", "cascade", "breather", "loot", "breather", "maneuver", "breather"],
+  development: ["cascade", "breather", "maneuver", "breather", "loot", "cascade", "breather", "tension", "breather"],
+  climax: ["climax", "breather", "cascade", "breather", "loot", "breather", "tension", "breather"],
 };
 const themes: Record<CourseSection, PlatformEncounterTheme> = {
   "run-up": "run-up", cascade: "break-run", maneuver: "trap", loot: "rich-lane",
@@ -32,7 +32,7 @@ export function climaxTheme(row: number): PlatformEncounterTheme {
 }
 export function sectionRows(section: CourseSection, progress: WorldProgression): number {
   if (section === "climax") return 20;
-  if (section === "breather") return 3;
+  if (section === "breather") return 4;
   if (section === "cascade") return progress.phase === "introduction" ? 8 : progress.phase === "development" ? 10 : 12;
-  return section === "run-up" ? 6 : progress.phase === "climax" ? 6 : 5;
+  return section === "run-up" || section === "maneuver" ? 8 : 6;
 }
