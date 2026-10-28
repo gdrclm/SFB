@@ -245,7 +245,10 @@ it.each([30, 60, 240])("retains the original opening across viewport widths and 
     if (speed <= 20) expect(ball.position.x).toBeCloseTo(16 * .1, 8);
     else highSpeedDistances.push(ball.position.x / ball.horizontalLimit);
   }
-  for (const distance of highSpeedDistances) expect(distance).toBeCloseTo(16 * 1.5 * .1 / 4.5, 8);
+  for (const distance of highSpeedDistances) {
+    expect(distance).toBeLessThanOrEqual(16 * .1 / 4.5 + 1e-8);
+    expect(distance).toBeGreaterThanOrEqual(16 * .75 * .1 / 4.5 - 1e-8);
+  }
 });
 
 it("tracks the cursor faster after boosts, stays bounded and reacts immediately to reversal and slowing", () => {
@@ -272,13 +275,36 @@ it("tracks the cursor faster after boosts, stays bounded and reacts immediately 
   ball.fallSpeed = 6000;
   const beforeExtreme = ball.position.x;
   ball.fixedUpdate(1 / 60);
-  expect(beforeExtreme - ball.position.x).toBeCloseTo(initialStep * ball.horizontalLimit / 4.5 * 1.5);
-  simulate(ball, 1, 60);
-  expect(ball.position.x).toBe(-47.5);
+  expect(beforeExtreme - ball.position.x).toBeLessThan(initialStep * ball.horizontalLimit / 4.5);
+  simulate(ball, 2, 60);
+  expect(ball.position.x).toBeCloseTo(-47.5, 6);
   ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
   ball.setPlayfieldHalfWidth(NaN); expect(ball.horizontalLimit).toBe(5.5);
   input.isActive = false; ball.fixedUpdate(1 / 60);
   expect(ball.horizontalVelocity).toBe(0);
+});
+
+it.each([45, 60, 80])("keeps small corrections precise and follows without overshoot at %s speed", speed => {
+  const input = { isActive: true, isImmediate: true, normalizedPosition: .05 };
+  const config = { ...gameConfig, ball: { ...gameConfig.ball, naturalAcceleration: 0 } };
+  const ball = new BallController(createTransform(), input, config);
+  ball.setPlayfieldHalfWidth(48); ball.fallSpeed = speed;
+  const target = ball.horizontalLimit * input.normalizedPosition;
+  ball.fixedUpdate(1 / 60);
+  expect(ball.position.x).toBeGreaterThan(0);
+  expect(ball.position.x).toBeLessThan(target * .4);
+  let previous = ball.position.x;
+  for (let i=0; i<30; i++) {
+    ball.fixedUpdate(1 / 60);
+    expect(ball.position.x).toBeGreaterThanOrEqual(previous);
+    expect(ball.position.x).toBeLessThanOrEqual(target);
+    previous = ball.position.x;
+  }
+  expect(ball.position.x).toBeCloseTo(target, 3);
+  input.normalizedPosition = -.05;
+  ball.fixedUpdate(1 / 60);
+  expect(ball.position.x).toBeLessThan(previous);
+  expect(ball.position.x).toBeGreaterThan(-target);
 });
 
 

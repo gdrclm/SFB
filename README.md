@@ -69,9 +69,12 @@ If WebGPU is unavailable, the application falls back to WebGL2.
 Move the mouse cursor or swipe horizontally to steer the falling ball. Pointer
 input changes the target immediately. Horizontal travel remains at the original
 16 world units per active second, on every screen width, through twice the starting
-fall speed (20 by default). Above that, assistance blends in smoothly and reaches
-its maximum at six times starting speed (60): expanded-field compensation plus
-up to 1.5x speed and swipe gain. Mouse targets remain under the cursor. Direction
+fall speed (20 by default). Above that, partial expanded-field compensation blends
+in smoothly through six times starting speed (60). Swipe sensitivity stays fixed;
+screen traversal never becomes faster than the original base-arena response.
+Above speed 35, near-target damping blends in and is fully active at 45,
+so small corrections remain precise at 60–80 and beyond. Mouse targets remain
+under the cursor. Direction
 changes respond immediately, with bounded movement and no positional teleport.
 Earn one **BOOST** with six consecutive platform breaks, then press the button
 for +50% fall speed. Its ring and counter show charge progress. Coins and waiting
