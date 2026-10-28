@@ -2,7 +2,7 @@ import { breakImpactProfile } from "../collision/BreakResistance";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { HorizontalInput } from "../input/HorizontalInput";
-import { steeringSpeedScale } from "../input/SteeringResponse";
+import { steeringSpeedScale, steeringWidthScale } from "../input/SteeringResponse";
 
 interface BallTransform {
   readonly position: {
@@ -146,9 +146,10 @@ export class BallController implements FixedSimulationSystem {
     if (this.#input.isImmediate) {
       if (this.#input.isActive) {
         const targetX = Math.max(-1, Math.min(1, this.#input.normalizedPosition)) * this.#horizontalLimit;
-        // Preserve screen traversal time as the viewport widens, then speed up
-        // corrections during fast falls. Still move a bounded distance per tick.
-        const widthScale = Math.max(1, this.#horizontalLimit / this.#baseHorizontalLimit);
+        // Retain the original opening response even on wide screens. Compensate
+        // for the expanded field only after the ball has substantially sped up.
+        const widthScale = steeringWidthScale(this.#horizontalLimit / this.#baseHorizontalLimit,
+          this.#fallSpeed, this.#config.startFallSpeed);
         const speedScale = steeringSpeedScale(this.#fallSpeed, this.#config.startFallSpeed);
         const maxSpeed = this.#config.horizontalMaxSpeed * widthScale * speedScale;
         this.#transform.position.x = moveTowards(this.#transform.position.x, targetX, maxSpeed * realFixedDeltaSeconds);

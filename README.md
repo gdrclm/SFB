@@ -67,10 +67,11 @@ If WebGPU is unavailable, the application falls back to WebGL2.
 ## Current controls
 
 Move the mouse cursor or swipe horizontally to steer the falling ball. Pointer
-input changes the target immediately. Horizontal travel starts at 16 world units
-per active second in the base arena, scales with the visible playfield width,
-and becomes up to three times faster as fall speed increases. Swipe sensitivity
-uses the same speed gain; mouse targets remain under the cursor. Direction
+input changes the target immediately. Horizontal travel remains at the original
+16 world units per active second, on every screen width, through twice the starting
+fall speed (20 by default). Above that, assistance blends in smoothly and reaches
+its maximum at six times starting speed (60): expanded-field compensation plus
+up to 1.5x speed and swipe gain. Mouse targets remain under the cursor. Direction
 changes respond immediately, with bounded movement and no positional teleport.
 Earn one **BOOST** with six consecutive platform breaks, then press the button
 for +50% fall speed. Its ring and counter show charge progress. Coins and waiting

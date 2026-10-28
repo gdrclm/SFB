@@ -234,16 +234,18 @@ it("caps direct mouse and touch targets without smoothing or banking pointer eve
   expect(ball.horizontalVelocity).toBe(0);
 });
 
-it.each([30, 60, 240])("preserves screen traversal speed across wide viewports and slow motion at %s ticks", fps => {
-  const distances: number[] = [];
+it.each([30, 60, 240])("retains the original opening across viewport widths and only compensates at high speed at %s ticks", fps => {
+  const highSpeedDistances: number[] = [];
   const config = { ...gameConfig, ball: { ...gameConfig.ball, naturalAcceleration: 0 } };
-  for (const halfWidth of [5, 18, 48]) for (const timeScale of [1, .1]) {
+  for (const halfWidth of [5, 18, 48]) for (const timeScale of [1, .1]) for (const speed of [10, 15, 20, 60]) {
     const ball = new BallController(createTransform(), { isActive: true, isImmediate: true, normalizedPosition: 1 }, config);
     ball.setPlayfieldHalfWidth(halfWidth);
+    ball.fallSpeed = speed;
     for (let i = 0; i < fps / 10; i++) ball.fixedUpdate(timeScale / fps, 1 / fps);
-    distances.push(ball.position.x / ball.horizontalLimit);
+    if (speed <= 20) expect(ball.position.x).toBeCloseTo(16 * .1, 8);
+    else highSpeedDistances.push(ball.position.x / ball.horizontalLimit);
   }
-  for (const distance of distances) expect(distance).toBeCloseTo(16 * .1 / 4.5, 8);
+  for (const distance of highSpeedDistances) expect(distance).toBeCloseTo(16 * 1.5 * .1 / 4.5, 8);
 });
 
 it("tracks the cursor faster after boosts, stays bounded and reacts immediately to reversal and slowing", () => {
@@ -255,11 +257,14 @@ it("tracks the cursor faster after boosts, stays bounded and reacts immediately 
   const initialStep = ball.position.x;
   ball.fallSpeed = 40;
   ball.fixedUpdate(1 / 60);
-  expect(ball.position.x - initialStep).toBeCloseTo(initialStep * 2);
+  const boostedStep = ball.position.x - initialStep;
+  expect(boostedStep).toBeGreaterThan(initialStep);
+  // Gentler than the old immediate full-width multiplier plus 2x speed gain.
+  expect(boostedStep).toBeLessThan(initialStep * ball.horizontalLimit / 4.5 * 2);
   input.normalizedPosition = -1;
   const beforeReverse = ball.position.x;
   ball.fixedUpdate(1 / 60);
-  expect(beforeReverse - ball.position.x).toBeCloseTo(initialStep * 2);
+  expect(beforeReverse - ball.position.x).toBeCloseTo(boostedStep);
   ball.fallSpeed = 10;
   const beforeSlow = ball.position.x;
   ball.fixedUpdate(1 / 60);
@@ -267,7 +272,7 @@ it("tracks the cursor faster after boosts, stays bounded and reacts immediately 
   ball.fallSpeed = 6000;
   const beforeExtreme = ball.position.x;
   ball.fixedUpdate(1 / 60);
-  expect(beforeExtreme - ball.position.x).toBeCloseTo(initialStep * 3);
+  expect(beforeExtreme - ball.position.x).toBeCloseTo(initialStep * ball.horizontalLimit / 4.5 * 1.5);
   simulate(ball, 1, 60);
   expect(ball.position.x).toBe(-47.5);
   ball.setPlayfieldHalfWidth(6); expect(ball.position.x).toBe(-5.5);
