@@ -1,158 +1,116 @@
 export const WATER_SPLASH_SECONDS = .9;
+const SHEET=40, TENDRILS=28, STEPS=5, BRANCHES=18, BRANCH_STEPS=2, DROPS=44, GLINTS=18;
+const TENDRIL_START=SHEET, BRANCH_START=TENDRIL_START+TENDRILS*STEPS;
+const DROP_START=BRANCH_START+BRANCHES*BRANCH_STEPS, GLINT_START=DROP_START+DROPS;
+const QUADS=GLINT_START+GLINTS, TAU=Math.PI*2;
+const clamp01=(x:number):number=>Math.max(0,Math.min(1,x));
+const easeOut=(x:number):number=>1-Math.pow(1-clamp01(x),3);
+const hash=(n:number):number=>{const v=Math.sin(n*127.1+78.233)*43758.5453;return v-Math.floor(v);};
 
-// A fixed mesh batch: no particles, meshes, random calls or array allocations per frame.
-// The burst is staged: membrane tears -> crown / water sheets -> flying droplets -> ripples.
-const DROPS = 32;
-const JETS = 6;
-const JET_SEGMENTS = 9;
-const CROWN = 14;
-const MEMBRANE = 20;
-const RING_SEGMENTS = 32;
-const RINGS = 2;
-const JET_START = DROPS;
-const CROWN_START = JET_START + JETS * JET_SEGMENTS;
-const MEMBRANE_START = CROWN_START + CROWN;
-const RING_START = MEMBRANE_START + MEMBRANE;
-const QUADS = RING_START + RING_SEGMENTS * RINGS;
-const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
-
-/** Local XY geometry with one quad per element. waterData.x selects the shader
- * shape: 0 = rounded/tapered droplet, 1 = liquid ribbon, 2 = translucent film.
- * waterData.y is the element alpha. All typed buffers are kept for pool reuse. */
+/** Reusable one-mesh splash; 0=drop, 1=sheet, 2=filament, 3=highlight. */
 export class WaterSplashGeometry {
-  readonly positions = new Float32Array(QUADS * 12);
-  readonly waterData = new Float32Array(QUADS * 8);
-  readonly uvs = new Float32Array(QUADS * 8);
-  readonly indices: number[] = [];
-
-  public constructor() {
-    for (let i = 0; i < QUADS; i++) {
-      this.uvs.set([0, 0, 1, 0, 1, 1, 0, 1], i * 8);
-      const n = i * 4;
-      this.indices.push(n, n + 1, n + 2, n, n + 2, n + 3);
+ readonly positions = new Float32Array(QUADS*12);
+ readonly waterData = new Float32Array(QUADS*8);
+ readonly uvs = new Float32Array(QUADS*8);
+ readonly indices:number[]=[];
+ public constructor(){for(let i=0;i<QUADS;i++){this.uvs.set([0,0,1,0,1,1,0,1],i*8);const n=i*4;this.indices.push(n,n+1,n+2,n,n+2,n+3);}}
+  /** Animated hand-drawn radial splat: irregular fluid sheets, split tendrils,
+   * specular strokes and heavy droplets. One fixed mesh/typed buffer set. */
+  public update(age:number,force:number,contactX:number,groundY:number,reduced:boolean):number{
+    this.positions.fill(0);this.waterData.fill(0);
+    if(!Number.isFinite(age)||age<0||age>=WATER_SPLASH_SECONDS)return 0;
+    for(let i=0;i<QUADS*4;i++){this.positions[i*3]=contactX;this.positions[i*3+1]=groundY;}
+    const strength=.84+Math.max(.7,Math.min(1.6,Number.isFinite(force)?force:1))*.23;
+    const motion=reduced?.3:1,expansion=easeOut(age/.22);
+    const radius=(.19+expansion*2.15)*strength*motion;
+    const sheetAlpha=clamp01((.37-age)/.22),tendrilAlpha=clamp01((.59-age)/.27);
+    const branchAlpha=clamp01((.51-age)/.23);
+    // Jagged sheet opens in <200ms. Some sectors tear away into transparent voids.
+    const count=reduced?12:SHEET;
+    for(let i=0;i<count;i++){
+      const index=reduced?i*3:i;
+      const a=-Math.PI+index*TAU/SHEET,b=a+TAU/SHEET*(reduced?2.4:.97);
+      const detail=hash(index+22);
+      if(age>.08&&index%13===4)continue;
+      const reach=radius*(.49+detail*.53)*(1+.15*Math.sin((a+b)*2.7+.8));
+      const inner=Math.min(.14,reach*.18);
+      const angle=(a+b)*.5+(hash(index+97)-.5)*.07;
+      const tipA=reach*(.86+hash(index+81)*.15),tipB=reach*(.76+hash(index+129)*.24)*.9;
+      this.#quad(index,contactX+Math.cos(a)*inner,groundY+Math.sin(a)*inner,
+        contactX+Math.cos(b)*inner,groundY+Math.sin(b)*inner,
+        contactX+Math.cos(b)*tipB,groundY+Math.sin(b)*tipB,
+        contactX+Math.cos(angle)*tipA,groundY+Math.sin(angle)*tipA,
+        1,sheetAlpha*(.75+detail*.25));
     }
+    // Long asymmetric hooked tendrils; links drop out to make lace-like holes.
+    for(let i=0;i<TENDRILS;i++){
+      if(reduced&&i%4!==0)continue;
+      const angle=i*TAU/TENDRILS+(hash(i+17)-.5)*.43;
+      const range=radius*(.7+hash(i+64)*.72)*(1+.12*Math.sin(angle*3.1+.6));
+      const bend=(hash(i+197)-.5)*.38;
+      for(let s=0;s<STEPS;s++){
+        if(age>.16&&s===2&&i%3===0)continue;
+        if(age>.24&&s===0&&i%2===0)continue;
+        if(age>.34&&s<=1)continue;
+        const t0=s/STEPS,t1=(s+1)/STEPS;
+        const a0=angle+bend*t0*t0,a1=angle+bend*t1*t1;
+        const x0=contactX+Math.cos(a0)*range*t0,y0=groundY+Math.sin(a0)*range*t0;
+        const x1=contactX+Math.cos(a1)*range*t1,y1=groundY+Math.sin(a1)*range*t1;
+        const base=(.12+hash(i+307)*.055)*motion;
+        const w0=base*Math.pow(1-t0,1.12),w1=base*Math.pow(1-t1,1.12)+.004*motion;
+        this.#ribbon(TENDRIL_START+i*STEPS+s,x0,y0,x1,y1,w0,w1,
+          tendrilAlpha*(.78+hash(i+401)*.22),2);
+      }
+    }
+    // Side branches change the silhouette from a geometric star into torn water.
+    for(let i=0;i<BRANCHES;i++){
+      if(reduced&&i%5!==0)continue;
+      const arm=Math.floor(i*TENDRILS/BRANCHES);
+      const angle=arm*TAU/TENDRILS,branchAt=.36+hash(i+499)*.25;
+      const ox=contactX+Math.cos(angle)*radius*branchAt;
+      const oy=groundY+Math.sin(angle)*radius*branchAt;
+      const direction=angle+(i%2===0?-1:1)*(.3+hash(i+571)*.47);
+      const length=radius*(.26+hash(i+609)*.23);
+      for(let s=0;s<BRANCH_STEPS;s++){
+        const t0=s/BRANCH_STEPS,t1=(s+1)/BRANCH_STEPS;
+        const x0=ox+Math.cos(direction+t0*.15)*length*t0;
+        const y0=oy+Math.sin(direction+t0*.15)*length*t0;
+        const x1=ox+Math.cos(direction+t1*.15)*length*t1;
+        const y1=oy+Math.sin(direction+t1*.15)*length*t1;
+        this.#ribbon(BRANCH_START+i*BRANCH_STEPS+s,x0,y0,x1,y1,
+          (.075-.05*t0)*motion,(.075-.05*t1)*motion,branchAlpha*.92,2);
+      }
+    }
+    // Deterministically staggered droplets fly radially, then arc with gravity.
+    for(let i=0;i<DROPS;i++){
+      if(reduced&&i>=9)continue;
+      const big=i<12,angle=(i+.4)*TAU/DROPS+(hash(i+713)-.5)*.3;
+      const delay=(big?.035:.08)+hash(i+731)*(big?.06:.14);
+      const t=age-delay;if(t<=0)continue;
+      const speed=(big?5:6.1)*(.68+hash(i+761)*.65)*strength*motion;
+      const dist=.46*expansion*motion+speed*t;
+      const x=contactX+Math.cos(angle)*dist,y=groundY+Math.sin(angle)*dist-4.1*t*t*motion;
+      const vx=Math.cos(angle)*speed,vy=Math.sin(angle)*speed-8.2*t*motion;
+      const norm=Math.max(.001,Math.hypot(vx,vy));
+      const size=(big?.075+hash(i+787)*.065:.018+hash(i+811)*.03)*motion;
+      const alpha=clamp01(((big?.79:.68)-age)/.26);
+      if(alpha>0)this.#drop(DROP_START+i,x,y,size,size*(big?1.7:1.25),vx/norm,vy/norm,alpha);
+    }
+    // Slim white/cyan strokes supply the specular highlights of a painted splash.
+    if(!reduced){
+      const fade=clamp01((.38-age)/.21);
+      for(let i=0;i<GLINTS&&fade>0;i++){
+        const a=i*TAU/GLINTS+.18;
+        const inner=.15+hash(i+863)*.35,outer=inner+.08+hash(i+887)*.14;
+        this.#ribbon(GLINT_START+i,
+          contactX+Math.cos(a)*radius*inner,groundY+Math.sin(a)*radius*inner,
+          contactX+Math.cos(a+.12)*radius*outer,groundY+Math.sin(a+.12)*radius*outer,
+          .022,.008,fade*.9,3);
+      }
+    }
+    return clamp01((WATER_SPLASH_SECONDS-age)/.18);
   }
-
-  public update(age: number, force: number, contactX: number, groundY: number, reduced: boolean): number {
-    this.positions.fill(0);
-    this.waterData.fill(0);
-    if (!Number.isFinite(age) || age < 0 || age >= WATER_SPLASH_SECONDS) return 0;
-
-    // Hidden quads remain local to the impact; there is only one bounds refresh.
-    for (let i = 0; i < QUADS * 4; i++) {
-      this.positions[i * 3] = contactX;
-      this.positions[i * 3 + 1] = groundY;
-    }
-    const motion = reduced ? .32 : 1;
-    const strength = .78 + Math.max(.7, Math.min(1.6, Number.isFinite(force) ? force : 1)) * .27;
-
-    // Size hierarchy: a few heavy masses carry the silhouette; fine satellite
-    // droplets add detail with deterministic stagger, avoiding frame-to-frame noise.
-    for (let i = 0; i < DROPS; i++) {
-      if (reduced && i >= 8) continue;
-      const group = Math.floor(i / 2);
-      const direction = i % 2 === 0 ? -1 : 1;
-      const spread = (group * .6180339 + .16) % 1;
-      const lift = (group * .41421356 + .09) % 1;
-      const small = group >= 8;
-      const start = (small ? .055 : .008) + lift * (small ? .085 : .04);
-      const t = age - start;
-      if (t < 0) continue;
-      const vx = direction * (1.55 + spread * 4.5) * strength * motion;
-      const vy = (6.2 + lift * 2.5 + (small ? .6 : 0)) * strength * motion;
-      const gravity = 9.8 * motion;
-      const x = contactX + vx * t;
-      const y = groundY + vy * t - gravity * t * t;
-      const velocityY = vy - 2 * gravity * t;
-      const speed = Math.max(.001, Math.hypot(vx, velocityY));
-      const radius = (small ? .021 + spread * .02 : .058 + spread * .056) * (reduced ? .88 : 1);
-      const length = radius * (small ? 1.3 : 1.6 + Math.min(1.0, speed * .13));
-      const fadeAt = small ? .61 : .73;
-      const alpha = clamp01((fadeAt - t) / (small ? .18 : .2));
-      if (alpha <= 0) continue;
-      this.#drop(i, x, y, radius, length, vx / speed, velocityY / speed, alpha);
-    }
-
-    // Curved-feeling, tapered water sheets briefly connect the impact with the
-    // outward spray. Their tail catches up to the head, so they break apart.
-    const jetFade = clamp01((.46 - age) / .16);
-    for (let jet = 0; jet < JETS; jet++) {
-      if (reduced && jet >= 2) continue;
-      if (jetFade <= 0) continue;
-      const direction = jet % 2 === 0 ? -1 : 1;
-      const band = Math.floor(jet / 2);
-      const vx = direction * (3.5 + band * .9) * strength * motion;
-      const vy = (6.4 + band * .8) * strength * motion;
-      const tail = Math.max(0, age - .18);
-      const head = Math.min(age, .34);
-      if (head <= tail) continue;
-      for (let s = 0; s < JET_SEGMENTS; s++) {
-        const a = tail + (head - tail) * s / JET_SEGMENTS;
-        const b = tail + (head - tail) * (s + 1) / JET_SEGMENTS;
-        const width = (.11 + band * .025) * (1 - .66 * s / JET_SEGMENTS) * motion;
-        this.#ribbon(JET_START + jet * JET_SEGMENTS + s,
-          contactX + vx * a * (1 + .3 * a), groundY + vy * a - 9.8 * motion * a * a,
-          contactX + vx * b * (1 + .3 * b), groundY + vy * b - 9.8 * motion * b * b,
-          width, width * .82, jetFade * .92);
-      }
-    }
-
-    // Asymmetric crown: broad low petals on the sides and tall narrow ones near
-    // the center. It grows very quickly and vanishes before the flying droplets.
-    const crownFade = clamp01((.29 - age) / .16);
-    if (crownFade > 0) {
-      for (let i = 0; i < CROWN; i++) {
-        if (reduced && i % 3 !== 0) continue;
-        const a = Math.PI * (.08 + .84 * (i + .5) / CROWN);
-        const wave = .86 + .14 * Math.sin(i * 2.7);
-        const reach = (.27 + age * 5.1) * strength * motion * wave;
-        const base = Math.cos(a) * .14 * motion;
-        const tipX = contactX + Math.cos(a) * reach;
-        const tipY = groundY + Math.sin(a) * reach * .92 - age * age * 3.0 * motion;
-        this.#ribbon(CROWN_START + i, contactX + base, groundY - .035,
-          tipX, tipY, (.115 + (i % 3) * .016) * motion, .024 * motion,
-          crownFade * .88);
-      }
-    }
-
-    // Shimmering torn film is distinct from opaque water. Unlike a generic
-    // explosion, it briefly remembers the curved shell of the popped bubble.
-    const filmFade = clamp01((.24 - age) / .13);
-    if (!reduced && filmFade > 0) {
-      for (let i = 0; i < MEMBRANE; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const f = (Math.floor(i / 2) + .5) / (MEMBRANE / 2);
-        const x = contactX + side * ((.17 + f * .85) + age * (1.1 + f * 2.0)) * strength;
-        const y = groundY + .16 + Math.sin(f * Math.PI) * (.22 + age * 1.5) * strength - age * age * 5.0;
-        const dx = side * (.12 + .08 * f) * filmFade;
-        const dy = (.09 + .1 * Math.sin(f * Math.PI)) * filmFade;
-        this.#ribbon(MEMBRANE_START + i, x - dx, y - dy, x + dx, y + dy,
-          .035 * filmFade, .022 * filmFade, filmFade * .76, 2);
-      }
-    }
-
-    // Two thin, time-offset ellipse ripples, never a full-screen flash.
-    for (let ring = 0; ring < RINGS; ring++) {
-      if (reduced && ring > 0) continue;
-      const t = age - ring * .085;
-      if (t < 0 || t >= .76) continue;
-      const fade = clamp01((.76 - t) / .35) * Math.min(1, t / .055);
-      const rx = (.23 + t * 4.3) * strength * motion;
-      const ry = (.085 + t * .56) * motion;
-      const width = (.05 - .018 * t) * motion;
-      for (let i = 0; i < RING_SEGMENTS; i++) {
-        const a = i * Math.PI * 2 / RING_SEGMENTS;
-        const b = (i + 1) * Math.PI * 2 / RING_SEGMENTS;
-        this.#ribbon(RING_START + ring * RING_SEGMENTS + i,
-          contactX + Math.cos(a) * rx, groundY + Math.sin(a) * ry,
-          contactX + Math.cos(b) * rx, groundY + Math.sin(b) * ry,
-          width, width, fade * (ring ? .35 : .62));
-      }
-    }
-    return clamp01((WATER_SPLASH_SECONDS - age) / .2);
-  }
-
-  #drop(slot: number, x: number, y: number, halfWidth: number, halfLength: number, vx: number, vy: number, alpha: number): void {
+ #drop(slot: number, x: number, y: number, halfWidth: number, halfLength: number, vx: number, vy: number, alpha: number): void {
     const ax = vy * halfWidth, ay = -vx * halfWidth;
     const bx = vx * halfLength, by = vy * halfLength;
     this.#quad(slot, x - ax - bx, y - ay - by, x + ax - bx, y + ay - by,
