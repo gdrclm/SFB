@@ -24,3 +24,15 @@ it("keeps reduced-motion splashes smaller and sparser and never exceeds its fixe
  expect(water.waterData.filter((_,i)=>i%2===1).filter(alpha=>alpha>0).length).toBeLessThan(fullVisible);
  expect(water.positions.length).toBe(length);
 });
+it("eases droplets and the connected sheet in and out without an opaque first frame",()=>{
+ const water=new WaterSplashGeometry();
+ const sheetAlpha=()=>water.waterData[water.waterData.length-1]??0;
+ water.update(0,1,0,0,false,true);
+ expect(water.waterData[1]).toBe(0);expect(sheetAlpha()).toBe(0);
+ water.update(.01,1,0,0,false,true);
+ expect(water.waterData[1]).toBeGreaterThan(0);expect(water.waterData[1]).toBeLessThan(.1);
+ expect(sheetAlpha()).toBeGreaterThan(0);expect(sheetAlpha()).toBeLessThan(.1);
+ water.update(.1,1,0,0,false,true);expect(sheetAlpha()).toBeCloseTo(1);
+ water.update(.73,1,0,0,false,true);expect(sheetAlpha()).toBeLessThan(.01);
+ water.update(.89,1,0,0,false,true);expect(water.waterData[1]).toBeLessThan(.01);
+});

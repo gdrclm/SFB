@@ -72,7 +72,7 @@ void main(){
    float bend=smoothstep(.20,.85,liquidUV.y)*sin(liquidUV.y*8.0+skyCue.w*10.0)*.018;
    liquidUV.x+=bend;
    vec4 liquid=texture2D(waterSheetSampler,liquidUV);
-   float breakup=smoothstep(.34,.62,skyCue.w);
+   float breakup=smoothstep(.42,.74,skyCue.w);
    float tear=sin(liquidUV.x*37.0+liquidUV.y*23.0)*.5+.5;
    float tips=1.0-smoothstep(.55,1.05,liquidUV.y+breakup*.65+tear*breakup*.14);
    color=liquid.rgb;
@@ -172,10 +172,12 @@ export class SkyPlatformSkin {
   const motion=this.#reduced ? .25 : 1;
   const inflate=cloud?envelope:envelope*.16;
   this.body.setEnabled(true);
-  this.#bodyData.opacity=breaking?(cloud?1-Math.max(0,(t-.22)/.78):1-Math.min(1,t*3)):1;
+  const shellFade=Math.max(0,Math.min(1,(age-.04)/.20));
+  this.#bodyData.opacity=breaking?(cloud?1-Math.max(0,(t-.22)/.78):1-shellFade*shellFade*(3-2*shellFade)):1;
   this.body.scaling.set((this.#width+.35)/this.parent.scaling.x*(1+inflate*.22*motion),this.#bodyData.height*(1+inflate*.40*motion),1);
   this.body.position.y=this.height/2-(cloud ? .55 : Math.min(1.3,Math.max(.6,this.#bodyData.width*.32)));
-  this.#splashData.opacity=active&&!cloud?this.#water.update(age,this.#force,this.#contactX,this.height/2+.1,this.#reduced):0;
+  this.#splashData.opacity=active&&!cloud?this.#water.update(age,this.#force,
+   breaking?0:this.#contactX,breaking?this.body.position.y:this.height/2+.1,this.#reduced,breaking):0;
   this.splash.setEnabled(this.#splashData.opacity>0);
   if(this.#splashData.opacity<=0)return;
   this.splash.scaling.set(1/this.parent.scaling.x,1,1);

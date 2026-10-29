@@ -43,3 +43,28 @@ it("sprays a bounded set of droplets from the actual contact and reuses their bu
  skin.reset();skin.render("cloud",3,null,2,true);expect(skin.splash.isEnabled()).toBe(false);
  scene.dispose();engine.dispose();
 });
+it("keeps a broken bubble's water sheet centered on its shell, even on an off-center hit or scaled platform",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("bubble",scene);
+ parent.position.set(3,-5,0);
+ const skin=new SkyPlatformSkin(parent,.3,1,scene);
+ for(const width of [2,4,6]){
+  parent.scaling.x=width/4;skin.reset();skin.render("bubble",width,null,0,false);
+  skin.impact(0,1,width*.35);
+  for(const age of [.02,.10,.20,.40]){
+   skin.renderBreak(age/.9);
+   const positions=skin.splash.getVerticesData(VertexBuffer.PositionKind)??[];
+   const sheet=Array.from(positions).slice(-12);
+   // Check the illustrated water's visible mass, rather than the empty quad bounds.
+   const left=sheet[0]??0,right=sheet[3]??0,bottom=sheet[1]??0,top=sheet[7]??0;
+   const centerX=left+(right-left)*.494;
+   const centerY=bottom+(top-bottom)*.415;
+   expect(centerX).toBeCloseTo(0);expect(centerY).toBeCloseTo(skin.body.position.y);
+   expect(skin.splash.scaling.x*parent.scaling.x).toBeCloseTo(1);
+  }
+ }
+ skin.renderBreak(.10/.9);
+ expect((skin.body.metadata as {sky:{opacity:number}}).sky.opacity).toBeGreaterThan(.7);
+ skin.renderBreak(.24/.9);
+ expect((skin.body.metadata as {sky:{opacity:number}}).sky.opacity).toBeCloseTo(0);
+ scene.dispose();engine.dispose();
+});
