@@ -7,7 +7,7 @@ import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./Platfo
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
 import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
 import { prepareMechanicSkin } from "./PlatformMechanicSkin";
-import { prepareSkyPlatformSkin } from "./SkyPlatformSkin";
+import { prepareSkyPlatformSkin, waterSplashTexture } from "./SkyPlatformSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Material } from "@babylonjs/core/Materials/material";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -67,11 +67,11 @@ export function preparePlatformSprites(scene: Scene): void {
 
 /** Begin falling only after the collision surfaces have visible artwork. */
 export async function waitForPlatformSprites(scene: Scene): Promise<void> {
-  await Promise.all([waitForAtlas(atlasMaterial(scene, "idle")), waitForAtlas(atlasMaterial(scene, "destroy"))]);
+  await Promise.all([waitForTexture(atlasMaterial(scene, "idle").diffuseTexture),
+    waitForTexture(atlasMaterial(scene, "destroy").diffuseTexture),waitForTexture(waterSplashTexture(scene))]);
 }
 
-async function waitForAtlas(material: StandardMaterial): Promise<void> {
-  const texture = material.diffuseTexture;
+async function waitForTexture(texture: StandardMaterial["diffuseTexture"]): Promise<void> {
   const message = "Не удалось загрузить платформы. Попробуйте запустить забег ещё раз.";
   if (!(texture instanceof Texture) || texture.loadingError) throw new Error(message);
   if (texture.isReady()) return;

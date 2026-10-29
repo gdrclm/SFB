@@ -3,6 +3,8 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import waterSheetUrl from "../assets/effects/water-sheet.png";
 import type { Scene } from "@babylonjs/core/scene";
 import type { ApproachState } from "./PlatformReadability";
 import type { SkyPlatformAppearance } from "./SkyPlatformAppearance";
@@ -23,6 +25,7 @@ attribute vec3 position;attribute vec2 uv;attribute vec2 waterData;uniform mat4 
 void main(){vUV=uv;vWater=waterData;gl_Position=worldViewProjection*vec4(position,1.0);}`;
 const fragment=`precision highp float;
 varying vec2 vUV;varying vec2 vWater;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
+uniform sampler2D waterSheetSampler;
 uniform vec3 skyShadow;uniform vec3 skyFace;uniform vec3 skyEdge;
 vec3 surfaceColor(float light){return mix(skyShadow,skyFace,clamp(light,0.0,1.0));}
 float ellipse(vec2 p,vec2 c,vec2 r){return (length((p-c)/r)-1.0)*min(r.x,r.y);}
@@ -64,14 +67,25 @@ void main(){
   alpha=max(inside*(.38+innerGlow*.30),max(rim*.98,max(outer,shine*.95+dotLight*.9)))+water*.12;
  }else{
   vec2 q=(vUV-.5)*2.0;
-  if(vWater.x<.5){
+  if(vWater.x>1.5){
+   vec2 liquidUV=vUV;
+   float bend=smoothstep(.20,.85,liquidUV.y)*sin(liquidUV.y*8.0+skyCue.w*10.0)*.018;
+   liquidUV.x+=bend;
+   vec4 liquid=texture2D(waterSheetSampler,liquidUV);
+   float breakup=smoothstep(.34,.62,skyCue.w);
+   float tear=sin(liquidUV.x*37.0+liquidUV.y*23.0)*.5+.5;
+   float tips=1.0-smoothstep(.55,1.05,liquidUV.y+breakup*.65+tear*breakup*.14);
+   color=liquid.rgb;
+   alpha=smoothstep(.04,.20,liquid.a)*vWater.y*mix(1.0,tips,breakup);
+  }else if(vWater.x<.5){
    float d=length((q-vec2(0.0,.25))/vec2(.72,.60));
    float head=1.0-smoothstep(.82,1.0,d);
    float width=.06+.42*smoothstep(-.95,.20,q.y);
    float tail=(1.0-smoothstep(width*.6,width,abs(q.x)))*(1.0-smoothstep(.1,.35,q.y))*smoothstep(-1.0,-.85,q.y);
    float glint=exp(-dot((q-vec2(-.21,.43))*vec2(9.0,8.0),(q-vec2(-.21,.43))*vec2(9.0,8.0)));
-   color=mix(skyShadow,skyFace,clamp(.45+q.y*.25-q.x*.2,0.0,1.0));
-   color=mix(color,skyEdge,clamp(glint+exp(-abs(d-.8)*28.0)*.75,0.0,1.0));
+   color=mix(vec3(.10,.56,.72),vec3(.62,.94,1.0),clamp(.65+q.y*.15-q.x*.3,0.0,1.0));
+   float reflection=exp(-pow((d-.72)*13.0,2.0))*(1.0-smoothstep(-.1,.45,q.x))*smoothstep(.1,.65,q.y);
+   color=mix(color,vec3(.96,1.0,1.0),clamp(glint+reflection,0.0,1.0));
    alpha=max(head,tail*.65)*vWater.y;
   }else{
    float edge=1.0-smoothstep(.45,1.0,abs(q.x));
@@ -91,11 +105,21 @@ void main(){
 }`;
 interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number}
 const materials=new WeakMap<Scene,ShaderMaterial>();
+const sheetTextures=new WeakMap<Scene,Texture>();
+export function waterSplashTexture(scene:Scene):Texture{
+ const cached=sheetTextures.get(scene);if(cached)return cached;
+ const texture=new Texture(waterSheetUrl,scene,true,true,Texture.BILINEAR_SAMPLINGMODE);
+ texture.name="WaterSplashSheet";texture.hasAlpha=true;
+ texture.wrapU=texture.wrapV=Texture.CLAMP_ADDRESSMODE;
+ sheetTextures.set(scene,texture);texture.onDisposeObservable.addOnce(()=>sheetTextures.delete(scene));return texture;
+}
 export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  const cached=materials.get(scene);if(cached)return cached;
  const material=new ShaderMaterial("SkyPlatformMaterial",scene,{vertexSource:vertex,fragmentSource:fragment},{
   attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade"],needAlphaBlending:true,
+  samplers:["waterSheetSampler"],
  });
+ material.setTexture("waterSheetSampler",waterSplashTexture(scene));
  material.backFaceCulling=false;material.disableDepthWrite=true;
  material.onBindObservable.add(mesh=>{
   const data=(mesh.metadata as {sky?:SkyUniforms}|null)?.sky;if(!data)return;
@@ -110,7 +134,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  materials.set(scene,material);material.onDisposeObservable.addOnce(()=>materials.delete(scene));return material;
 }
 
-/** Two meshes per used pool slot, no particle emitters or textures. */
+/** Two meshes per used pool slot; one water illustration is shared by the scene. */
 export class SkyPlatformSkin {
  public readonly body:Mesh;
  public readonly splash:Mesh;
@@ -155,6 +179,7 @@ export class SkyPlatformSkin {
   this.splash.setEnabled(this.#splashData.opacity>0);
   if(this.#splashData.opacity<=0)return;
   this.splash.scaling.set(1/this.parent.scaling.x,1,1);
+  this.#splashData.time=age;
   this.splash.updateVerticesData(VertexBuffer.PositionKind,this.#water.positions);
   this.splash.updateVerticesData("waterData",this.#water.waterData);this.splash.refreshBoundingInfo();
  }

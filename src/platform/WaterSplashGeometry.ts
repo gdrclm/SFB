@@ -1,10 +1,10 @@
 export const WATER_SPLASH_SECONDS = .9;
-const DROPS = 24, JETS = 6, JET_SEGMENTS = 10, CROWN = 12, RING = 32;
-const QUADS = DROPS + JETS * JET_SEGMENTS + CROWN + RING;
+const DROPS = 12, JETS = 2, JET_SEGMENTS = 8;
+const QUADS = DROPS + JETS * JET_SEGMENTS + 1;
 const clamp01 = (x:number):number => Math.max(0,Math.min(1,x));
 
-/** One persistent batch: ballistic teardrops, tapering water jets, a short crown
- * and an expanding ripple. Opacity is per vertex; hidden slots allocate nothing. */
+/** A broad illustrated liquid sheet with a small number of glossy ballistic
+ * droplets. The connected sheet carries the silhouette, not thin radial rays. */
 export class WaterSplashGeometry {
  readonly positions = new Float32Array(QUADS*12);
  readonly waterData = new Float32Array(QUADS*8);
@@ -23,7 +23,7 @@ export class WaterSplashGeometry {
   for(let i=0;i<QUADS*4;i++){this.positions[i*3]=contactX;this.positions[i*3+1]=groundY;}
   const motion=reduced ? .3 : 1,power=.8+Math.max(.7,Math.min(1.6,force))*.3;
   for(let i=0;i<DROPS;i++){
-   if(reduced&&i>=8)continue;
+   if(reduced&&i>=4)continue;
    const band=Math.floor(i/2),direction=i%2===0?-1:1;
    const spread=(band*.618+.20)%1,lift=(band*.414+.13)%1;
    const t=age-lift*.035;if(t<0)continue;
@@ -31,11 +31,11 @@ export class WaterSplashGeometry {
    const vy=(3.2+lift*3.3)*power*motion,gravity=6.8*motion;
    const x=contactX+vx*t,y=groundY+vy*t-gravity*t*t;
    const speedY=vy-2*gravity*t,speed=Math.max(.01,Math.hypot(vx,speedY));
-   const radius=(band>=7 ? .025+spread*.024 : .055+spread*.055)*(reduced ? .8 : 1);
+   const radius=(band>=4 ? .055+spread*.035 : .105+spread*.08)*(reduced ? .8 : 1);
    const length=radius*(1.3+Math.min(1.5,speed*.18));
    this.#drop(i,x,y,radius,length,vx/speed,speedY/speed,clamp01((.88-t)/.2));
   }
-  const jetFade=clamp01((.47-age)/.16);
+  const jetFade=clamp01((.34-age)/.18);
   for(let jet=0;jet<JETS;jet++){
    if(reduced&&jet>=2)continue;
    const direction=jet%2===0?-1:1,band=Math.floor(jet/2);
@@ -47,27 +47,17 @@ export class WaterSplashGeometry {
     const a=tail+(head-tail)*s/JET_SEGMENTS,b=tail+(head-tail)*(s+1)/JET_SEGMENTS;
     this.#ribbon(slot,contactX+vx*a,groundY+vy*a-6.8*motion*a*a,
      contactX+vx*b,groundY+vy*b-6.8*motion*b*b,
-     (.065+band*.012)*(1-s/JET_SEGMENTS*.72),(.065+band*.012)*(1-(s+1)/JET_SEGMENTS*.72),jetFade*.9);
+     (.065+band*.012)*(1-s/JET_SEGMENTS*.72),(.065+band*.012)*(1-(s+1)/JET_SEGMENTS*.72),jetFade*.35);
    }
   }
-  const crownFade=clamp01(1-age/.23),crownWidth=(.14+age*7)*motion;
-  for(let i=0;i<CROWN;i++){
-   const slot=DROPS+JETS*JET_SEGMENTS+i;
-   const a=i*Math.PI/CROWN,b=(i+1)*Math.PI/CROWN;
-   const height=(.25+age*3.2)*motion,spike=i%2===0?1.22:.8;
-   this.#quad(slot,
-    contactX+Math.cos(a)*crownWidth*.65,groundY+Math.sin(a)*height*.32,
-    contactX+Math.cos(b)*crownWidth*.65,groundY+Math.sin(b)*height*.32,
-    contactX+Math.cos(b)*crownWidth,groundY+Math.sin(b)*height*spike,
-    contactX+Math.cos(a)*crownWidth,groundY+Math.sin(a)*height*spike,1,crownFade*.85);
-  }
-  const rippleFade=clamp01(1-age/.65),rx=(.25+age*3.5)*motion,ry=(.08+age*.42)*motion;
-  for(let i=0;i<RING;i++){
-   const a=i*Math.PI*2/RING,b=(i+1)*Math.PI*2/RING;
-   this.#ribbon(DROPS+JETS*JET_SEGMENTS+CROWN+i,
-    contactX+Math.cos(a)*rx,groundY+Math.sin(a)*ry,
-    contactX+Math.cos(b)*rx,groundY+Math.sin(b)*ry,.035*rippleFade,.035*rippleFade,rippleFade*.65);
-  }
+  const progress=clamp01(age/.18),growth=progress*progress*(3-2*progress);
+  const sheetMotion=reduced?.55:1;
+  const width=(.65+growth*3.8)*power*sheetMotion;
+  const height=(.45+growth*3.3)*power*sheetMotion;
+  // The illustrated root is at UV (.5,.185), keeping it attached to the hit.
+  const bottom=groundY-height*.185,top=groundY+height*.815;
+  this.#quad(QUADS-1,contactX-width/2,bottom,contactX+width/2,bottom,
+   contactX+width/2,top,contactX-width/2,top,2,clamp01(age/.035)*clamp01((.62-age)/.20));
   return clamp01((WATER_SPLASH_SECONDS-age)/.25);
  }
  #drop(slot:number,x:number,y:number,halfWidth:number,halfLength:number,vx:number,vy:number,alpha:number):void{
