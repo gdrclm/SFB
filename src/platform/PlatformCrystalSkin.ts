@@ -15,6 +15,12 @@ export function setPlatformCrystalBlend(scene: Scene, weight: number): void {
   crystalWeights.set(scene, Math.max(0, Math.min(1, weight)));
 }
 
+/** Custom surface shaders use the same scene grading as the rock atlas. */
+export function getPlatformCrystalBlend(scene: Scene): number { return crystalWeights.get(scene) ?? 0; }
+export function getPlatformCrystalTint(row: number): readonly [number, number, number] {
+  return tints[row] ?? [.58, .18, 1];
+}
+
 /** Location color grading preserves the atlas facets, alpha, animation and type cues. */
 export class PlatformCrystalSkin extends MaterialPluginBase {
   public constructor(material: StandardMaterial) {
