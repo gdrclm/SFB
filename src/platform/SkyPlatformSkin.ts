@@ -19,10 +19,10 @@ const palettes = [
 function paletteForRow(row:number){return palettes[row]??palettes[0];}
 
 const vertex=`precision highp float;
-attribute vec3 position;attribute vec2 uv;attribute vec2 waterData;uniform mat4 worldViewProjection;varying vec2 vUV;varying vec2 vWater;
-void main(){vUV=uv;vWater=waterData;gl_Position=worldViewProjection*vec4(position,1.0);}`;
+attribute vec3 position;attribute vec2 uv;attribute vec2 waterData;uniform mat4 worldViewProjection;varying vec2 vUV;varying vec2 vWater;varying vec2 vLocal;
+void main(){vUV=uv;vWater=waterData;vLocal=position.xy;gl_Position=worldViewProjection*vec4(position,1.0);}`;
 const fragment=`precision highp float;
-varying vec2 vUV;varying vec2 vWater;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
+varying vec2 vUV;varying vec2 vWater;varying vec2 vLocal;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
 uniform vec3 skyShadow;uniform vec3 skyFace;uniform vec3 skyEdge;
 vec3 surfaceColor(float light){return mix(skyShadow,skyFace,clamp(light,0.0,1.0));}
 float ellipse(vec2 p,vec2 c,vec2 r){return (length((p-c)/r)-1.0)*min(r.x,r.y);}
@@ -65,19 +65,38 @@ void main(){
  }else{
   vec2 q=(vUV-.5)*2.0;
   if(vWater.x<.5){
-   float d=length((q-vec2(0.0,.25))/vec2(.72,.60));
-   float head=1.0-smoothstep(.82,1.0,d);
-   float width=.06+.42*smoothstep(-.95,.20,q.y);
-   float tail=(1.0-smoothstep(width*.6,width,abs(q.x)))*(1.0-smoothstep(.1,.35,q.y))*smoothstep(-1.0,-.85,q.y);
-   float glint=exp(-dot((q-vec2(-.21,.43))*vec2(9.0,8.0),(q-vec2(-.21,.43))*vec2(9.0,8.0)));
-   color=mix(skyShadow,skyFace,clamp(.45+q.y*.25-q.x*.2,0.0,1.0));
-   color=mix(color,skyEdge,clamp(glint+exp(-abs(d-.8)*28.0)*.75,0.0,1.0));
-   alpha=max(head,tail*.65)*vWater.y;
-  }else{
-   float edge=1.0-smoothstep(.45,1.0,abs(q.x));
-   float core=pow(max(0.0,1.0-abs(q.x)),2.0);
-   color=mix(skyShadow,skyEdge,.25+core*.75);
+   // Large, highlighted teardrops; shader masks square geometry into ovals.
+   float d=length((q-vec2(0.0,.18))/vec2(.79,.82));
+   float head=1.0-smoothstep(.77,1.0,d);
+   float width=.08+.47*smoothstep(-.9,.3,q.y);
+   float tail=(1.0-smoothstep(width*.65,width,abs(q.x)))*(1.0-smoothstep(.03,.35,q.y))*smoothstep(-1.0,-.78,q.y);
+   float glint=exp(-dot((q-vec2(-.26,.42))*vec2(7.0,8.0),(q-vec2(-.26,.42))*vec2(7.0,8.0)));
+   color=mix(skyShadow,skyFace,clamp(.65+q.y*.2-q.x*.17,0.0,1.0));
+   color=mix(color,skyEdge,clamp(glint+exp(-abs(d-.79)*23.0)*.55,0.0,1.0));
+   alpha=max(head,tail*.7)*vWater.y;
+  }else if(vWater.x<1.5){
+   // Broad, joined jagged liquid sheet. Lacy irregular holes open as it bursts.
+   float edge=1.0-smoothstep(.79,1.0,abs(q.x));
+   vec2 rel=vLocal-skyParams.xy;
+   float noise=sin(rel.x*7.2+sin(rel.y*3.2)*1.4)*sin(rel.y*8.3-rel.x*1.7);
+   float holes=smoothstep(.40,.79,noise)*smoothstep(.085,.26,skyCue.w)
+    *(1.0-smoothstep(.5,2.7,length(rel)));
+   color=mix(skyShadow,skyFace,clamp(.69+.12*q.y-.15*q.x,0.0,1.0));
+   float shine=exp(-pow((q.x+.6)*8.0,2.0))*.55;
+   color=mix(color,skyEdge,shine);
+   alpha=edge*(1.0-holes*.93)*vWater.y;
+  }else if(vWater.x<2.5){
+   // Tapered liquid filaments break up before their distant droplets vanish.
+   float edge=1.0-smoothstep(.7,1.0,abs(q.x));
+   float ridge=pow(max(0.0,1.0-abs(q.x)),1.75);
+   color=mix(skyShadow,skyFace,.48+ridge*.43);
+   color=mix(color,skyEdge,exp(-pow((q.x+.38)*5.0,2.0))*.3);
    alpha=edge*vWater.y;
+  }else{
+   // Narrow bright strokes add a glossy illustrated specular accent.
+   float glint=1.0-smoothstep(.28,1.0,abs(q.x));
+   color=mix(skyFace,skyEdge,.94);
+   alpha=glint*vWater.y*.9;
   }
  }
  // A slim cue at the actual collision surface preserves the ! / BOOST reading.
@@ -151,6 +170,11 @@ export class SkyPlatformSkin {
   this.#bodyData.opacity=breaking?(cloud?1-Math.max(0,(t-.22)/.78):1-Math.min(1,t*3)):1;
   this.body.scaling.set((this.#width+.35)/this.parent.scaling.x*(1+inflate*.22*motion),this.#bodyData.height*(1+inflate*.40*motion),1);
   this.body.position.y=this.height/2-(cloud ? .55 : Math.min(1.3,Math.max(.6,this.#bodyData.width*.32)));
+  // For splash shading, skyParams.xy is the local impact center; skyCue.w is age.
+  // Normal cloud / bubble body shader parameters remain unchanged.
+  this.#splashData.width=this.#contactX;
+  this.#splashData.height=this.height/2+.1;
+  this.#splashData.time=age;
   this.#splashData.opacity=active&&!cloud?this.#water.update(age,this.#force,this.#contactX,this.height/2+.1,this.#reduced):0;
   this.splash.setEnabled(this.#splashData.opacity>0);
   if(this.#splashData.opacity<=0)return;

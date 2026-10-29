@@ -1,26 +1,68 @@
-import { expect,it } from "vitest";
-import { WaterSplashGeometry,WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
-function center(positions:Float32Array,quad:number):{x:number;y:number}{
- let x=0,y=0;for(let i=0;i<4;i++){x+=positions[quad*12+i*3]??0;y+=positions[quad*12+i*3+1]??0;}return{x:x/4,y:y/4};
+import { expect, it } from "vitest";
+import { WaterSplashGeometry, WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+
+function visible(water: WaterSplashGeometry): number {
+ let count=0;
+ for(let i=1;i<water.waterData.length;i+=2) if(water.waterData[i]>0) count++;
+ return count;
 }
-it("sends shaped droplets out from the hit, lets gravity bring them down and keeps continuous water jets",()=>{
- const water=new WaterSplashGeometry(),positions=water.positions,attributes=water.waterData;
- water.update(.1,1,1.2,.25,false);const early=center(water.positions,0);
- water.update(.3,1,1.2,.25,false);const peak=center(water.positions,0);
- expect(peak.x).toBeLessThan(early.x);expect(peak.y).toBeGreaterThan(early.y);
- expect(Math.max(...water.positions.filter((_,i)=>i%3===1))).toBeGreaterThan(1.3);
- expect(water.waterData.some((shape,i)=>i%2===0&&shape===1&&(water.waterData[i+1]??0)>0)).toBe(true);
- water.update(.7,1,1.2,.25,false);expect(center(water.positions,0).y).toBeLessThan(peak.y);
- expect(water.positions).toBe(positions);expect(water.waterData).toBe(attributes);
+function range(water: WaterSplashGeometry, x: number, y: number): number {
+ let radius=0;
+ for(let slot=0;slot<water.waterData.length/8;slot++){
+  if((water.waterData[slot*8+1]??0)<=0)continue;
+  for(let vertex=0;vertex<4;vertex++){
+   const index=slot*12+vertex*3;
+   radius=Math.max(radius,Math.hypot((water.positions[index]??0)-x,(water.positions[index+1]??0)-y));
+  }
+ }
+ return radius;
+}
+it("expands a dense starburst quickly, opens up, then leaves separated drops",()=>{
+ const water=new WaterSplashGeometry();
+ const originalPositions=water.positions,originalData=water.waterData,originalUvs=water.uvs;
+ water.update(.025,1,1.2,.25,false);
+ const initial=range(water,1.2,.25);
+ expect(visible(water)).toBeGreaterThan(100);
+ water.update(.16,1,1.2,.25,false);
+ const peak=range(water,1.2,.25);
+ expect(peak).toBeGreaterThan(initial*2);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape===2&&(water.waterData[i+1]??0)>0)).toBe(true);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape===3&&(water.waterData[i+1]??0)>0)).toBe(true);
+ water.update(.45,1,1.2,.25,false);
+ expect(visible(water)).toBeLessThan(visibleAt(.16));
+ water.update(.7,1,1.2,.25,false);
+ expect(visible(water)).toBeGreaterThan(0);
+ expect(water.positions).toBe(originalPositions);
+ expect(water.waterData).toBe(originalData);
+ expect(water.uvs).toBe(originalUvs);
  expect(water.update(WATER_SPLASH_SECONDS,1,1.2,.25,false)).toBe(0);
  expect(water.waterData.every(value=>value===0)).toBe(true);
 });
-it("keeps reduced-motion splashes smaller and sparser and never exceeds its fixed batch",()=>{
- const water=new WaterSplashGeometry();water.update(.2,1,0,0,false);
- const fullRange=Math.max(...water.positions.filter((_,i)=>i%3===0));
- const fullVisible=water.waterData.filter((_,i)=>i%2===1).filter(alpha=>alpha>0).length;
- const length=water.positions.length;water.update(.2,1,0,0,true);
- expect(Math.max(...water.positions.filter((_,i)=>i%3===0))).toBeLessThan(fullRange*.6);
- expect(water.waterData.filter((_,i)=>i%2===1).filter(alpha=>alpha>0).length).toBeLessThan(fullVisible);
- expect(water.positions.length).toBe(length);
+function visibleAt(age:number):number{
+ const water=new WaterSplashGeometry();
+ water.update(age,1,1.2,.25,false);
+ return visible(water);
+}
+it("honors reduced motion with a much smaller and sparser splash",()=>{
+ const water=new WaterSplashGeometry();
+ water.update(.16,1,0,0,false);
+ const fullRange=range(water,0,0),fullVisible=visible(water);
+ const allocated=water.positions.length;
+ water.update(.16,1,0,0,true);
+ expect(range(water,0,0)).toBeLessThan(fullRange*.6);
+ expect(visible(water)).toBeLessThan(fullVisible*.4);
+ expect(water.positions.length).toBe(allocated);
+});
+it("reuses a fixed batch and safely clears invalid or expired frames",()=>{
+ const water=new WaterSplashGeometry();
+ const indices=water.indices.slice(),pos=water.positions,data=water.waterData;
+ for(const time of [.0,.08,.12,.24,.44,.65]){
+  expect(water.update(time,1,0,0,false)).toBeGreaterThan(0);
+  expect(water.positions).toBe(pos);expect(water.waterData).toBe(data);
+  expect(water.indices).toEqual(indices);
+ }
+ for(const time of [-1,Number.NaN,WATER_SPLASH_SECONDS]){
+  expect(water.update(time,1,0,0,false)).toBe(0);
+  expect(visible(water)).toBe(0);
+ }
 });
