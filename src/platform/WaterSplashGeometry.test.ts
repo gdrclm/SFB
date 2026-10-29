@@ -33,6 +33,24 @@ it("eases droplets and the connected sheet in and out without an opaque first fr
  expect(water.waterData[1]).toBeGreaterThan(0);expect(water.waterData[1]).toBeLessThan(.1);
  expect(sheetAlpha()).toBeGreaterThan(0);expect(sheetAlpha()).toBeLessThan(.1);
  water.update(.1,1,0,0,false,true);expect(sheetAlpha()).toBeCloseTo(1);
- water.update(.73,1,0,0,false,true);expect(sheetAlpha()).toBeLessThan(.01);
- water.update(.89,1,0,0,false,true);expect(water.waterData[1]).toBeLessThan(.01);
+ water.update(.73,1,0,0,false,true);expect(water.waterData[1]).toBe(0);
+ water.update(WATER_SPLASH_SECONDS,1,0,0,false,true);expect(sheetAlpha()).toBe(0);
+});
+it("hands the sheet to shrinking fragments and splits large drops along their existing path",()=>{
+ const water=new WaterSplashGeometry();
+ water.update(.29,1,0,0,false,true);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape>=3&&(water.waterData[i+1]??0)>0)).toBe(false);
+ water.update(.41,1,0,0,false,true);
+ // First child belongs to the first large drop, rather than a fresh burst at origin.
+ const parent=center(water.positions,0),child=center(water.positions,28);
+ expect(Math.hypot(parent.x-child.x,parent.y-child.y)).toBeLessThan(.02);
+ const fragment=Array.from(water.waterData).findIndex((shape,i)=>i%8===0&&shape>=3&&(water.waterData[i+1]??0)>.1)/8;
+ expect(fragment).toBeGreaterThan(0);
+ const width=(water.positions[fragment*12+3]??0)-(water.positions[fragment*12]??0);
+ const alpha=water.waterData[fragment*8+1]??0;
+ water.update(.90,1,0,0,false,true);
+ expect((water.positions[fragment*12+3]??0)-(water.positions[fragment*12]??0)).toBeLessThan(width*.4);
+ expect(water.waterData[fragment*8+1]).toBeLessThan(alpha);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape>=3&&(water.waterData[i+1]??0)>0)).toBe(true);
+ water.update(WATER_SPLASH_SECONDS,1,0,0,false,true);expect(water.waterData.every(x=>x===0)).toBe(true);
 });

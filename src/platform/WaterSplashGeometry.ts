@@ -1,11 +1,14 @@
-export const WATER_SPLASH_SECONDS = .9;
+export const WATER_SPLASH_SECONDS = 1.35;
+export const WATER_SHEET_COLUMNS = 10, WATER_SHEET_ROWS = 8;
 const DROPS = 12, JETS = 2, JET_SEGMENTS = 8;
-const QUADS = DROPS + JETS * JET_SEGMENTS + 1;
+const CHILDREN = DROPS*2, FRAGMENTS = WATER_SHEET_COLUMNS*WATER_SHEET_ROWS;
+const CHILD_START=DROPS+JETS*JET_SEGMENTS,FRAGMENT_START=CHILD_START+CHILDREN;
+const QUADS = FRAGMENT_START+FRAGMENTS+1;
 const clamp01 = (x:number):number => Math.max(0,Math.min(1,x));
 const smooth01 = (x:number):number => {const t=clamp01(x);return t*t*(3-2*t);};
 
-/** A broad illustrated liquid sheet with a small number of glossy ballistic
- * droplets. The connected sheet carries the silhouette, not thin radial rays. */
+/** Fixed batches carry a connected sheet into drifting water fragments, while
+ * the large ballistic drops split into smaller drops along the same trajectory. */
 export class WaterSplashGeometry {
  readonly positions = new Float32Array(QUADS*12);
  readonly waterData = new Float32Array(QUADS*8);
@@ -15,6 +18,12 @@ export class WaterSplashGeometry {
   for(let i=0;i<QUADS;i++){
    this.uvs.set([0,0,1,0,1,1,0,1],i*8);
    const n=i*4;this.indices.push(n,n+1,n+2,n,n+2,n+3);
+  }
+  for(let i=0;i<FRAGMENTS;i++){
+   const col=i%WATER_SHEET_COLUMNS,row=Math.floor(i/WATER_SHEET_COLUMNS);
+   const u=(col+.5)/WATER_SHEET_COLUMNS,v=(row+.5)/WATER_SHEET_ROWS;
+   const du=1.25/WATER_SHEET_COLUMNS,dv=1.25/WATER_SHEET_ROWS;
+   this.uvs.set([u-du,v-dv,u+du,v-dv,u+du,v+dv,u-du,v+dv],(FRAGMENT_START+i)*8);
   }
  }
  public update(age:number,force:number,contactX:number,groundY:number,reduced:boolean,centered=false):number{
@@ -35,7 +44,17 @@ export class WaterSplashGeometry {
    const speedY=vy-2*gravity*t,speed=Math.max(.01,Math.hypot(vx,speedY));
    const radius=(band>=4 ? .055+spread*.035 : .105+spread*.08)*(reduced ? .8 : 1);
    const length=radius*(1.3+Math.min(1.5,speed*.18));
-   this.#drop(i,x,y,radius,length,vx/speed,speedY/speed,smooth01(born/.065)*smooth01((.90-born)/.26));
+   const split=.40+band*.024,splitFade=smooth01((born-split)/.12);
+   this.#drop(i,x,y,radius*(1-splitFade*.65),length*(1-splitFade*.65),vx/speed,speedY/speed,smooth01(born/.065)*(1-splitFade));
+   if(born<split)continue;
+   for(let child=0;child<2;child++){
+    const dt=born-split,side=child===0?-1:1;
+    const dx=side*(.35+spread*.6)*motion,dy=(child===0?.45:-.25)*motion;
+    const fade=smooth01(dt/.12)*smooth01((.70+lift*.12-dt)/.30);
+    const shrink=1-smooth01(dt/.80)*.80;
+    this.#drop(CHILD_START+i*2+child,x+dx*dt,y+dy*dt,radius*.45*shrink,radius*.58*shrink,
+     vx/speed,speedY/speed,fade);
+   }
   }
   const jetFade=smooth01(age/.065)*smooth01((.38-age)/.20);
   for(let jet=0;jet<JETS;jet++){
@@ -63,8 +82,24 @@ export class WaterSplashGeometry {
   const anchorX=centered?.494:.5,anchorY=centered?.415:.185;
   const left=contactX-width*anchorX,right=contactX+width*(1-anchorX);
   const bottom=groundY-height*anchorY,top=groundY+height*(1-anchorY);
+  // Match the shader's cell schedule: each piece starts exactly where the
+  // connected sheet loses that cell, then drifts apart and shrinks into spray.
+  for(let i=0;i<FRAGMENTS;i++){
+   if(reduced&&i%4!==0)continue;
+   const col=i%WATER_SHEET_COLUMNS,row=Math.floor(i/WATER_SHEET_COLUMNS);
+   const seed=((col*7+row*13)%17)/16,start=.30+seed*.20,dt=age-start;
+   if(dt<0)continue;
+   const life=.65+seed*.20;if(dt>=life)continue;
+   const u=(col+.5)/WATER_SHEET_COLUMNS,v=(row+.5)/WATER_SHEET_ROWS;
+   const drift=Math.max(0,dt-.04),shrink=1-smooth01(dt/life)*.94;
+   const x=left+u*width+((u-.5)*2.2+(seed-.5)*.35)*drift*motion;
+   const y=bottom+v*height+((v-.4)*1.5+.5)*drift*motion-1.3*drift*drift*motion;
+   const halfWidth=width/WATER_SHEET_COLUMNS*1.25*shrink,halfHeight=height/WATER_SHEET_ROWS*1.25*shrink;
+   this.#quad(FRAGMENT_START+i,x-halfWidth,y-halfHeight,x+halfWidth,y-halfHeight,
+    x+halfWidth,y+halfHeight,x-halfWidth,y+halfHeight,3+i+smooth01(dt/life)*.49,smooth01(dt/.08)*smooth01((life-dt)/.30));
+  }
   this.#quad(QUADS-1,left,bottom,right,bottom,
-   right,top,left,top,2,smooth01(age/.10)*smooth01((.74-age)/.28));
+   right,top,left,top,2,smooth01(age/.10));
   return smooth01((WATER_SPLASH_SECONDS-age)/.25);
  }
  #drop(slot:number,x:number,y:number,halfWidth:number,halfLength:number,vx:number,vy:number,alpha:number):void{

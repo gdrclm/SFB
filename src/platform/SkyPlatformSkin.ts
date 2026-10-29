@@ -10,7 +10,7 @@ import type { ApproachState } from "./PlatformReadability";
 import type { SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { platformSpriteRow } from "./PlatformSpriteLayout";
 import { getPlatformCrystalBlend, getPlatformCrystalTint } from "./PlatformCrystalSkin";
-import { WaterSplashGeometry, WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+import { WaterSplashGeometry, WATER_SPLASH_SECONDS, WATER_SHEET_COLUMNS, WATER_SHEET_ROWS } from "./WaterSplashGeometry";
 
 // Soft icy colors for sky shapes; ordinary orange/red safety cues remain shared.
 const palettes = [
@@ -72,11 +72,39 @@ void main(){
    float bend=smoothstep(.20,.85,liquidUV.y)*sin(liquidUV.y*8.0+skyCue.w*10.0)*.018;
    liquidUV.x+=bend;
    vec4 liquid=texture2D(waterSheetSampler,liquidUV);
-   float breakup=smoothstep(.42,.74,skyCue.w);
-   float tear=sin(liquidUV.x*37.0+liquidUV.y*23.0)*.5+.5;
-   float tips=1.0-smoothstep(.55,1.05,liquidUV.y+breakup*.65+tear*breakup*.14);
+   // Jittered Voronoi regions let water separate into organic pieces instead
+   // of revealing the rectangular geometry used by the fixed particle batch.
+   vec2 grid=vec2(${String(WATER_SHEET_COLUMNS)}.0,${String(WATER_SHEET_ROWS)}.0),point=vUV*grid;
+   vec2 tile=floor(point),cell=tile,seedPoint=point;float nearest=100.0;
+   for(int cy=-1;cy<=1;cy++)for(int cx=-1;cx<=1;cx++){
+    vec2 candidate=tile+vec2(float(cx),float(cy));
+    if(candidate.x<0.0||candidate.y<0.0||candidate.x>=grid.x||candidate.y>=grid.y)continue;
+    vec2 jitter=(vec2(mod(candidate.x*3.0+candidate.y*5.0,11.0)/10.0,mod(candidate.x*5.0+candidate.y*3.0,13.0)/12.0)-.5)*.55;
+    float distance=length(point-candidate-.5-jitter);
+    if(distance<nearest){nearest=distance;cell=candidate;seedPoint=candidate+.5+jitter;}
+   }
+   float seed=mod(cell.x*7.0+cell.y*13.0,17.0)/16.0;
+   float handoff=.30+seed*.20;
+   float connected=vWater.x<2.5?1.0-smoothstep(handoff,handoff+.08,skyCue.w):1.0;
    color=liquid.rgb;
-   alpha=smoothstep(.04,.20,liquid.a)*vWater.y*mix(1.0,tips,breakup);
+   alpha=smoothstep(.04,.20,liquid.a)*vWater.y*connected;
+   if(vWater.x>2.5){
+    float id=floor(vWater.x-3.0),phase=fract(vWater.x-3.0)/.49;
+    vec2 owner=vec2(mod(id,grid.x),floor(id/grid.x));
+    float owned=1.0-step(.1,length(cell-owner));
+    float morph=smoothstep(.06,.45,phase);
+    float radius=mix(1.6,.38,smoothstep(0.0,.50,phase));
+    float bead=1.0-smoothstep(radius*.75,radius,nearest);
+    vec2 beadUV=(point-seedPoint)/radius;
+    vec3 beadColor=mix(vec3(.16,.65,.80),vec3(.72,.96,1.0),clamp(.65+beadUV.y*.20-beadUV.x*.35,0.0,1.0));
+    float glint=exp(-dot((beadUV-vec2(-.28,.32))*5.0,(beadUV-vec2(-.28,.32))*5.0));
+    beadColor=mix(beadColor,vec3(.96,1.0,1.0),glint);
+    float seedWater=smoothstep(.04,.20,texture2D(waterSheetSampler,seedPoint/grid).a);
+    color=mix(color,beadColor,morph);
+    alpha=mix(alpha,seedWater*bead*vWater.y,morph);
+    float inImage=step(0.0,vUV.x)*step(vUV.x,1.0)*step(0.0,vUV.y)*step(vUV.y,1.0);
+    alpha*=owned*bead*inImage;
+   }
   }else if(vWater.x<.5){
    float d=length((q-vec2(0.0,.25))/vec2(.72,.60));
    float head=1.0-smoothstep(.82,1.0,d);

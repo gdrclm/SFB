@@ -6,6 +6,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { SuccessfulHitEffects } from "./SuccessfulHitEffects";
+import { WATER_SPLASH_SECONDS } from "../platform/WaterSplashGeometry";
 
 describe("SuccessfulHitEffects", () => {
   it("starts platform, ball and camera reactions", () => {
@@ -66,10 +67,11 @@ describe("SuccessfulHitEffects", () => {
 it("lets water finish its arc before returning the already-broken platform to the pool",()=>{
  const engine=new NullEngine(),scene=new Scene(engine),camera=new FreeCamera("camera",new Vector3(0,0,-10),scene);
  const ball=MeshBuilder.CreateSphere("ball",{diameter:1},scene);
- const platform={renderBreak:vi.fn(),breakEffectSeconds:.9},complete=vi.fn();
+ const platform={renderBreak:vi.fn(),breakEffectSeconds:WATER_SPLASH_SECONDS},complete=vi.fn();
  const effects=new SuccessfulHitEffects(ball,camera,gameConfig);
  effects.playPlatformBreak(platform,complete);effects.fixedUpdate(.6);
- expect(complete).not.toHaveBeenCalled();expect(platform.renderBreak).toHaveBeenLastCalledWith(.6/.9);
- effects.fixedUpdate(.31);expect(complete).toHaveBeenCalledOnce();expect(platform.renderBreak).toHaveBeenLastCalledWith(1);
+ expect(complete).not.toHaveBeenCalled();expect(platform.renderBreak).toHaveBeenLastCalledWith(.6/WATER_SPLASH_SECONDS);
+ effects.fixedUpdate(.4);expect(complete).not.toHaveBeenCalled();
+ effects.fixedUpdate(WATER_SPLASH_SECONDS-1+.01);expect(complete).toHaveBeenCalledOnce();expect(platform.renderBreak).toHaveBeenLastCalledWith(1);
  effects.dispose();scene.dispose();engine.dispose();
 });

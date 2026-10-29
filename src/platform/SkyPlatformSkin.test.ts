@@ -5,6 +5,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { skyPlatformAppearance } from "./SkyPlatformAppearance";
+import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
 
 it("mixes islands, clouds and bubbles only among ordinary sky platforms",()=>{
  const appearances=Array.from({length:40},(_,i)=>skyPlatformAppearance("sky","standard",undefined,i));
@@ -39,7 +40,7 @@ it("sprays a bounded set of droplets from the actual contact and reuses their bu
  expect(Math.max(...positions.filter((_,i)=>i%3===1))).toBeGreaterThan(.6);
  for(let i=1;i<30;i++)skin.render("bubble",4,null,i/60,false);
  expect(scene.meshes.length).toBe(count);expect(skin.splash.getVertexBuffer(VertexBuffer.PositionKind)).toBe(buffer);
- skin.render("bubble",4,null,1,false);expect(skin.splash.isEnabled()).toBe(false);
+ skin.render("bubble",4,null,WATER_SPLASH_SECONDS,false);expect(skin.splash.isEnabled()).toBe(false);
  skin.reset();skin.render("cloud",3,null,2,true);expect(skin.splash.isEnabled()).toBe(false);
  scene.dispose();engine.dispose();
 });
@@ -51,7 +52,7 @@ it("keeps a broken bubble's water sheet centered on its shell, even on an off-ce
   parent.scaling.x=width/4;skin.reset();skin.render("bubble",width,null,0,false);
   skin.impact(0,1,width*.35);
   for(const age of [.02,.10,.20,.40]){
-   skin.renderBreak(age/.9);
+   skin.renderBreak(age/WATER_SPLASH_SECONDS);
    const positions=skin.splash.getVerticesData(VertexBuffer.PositionKind)??[];
    const sheet=Array.from(positions).slice(-12);
    // Check the illustrated water's visible mass, rather than the empty quad bounds.
@@ -62,9 +63,9 @@ it("keeps a broken bubble's water sheet centered on its shell, even on an off-ce
    expect(skin.splash.scaling.x*parent.scaling.x).toBeCloseTo(1);
   }
  }
- skin.renderBreak(.10/.9);
+ skin.renderBreak(.10/WATER_SPLASH_SECONDS);
  expect((skin.body.metadata as {sky:{opacity:number}}).sky.opacity).toBeGreaterThan(.7);
- skin.renderBreak(.24/.9);
+ skin.renderBreak(.24/WATER_SPLASH_SECONDS);
  expect((skin.body.metadata as {sky:{opacity:number}}).sky.opacity).toBeCloseTo(0);
  scene.dispose();engine.dispose();
 });
