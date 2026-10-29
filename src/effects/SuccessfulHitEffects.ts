@@ -10,6 +10,7 @@ interface PlatformBreakState {
   readonly platform: Pick<PlatformController, "renderBreak">;
   readonly onComplete: () => void;
   elapsedSeconds: number;
+  readonly durationSeconds: number;
 }
 
 function clamp01(value: number): number {
@@ -45,10 +46,10 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak"> & Partial<Pick<PlatformController, "playImpact">>, onComplete: () => void, force = 1): void {
+  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak"> & Partial<Pick<PlatformController, "playImpact" | "breakEffectSeconds">>, onComplete: () => void, force = 1): void {
     platform.playImpact?.(force,this.#ball.position.x);
     platform.renderBreak(0);
-    this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0 });
+    this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0, durationSeconds:platform.breakEffectSeconds??this.#config.platformEffectSeconds });
   }
 
   public playBallReaction(): void {
@@ -81,7 +82,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   #updatePlatformBreaks(realDeltaSeconds: number): void {
     for (const state of this.#platformBreaks) {
       state.elapsedSeconds += realDeltaSeconds;
-      const progress = clamp01(state.elapsedSeconds / this.#config.platformEffectSeconds);
+      const progress = clamp01(state.elapsedSeconds / state.durationSeconds);
       state.platform.renderBreak(progress);
       if (progress >= 1) {
         this.#platformBreaks.delete(state);

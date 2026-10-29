@@ -62,3 +62,14 @@ describe("SuccessfulHitEffects", () => {
     engine.dispose();
   });
 });
+
+it("lets water finish its arc before returning the already-broken platform to the pool",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),camera=new FreeCamera("camera",new Vector3(0,0,-10),scene);
+ const ball=MeshBuilder.CreateSphere("ball",{diameter:1},scene);
+ const platform={renderBreak:vi.fn(),breakEffectSeconds:.9},complete=vi.fn();
+ const effects=new SuccessfulHitEffects(ball,camera,gameConfig);
+ effects.playPlatformBreak(platform,complete);effects.fixedUpdate(.6);
+ expect(complete).not.toHaveBeenCalled();expect(platform.renderBreak).toHaveBeenLastCalledWith(.6/.9);
+ effects.fixedUpdate(.31);expect(complete).toHaveBeenCalledOnce();expect(platform.renderBreak).toHaveBeenLastCalledWith(1);
+ effects.dispose();scene.dispose();engine.dispose();
+});
