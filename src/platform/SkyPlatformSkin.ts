@@ -11,6 +11,7 @@ import type { SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { platformSpriteRow } from "./PlatformSpriteLayout";
 import { getPlatformCrystalBlend, getPlatformCrystalTint } from "./PlatformCrystalSkin";
 import { WaterSplashGeometry, WATER_SPLASH_SECONDS, WATER_SHEET_COLUMNS, WATER_SHEET_ROWS } from "./WaterSplashGeometry";
+import { CloudBurstGeometry, CLOUD_BURST_SECONDS, cloudSplitGap } from "./CloudBurstGeometry";
 
 // Soft icy colors for sky shapes; ordinary orange/red safety cues remain shared.
 const palettes = [
@@ -25,6 +26,7 @@ attribute vec3 position;attribute vec2 uv;attribute vec2 waterData;uniform mat4 
 void main(){vUV=uv;vWater=waterData;gl_Position=worldViewProjection*vec4(position,1.0);}`;
 const fragment=`precision highp float;
 varying vec2 vUV;varying vec2 vWater;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
+uniform vec4 skyCloud;
 uniform sampler2D waterSheetSampler;
 uniform vec3 skyShadow;uniform vec3 skyFace;uniform vec3 skyEdge;
 vec3 surfaceColor(float light){return mix(skyShadow,skyFace,clamp(light,0.0,1.0));}
@@ -40,15 +42,22 @@ void main(){
  vec2 p=(vUV-.5)*skyParams.xy;float style=skyParams.z;float opacity=skyParams.w;
  vec3 color;float alpha;
  if(style<.5){
-  float d=puff(p,skyParams.x*.86);
+  float age=max(0.0,skyCue.w),seam=skyCloud.y+sin(p.y*11.0+age*3.0)*.05;
+  float side=p.x<seam?-1.0:1.0;
+  vec2 cloudPoint=p;cloudPoint.x-=side*skyCloud.z;
+  float wave=exp(-pow((abs(cloudPoint.x-skyCloud.y)-age*9.0)/.42,2.0))*exp(-age*2.2)*skyCloud.w;
+  cloudPoint.y=(cloudPoint.y-wave*.08)/(1.0+wave*.30);
+  float d=puff(cloudPoint,skyCloud.x*.86);
   float edge=1.0-smoothstep(-.02,.065,d);
   float soft=exp(-max(d,0.0)*15.0)*.20;
-  float light=clamp(.65+p.y*.45-p.x/max(1.0,skyParams.x)*.12,0.0,1.0);
+  float light=clamp(.65+cloudPoint.y*.45-cloudPoint.x/max(1.0,skyCloud.x)*.12+wave*.10,0.0,1.0);
   color=surfaceColor(light);
   color=mix(color,mix(skyFace,skyEdge,.15),exp(-abs(d+.12)*8.0)*max(0.0,p.y+.2)*.55);
   color=mix(color,skyEdge,exp(-abs(d)*40.0)*.5);
   if(d>0.0)color=mix(skyFace,skyEdge,exp(-d*30.0));
   alpha=max(edge*.97,soft);
+  float splitEdge=smoothstep(-.035,.035,side*(cloudPoint.x-seam));
+  alpha*=mix(1.0,splitEdge,smoothstep(0.0,.06,skyCloud.z));
  }else if(style<1.5){
   vec2 q=p/vec2(skyParams.x*.43,min(1.3,max(.6,skyParams.x*.32)));float r=length(q);
   float inside=1.0-smoothstep(.97,1.015,r);
@@ -65,6 +74,16 @@ void main(){
   color=mix(color,skyEdge,clamp(shine+dotLight+rim*.95,0.0,1.0));
   if(r>1.0)color=mix(skyFace,skyEdge,exp(-(r-1.0)*20.0));
   alpha=max(inside*(.38+innerGlow*.30),max(rim*.98,max(outer,shine*.95+dotLight*.9)))+water*.12;
+ }else if(style>2.5){
+  vec2 q=(vUV-.5)*vec2(3.6,2.2);
+  float d=puff(q,2.8);
+  float edge=1.0-smoothstep(-.08,.12,d),haze=exp(-max(d,0.0)*12.0)*.14;
+  color=surfaceColor(clamp(.70+q.y*.25-q.x*.07,0.0,1.0));
+  float pillows=exp(-dot((q-vec2(-.35,.13))*vec2(2.8,3.7),(q-vec2(-.35,.13))*vec2(2.8,3.7)))
+   +exp(-dot((q-vec2(.40,.10))*vec2(3.4,4.0),(q-vec2(.40,.10))*vec2(3.4,4.0)));
+  color=mix(color,skyEdge,clamp(pillows*.25,0.0,.4));
+  color=mix(color,skyEdge,exp(-abs(d+.08)*14.0)*.25);
+  alpha=max(edge*.85,haze)*vWater.y;
  }else{
   vec2 q=(vUV-.5)*2.0;
   if(vWater.x>1.5){
@@ -123,7 +142,7 @@ void main(){
   }
  }
  // A slim cue at the actual collision surface preserves the ! / BOOST reading.
- if(style<1.5){float top=style<.5?.55:min(1.3,max(.6,skyParams.x*.32));float rim=exp(-abs(p.y-top)*70.0)*(1.0-smoothstep(skyParams.x*.36,skyParams.x*.42,abs(p.x)));color=mix(color,skyCue.rgb,rim*.8);alpha=max(alpha,rim*.7);}
+ if(style<1.5){float top=style<.5?.55:min(1.3,max(.6,skyParams.x*.32));float rim=exp(-abs(p.y-top)*70.0)*(1.0-smoothstep(skyParams.x*.36,skyParams.x*.42,abs(p.x)));if(style<.5)rim*=1.0-smoothstep(0.0,.12,skyCloud.z);color=mix(color,skyCue.rgb,rim*.8);alpha=max(alpha,rim*.7);}
  // Match PlatformCrystalSkin's grading equation after surface color and highlights.
  float crystalLum=dot(color,vec3(.2126,.7152,.0722));
  float crystalFacet=pow(clamp(crystalLum,0.0,1.0),.54);
@@ -131,7 +150,7 @@ void main(){
  color=mix(color,skyGrade.rgb*(crystalFacet*.85+crystalRim*.32)+color*.55,skyGrade.a);
  gl_FragColor=vec4(color,clamp(alpha*opacity,0.0,1.0));
 }`;
-interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number}
+interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number}
 const materials=new WeakMap<Scene,ShaderMaterial>();
 const sheetTextures=new WeakMap<Scene,Texture>();
 export function waterSplashTexture(scene:Scene):Texture{
@@ -144,7 +163,7 @@ export function waterSplashTexture(scene:Scene):Texture{
 export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  const cached=materials.get(scene);if(cached)return cached;
  const material=new ShaderMaterial("SkyPlatformMaterial",scene,{vertexSource:vertex,fragmentSource:fragment},{
-  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade"],needAlphaBlending:true,
+  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade","skyCloud"],needAlphaBlending:true,
   samplers:["waterSheetSampler"],
  });
  material.setTexture("waterSheetSampler",waterSplashTexture(scene));
@@ -153,6 +172,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
   const data=(mesh.metadata as {sky?:SkyUniforms}|null)?.sky;if(!data)return;
   const effect=material.getEffect();effect.setFloat4("skyParams",data.width,data.height,data.style,data.opacity);
   effect.setFloat4("skyCue",data.cue[0],data.cue[1],data.cue[2],data.time);
+  effect.setFloat4("skyCloud",data.cloudWidth??data.width,data.contactX??0,data.splitGap??0,data.waveForce??0);
   const palette=paletteForRow(data.row),tint=getPlatformCrystalTint(data.row);
   effect.setFloat3("skyShadow",palette[0][0],palette[0][1],palette[0][2]);
   effect.setFloat3("skyFace",palette[1][0],palette[1][1],palette[1][2]);
@@ -162,11 +182,14 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  materials.set(scene,material);material.onDisposeObservable.addOnce(()=>materials.delete(scene));return material;
 }
 
-/** Two meshes per used pool slot; one water illustration is shared by the scene. */
+/** Shared material, with a lazy fixed puff batch for slots that display clouds. */
 export class SkyPlatformSkin {
  public readonly body:Mesh;
  public readonly splash:Mesh;
  readonly #water=new WaterSplashGeometry();
+ readonly #cloud=new CloudBurstGeometry();
+ #mist:Mesh|null=null;
+ readonly #mistData:SkyUniforms={width:1,height:1,style:3,opacity:0,cue:palettes[0][2],time:0,row:0};
  readonly #bodyData:SkyUniforms={width:3,height:2.4,style:0,opacity:1,cue:palettes[0][2],time:0,row:0};
  readonly #splashData:SkyUniforms={width:1,height:1,style:2,opacity:0,cue:palettes[0][2],time:0,row:0};
  #appearance:SkyPlatformAppearance="cloud";
@@ -180,8 +203,9 @@ export class SkyPlatformSkin {
   this.body.metadata={sky:this.#bodyData};this.splash.metadata={sky:this.#splashData};
   for(const mesh of [this.body,this.splash]){mesh.parent=parent;mesh.material=prepareSkyPlatformSkin(scene);mesh.isPickable=false;mesh.position.z=-depth/2-.075;mesh.setEnabled(false);}
  }
+ public get cloudBurst():Mesh|null{return this.#mist;}
  public reset():void{this.#impactAt=-Infinity;this.#contactX=0;this.hide();}
- public hide():void{this.body.setEnabled(false);this.splash.setEnabled(false);}
+ public hide():void{this.body.setEnabled(false);this.splash.setEnabled(false);this.#mist?.setEnabled(false);}
  public impact(elapsed:number,force=1,contactX=0):void{this.#impactAt=elapsed;this.#force=Math.max(.7,Math.min(1.6,force));this.#contactX=Math.max(-this.#width/2,Math.min(this.#width/2,contactX));}
  public render(appearance:SkyPlatformAppearance,width:number,state:ApproachState|null,elapsed:number,reduced:boolean):void{
   this.#appearance=appearance;this.#width=width;this.#reduced=reduced;
@@ -193,17 +217,27 @@ export class SkyPlatformSkin {
   this.#bodyData.time=reduced?0:elapsed*2;
   this.#renderContact(Math.max(0,elapsed-this.#impactAt),false);
  }
- public renderBreak(progress:number):void{this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:.48),true);}
+ public renderBreak(progress:number):void{this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:CLOUD_BURST_SECONDS),true);}
  #renderContact(age:number,breaking:boolean):void{
-  const cloud=this.#appearance==="cloud",active=Number.isFinite(age)&&age<(cloud?.65:WATER_SPLASH_SECONDS);
-  const t=Math.min(1,age/.48),envelope=active?Math.sin(Math.min(1,age/.48)*Math.PI)*this.#force:0;
+  const cloud=this.#appearance==="cloud",active=Number.isFinite(age)&&age<(cloud?CLOUD_BURST_SECONDS:WATER_SPLASH_SECONDS);
+  const envelope=active?Math.sin(Math.min(1,age/.48)*Math.PI)*this.#force:0;
   const motion=this.#reduced ? .25 : 1;
   const inflate=cloud?envelope:envelope*.16;
+  const gap=cloud&&breaking?cloudSplitGap(age,this.#force,this.#reduced):0;
+  this.#bodyData.cloudWidth=this.#width+.35;
+  this.#bodyData.width=this.#width+.35+gap*2.5;
+  this.#bodyData.contactX=this.#contactX;this.#bodyData.splitGap=gap;
+  this.#bodyData.waveForce=cloud&&active?this.#force*motion:0;
+  if(cloud)this.#bodyData.time=active?age:0;
   this.body.setEnabled(true);
   const shellFade=Math.max(0,Math.min(1,(age-.04)/.20));
-  this.#bodyData.opacity=breaking?(cloud?1-Math.max(0,(t-.22)/.78):1-shellFade*shellFade*(3-2*shellFade)):1;
-  this.body.scaling.set((this.#width+.35)/this.parent.scaling.x*(1+inflate*.22*motion),this.#bodyData.height*(1+inflate*.40*motion),1);
+  const cloudFade=Math.max(0,Math.min(1,(age-.35)/.50));
+  this.#bodyData.opacity=breaking?(cloud?1-cloudFade*cloudFade*(3-2*cloudFade):1-shellFade*shellFade*(3-2*shellFade)):1;
+  const squash=cloud&&active?Math.sin(Math.min(1,age/.09)*Math.PI)*.10*motion:0;
+  this.body.scaling.set(this.#bodyData.width/this.parent.scaling.x*(1+inflate*.22*motion+squash*.6),this.#bodyData.height*(1+inflate*.40*motion-squash),1);
   this.body.position.y=this.height/2-(cloud ? .55 : Math.min(1.3,Math.max(.6,this.#bodyData.width*.32)));
+  if(cloud)this.#renderCloud(age,breaking&&active);
+  else this.#mist?.setEnabled(false);
   this.#splashData.opacity=active&&!cloud?this.#water.update(age,this.#force,
    breaking?0:this.#contactX,breaking?this.body.position.y:this.height/2+.1,this.#reduced,breaking):0;
   this.splash.setEnabled(this.#splashData.opacity>0);
@@ -212,5 +246,19 @@ export class SkyPlatformSkin {
   this.#splashData.time=age;
   this.splash.updateVerticesData(VertexBuffer.PositionKind,this.#water.positions);
   this.splash.updateVerticesData("waterData",this.#water.waterData);this.splash.refreshBoundingInfo();
+ }
+ #renderCloud(age:number,active:boolean):void{
+  if(!this.#mist){
+   this.#mist=new Mesh(`${this.parent.name}-cloud-puffs`,this.parent.getScene());
+   const data=new VertexData();data.positions=this.#cloud.positions;data.uvs=this.#cloud.uvs;data.indices=this.#cloud.indices;data.applyToMesh(this.#mist,true);
+   this.#mist.setVerticesData("waterData",this.#cloud.waterData,true,2);
+   this.#mist.metadata={sky:this.#mistData};this.#mist.material=this.body.material;
+   this.#mist.parent=this.parent;this.#mist.position.z=this.body.position.z-.005;this.#mist.isPickable=false;
+  }
+  this.#mist.setEnabled(active);if(!active)return;
+  this.#mistData.opacity=this.#cloud.update(age,this.#width,this.#contactX,this.body.position.y,this.#force,this.#reduced);
+  this.#mist.scaling.set(1/this.parent.scaling.x,1,1);
+  this.#mist.updateVerticesData(VertexBuffer.PositionKind,this.#cloud.positions);
+  this.#mist.updateVerticesData("waterData",this.#cloud.waterData);this.#mist.refreshBoundingInfo();
  }
 }

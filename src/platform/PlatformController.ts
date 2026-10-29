@@ -3,6 +3,7 @@ import type { PlatformMechanic } from "./PlatformMechanic";
 import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
 import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+import { CLOUD_BURST_SECONDS } from "./CloudBurstGeometry";
 import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { locationAtDepth } from "../progression/WorldProgression";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
@@ -79,7 +80,7 @@ export class PlatformController {
   public get motionCenterX(): number { return this.#motionStartX; }
   public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
   public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
-  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS:undefined; }
+  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:undefined; }
   public setMechanicAim(x: number, y: number): void { this.#machine?.aim(x,y); }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;

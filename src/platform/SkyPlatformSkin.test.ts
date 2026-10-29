@@ -6,6 +6,7 @@ import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { skyPlatformAppearance } from "./SkyPlatformAppearance";
 import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+import { CLOUD_BURST_SECONDS } from "./CloudBurstGeometry";
 
 it("mixes islands, clouds and bubbles only among ordinary sky platforms",()=>{
  const appearances=Array.from({length:40},(_,i)=>skyPlatformAppearance("sky","standard",undefined,i));
@@ -23,10 +24,30 @@ it("inflates a contacted cloud softly, fades on break and resets cleanly on pool
  expect(skin.body.scaling.x).toBeGreaterThan(width*1.15);expect(skin.body.scaling.y).toBeGreaterThan(height*1.3);
  expect(parent.scaling.x).toBe(.4);expect(skin.splash.isEnabled()).toBe(false);
  skin.render("cloud",3,null,1,false);expect(skin.body.scaling.x).toBeCloseTo(width);
- skin.renderBreak(.5);expect(skin.body.scaling.y).toBeGreaterThan(height);
+ skin.renderBreak(.18/CLOUD_BURST_SECONDS);expect(skin.body.scaling.y).toBeGreaterThan(height);
  skin.reset();expect(skin.body.isEnabled()).toBe(false);
  skin.render("bubble",2,"boost",2,false);expect(skin.splash.isEnabled()).toBe(false);
  expect((skin.body.metadata as {sky:{opacity:number;style:number}}).sky).toMatchObject({opacity:1,style:1});
+ scene.dispose();engine.dispose();
+});
+it("splits clouds around the hit, retains a fixed puff batch and clears it on reuse",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("cloud",scene);parent.scaling.x=.6;
+ const skin=new SkyPlatformSkin(parent,.3,1,scene);skin.render("cloud",4,null,0,false);
+ const mist=skin.cloudBurst,buffer=mist?.getVertexBuffer(VertexBuffer.PositionKind),count=scene.meshes.length;
+ skin.impact(0,1,.8);skin.renderBreak(.15/CLOUD_BURST_SECONDS);
+ const earlyWidth=skin.body.scaling.x;
+ expect((skin.body.metadata as {sky:{contactX:number}}).sky.contactX).toBe(.8);
+ skin.renderBreak(.40/CLOUD_BURST_SECONDS);
+ expect(skin.body.scaling.x).toBeGreaterThan(earlyWidth);
+ expect(mist?.isEnabled()).toBe(true);
+ expect(mist?.getVerticesData("waterData")?.some((value,i)=>i%2===1&&value>0)).toBe(true);
+ expect((mist?.scaling.x??0)*parent.scaling.x).toBeCloseTo(1);
+ for(let i=1;i<=75;i++)skin.renderBreak(i/75);
+ expect(scene.meshes.length).toBe(count);expect(mist?.getVertexBuffer(VertexBuffer.PositionKind)).toBe(buffer);
+ expect(mist?.isEnabled()).toBe(false);
+ skin.reset();skin.render("bubble",3,null,3,false);expect(mist?.isEnabled()).toBe(false);
+ skin.render("cloud",3,null,3,false);expect(mist?.isEnabled()).toBe(false);
+ expect((skin.body.metadata as {sky:{splitGap:number;waveForce:number}}).sky).toMatchObject({splitGap:0,waveForce:0});
  scene.dispose();engine.dispose();
 });
 it("sprays a bounded set of droplets from the actual contact and reuses their buffers",()=>{
