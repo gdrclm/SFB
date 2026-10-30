@@ -207,7 +207,7 @@ export class PlatformSprite {
   public renderCollapse(width:number,age:number):void{
     this.renderBreak(width,Math.min(1,age/.20));
     const p=Math.min(1,age/.12);this.mesh.visibility*=1-p;
-    this.mesh.position.y=-p*.6;this.mesh.scaling.y=1-p*.45;
+    this.mesh.position.y=-p*.6;
   }
 }
 

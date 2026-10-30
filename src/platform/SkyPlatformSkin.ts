@@ -245,8 +245,7 @@ export class SkyPlatformSkin {
   const shellFade=Math.max(0,Math.min(1,(age-.04)/.20));
   const cloudFade=Math.max(0,Math.min(1,(age-.35)/.50));
   this.#bodyData.opacity=breaking?(cloud?1-cloudFade*cloudFade*(3-2*cloudFade):1-shellFade*shellFade*(3-2*shellFade)):1;
-  const squash=cloud&&active?Math.sin(Math.min(1,age/.09)*Math.PI)*.10*motion:0;
-  this.body.scaling.set(this.#bodyData.width/this.parent.scaling.x*(1+inflate*.22*motion+squash*.6),this.#bodyData.height*(1+inflate*.40*motion-squash),1);
+  this.body.scaling.set(this.#bodyData.width/this.parent.scaling.x*(1+inflate*.22*motion),this.#bodyData.height*(1+inflate*.40*motion),1);
   this.body.position.y=this.height/2-(cloud ? .55 : Math.min(1.3,Math.max(.6,this.#bodyData.width*.32)));
   if(cloud)this.#renderCloud(age,breaking&&active);
   else this.#mist?.setEnabled(false);

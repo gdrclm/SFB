@@ -86,7 +86,7 @@ export class PlatformMechanicSkin {
     if(this.#kind==="turret"){this.#aim={x,y};this.part.rotation.z=-Math.atan2(x-this.parent.position.x,y-this.parent.position.y);}
   }
   public renderBreak(progress: number): void {
-    for(const mesh of [this.body,this.part]) {mesh.visibility=Math.max(0,1-progress);mesh.position.y=-progress*.7;mesh.scaling.y=1-progress*.5;}
+    for(const mesh of [this.body,this.part]) {mesh.visibility=Math.max(0,1-progress);mesh.position.y=-progress*.7;}
   }
   public hide(): void {this.body.setEnabled(false);this.part.setEnabled(false);}
 }

@@ -24,6 +24,7 @@ it("uses three distinct silhouettes, a rotating turbine, preserved contact cues 
   for(let i=0;i<100;i++)skin.render("wind-right",3,"breakable",i*.1,true);
   expect(skin.part.rotation.z).toBe(0);expect([scene.meshes.length,scene.materials.length]).toEqual(resources);
   skin.renderBreak(.5);expect(skin.body.visibility).toBe(.5);
+  expect(skin.body.scaling.y).toBe(1);expect(skin.part.scaling.y).toBe(1);
   skin.reset();expect(skin.body.isEnabled()).toBe(false);
   scene.dispose();engine.dispose();
 });
