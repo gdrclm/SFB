@@ -45,7 +45,8 @@ it("places the first impact frame at contact even before the next simulation upd
   const engine = new NullEngine(), scene = new Scene(engine);
   const ball = MeshBuilder.CreateSphere("ball", {}, scene); ball.position.set(20, -500, 0);
   const fx = new BallDynamicsFX(ball, 1); fx.trigger("break"); fx.trigger("coin");
-  expect(scene.getMeshByName("BallFXShard-0")?.position.y).toBeCloseTo(-500.8);
+  expect(scene.getTransformNodeByName("BallFXRoot")?.position.y).toBeCloseTo(-500);
+  expect(scene.getMeshByName("BallFXImpactFlash")?.visibility).toBeGreaterThan(0);
   expect(scene.getMeshByName("BallFXStar-0")?.position.y).toBeLessThan(-498);
   expect(scene.getMeshByName("BallFXStar-0")?.scaling.x).toBeLessThan(.2);
   fx.dispose(); scene.dispose(); engine.dispose();
@@ -66,13 +67,13 @@ it("keeps effects independent from squash and reuses bounded resources through r
   scene.dispose(); engine.dispose();
 });
 
-it("leaves break shards at contact while reward stars follow the falling character", () => {
+it("leaves platform fragments to the shared debris system while reward stars follow the falling character", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, 1);
   const motion = { speed: 10, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
   fx.trigger("break"); fx.trigger("coin"); fx.update(.02, motion);
   ball.position.y = -10; fx.update(.02, motion);
-  expect(scene.getMeshByName("BallFXShard-0")?.position.y).toBeGreaterThan(-3);
+  expect(scene.meshes.some(m=>m.name.startsWith("BallFXShard"))).toBe(false);
   expect(scene.getMeshByName("BallFXStar-0")?.position.y).toBeLessThan(-7);
   fx.update(1, motion);
   expect(scene.meshes.filter(m => /BallFX(Shard|Star)/.test(m.name)).every(m => m.visibility === 0)).toBe(true);
@@ -154,4 +155,16 @@ it("leaves fading comet particles in world space with bounded resources", () => 
   expect([scene.meshes.length, scene.materials.length]).toEqual(resources);
   fx.dispose(); expect(scene.meshes).toHaveLength(1);
   scene.dispose(); engine.dispose();
+});
+it("makes earned power denser and visibly distinct, then relaxes it without growing the effect pools",()=>{
+ const density=(power:boolean):{count:number;arc:number}=>{
+  const engine=new NullEngine(),scene=new Scene(engine),ball=MeshBuilder.CreateSphere("ball",{},scene),fx=new BallDynamicsFX(ball,.5);
+  const resources=[scene.meshes.length,scene.materials.length];
+  const motion={speed:80,look:0,boost:0,anticipating:false,slow:false,danger:false,power};
+  fx.update(.1,motion);
+  const result={count:scene.meshes.filter(m=>m.name.startsWith("BallFXEmber")&&m.visibility>0).length,arc:scene.getMeshByName("BallFXArc-0")?.visibility??0};
+  fx.update(1,{...motion,power:false});expect(scene.getMeshByName("BallFXArc-0")?.visibility).toBeLessThan(.001);
+  expect([scene.meshes.length,scene.materials.length]).toEqual(resources);fx.dispose();scene.dispose();engine.dispose();return result;
+ };
+ const normal=density(false),power=density(true);expect(power.count).toBeGreaterThan(normal.count);expect(power.arc).toBeGreaterThan(normal.arc);
 });

@@ -6,6 +6,7 @@ import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./PlatformIdle";
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
 import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
+import { PlatformImpactSkin } from "./PlatformImpactSkin";
 import { prepareMechanicSkin } from "./PlatformMechanicSkin";
 import { prepareSkyPlatformSkin, waterSplashTexture } from "./SkyPlatformSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -43,6 +44,7 @@ function atlasMaterial(scene: Scene, kind: AtlasKind = "debris"): StandardMateri
   texture.wrapU = texture.wrapV = Texture.CLAMP_ADDRESSMODE;
   material.diffuseTexture = texture;
   if (animated) new PlatformIdleBlend(material);
+  if(kind==="idle")new PlatformImpactSkin(material);
   new PlatformCrystalSkin(material);
   cache.set(scene, material);
   material.onDisposeObservable.addOnce(() => { cache.delete(scene); });
@@ -68,7 +70,7 @@ export function preparePlatformSprites(scene: Scene): void {
 /** Begin falling only after the collision surfaces have visible artwork. */
 export async function waitForPlatformSprites(scene: Scene): Promise<void> {
   await Promise.all([waitForTexture(atlasMaterial(scene, "idle").diffuseTexture),
-    waitForTexture(atlasMaterial(scene, "destroy").diffuseTexture),waitForTexture(waterSplashTexture(scene))]);
+    waitForTexture(atlasMaterial(scene, "destroy").diffuseTexture),waitForTexture(atlasMaterial(scene,"debris").diffuseTexture),waitForTexture(waterSplashTexture(scene))]);
 }
 
 async function waitForTexture(texture: StandardMaterial["diffuseTexture"]): Promise<void> {
@@ -126,8 +128,11 @@ export class PlatformSprite {
   #destroying = false;
   #impactAt = -Infinity;
   #impactForce = 1;
+  #bendBase:Float32Array|null=null;
+  #bendPositions:Float32Array|null=null;
+  #bendX=0;
   public impact(elapsed: number, force: number): void { this.#impactAt = elapsed; this.#impactForce = Math.max(.7, Math.min(1.8, force)); }
-  public resetImpact(): void { this.#rowChangedAt = -Infinity; this.#frame = -1; this.#impactAt = -Infinity; this.mesh.position.y = 0; this.mesh.rotation.z = 0; }
+  public resetImpact(): void { this.#rowChangedAt = -Infinity; this.#frame = -1; this.#impactAt = -Infinity; this.mesh.position.y = 0; this.mesh.rotation.z = 0;this.mesh.scaling.y=1;this.#bendBase=null;this.#bendPositions=null; }
   #updateImpact(elapsed: number): void {
     if (this.#impactAt === -Infinity) return;
     const t = Math.max(0, elapsed - this.#impactAt);
@@ -177,6 +182,32 @@ export class PlatformSprite {
     applySlices(this.mesh, platformSpriteSlices(width + .6, destroySpriteRect(this.#row, sample.frame)), top, top - 2.8, DESTROY_ATLAS_SIZE, rebuild);
     this.mesh.visibility = sample.opacity;
     this.mesh.metadata = { spriteAtlas: "neon-destroy", row: this.#row, ...sample, destroyFrames: 12 };
+  }
+
+  public startPress(width:number,elapsed:number,contactX:number):void{
+    this.render(width,this.#row,elapsed);
+    const rect=idleSpriteRect(this.#row,idleSample(elapsed,this.#phase).frame);
+    const strips=platformSpriteSlices(width+.6,rect).flatMap(slice=>Array.from({length:6},(_,i)=>({
+      left:slice.left+(slice.right-slice.left)*i/6,right:slice.left+(slice.right-slice.left)*(i+1)/6,
+      rect:{...slice.rect,x:slice.rect.x+slice.rect.width*i/6,width:slice.rect.width/6},
+    })));
+    const top=this.#height/2+.94;
+    applySlices(this.mesh,strips,top,top-2.4,IDLE_ATLAS_SIZE);
+    this.#bendBase=new Float32Array(this.mesh.getVerticesData(VertexBuffer.PositionKind)??[]);
+    this.#bendPositions=new Float32Array(this.#bendBase);this.#bendX=contactX;
+    Object.assign(this.mesh.metadata,{impactX:this.#parent.position.x+contactX,impactY:this.#parent.position.y+this.#height/2});
+  }
+  public renderPress(progress:number,force:number,hole:number):void{
+    const base=this.#bendBase,positions=this.#bendPositions;if(!base||!positions)return;
+    const amount=Math.max(0,Math.min(1,progress)),depth=amount*.32*force;
+    for(let i=0;i<base.length;i+=3){const x=base[i]??0;positions[i+1]=(base[i+1]??0)-Math.exp(-(((x-this.#bendX)/.7)**2))*depth;}
+    this.mesh.updateVerticesData(VertexBuffer.PositionKind,positions);
+    Object.assign(this.mesh.metadata,{impactCrack:amount,impactHole:hole});
+  }
+  public renderCollapse(width:number,age:number):void{
+    this.renderBreak(width,Math.min(1,age/.20));
+    const p=Math.min(1,age/.12);this.mesh.visibility*=1-p;
+    this.mesh.position.y=-p*.6;this.mesh.scaling.y=1-p*.45;
   }
 }
 

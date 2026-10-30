@@ -53,6 +53,15 @@ function advance(music: BackgroundMusic, seconds: number): void {
   for (let i = 0; i < Math.round(seconds * 10); i++) music.update(.1);
 }
 async function settle(): Promise<void> { await Promise.resolve(); await Promise.resolve(); }
+it("ducks both music tracks briefly without accumulating attenuation or resetting their transition",async()=>{
+ const {music,sky,crystal}=pair();await settle();music.setCrystalBlend(1);advance(music,2.5);
+ const before=crystal.volume;music.duck(.35);music.update(.016);
+ expect(crystal.volume).toBeLessThan(before);expect(crystal.volume).toBeGreaterThan(before*.55);
+ for(let i=0;i<12;i++){music.duck(.35);music.update(.016);}
+ expect(crystal.volume).toBeGreaterThan(.32*.65*.30);
+ music.setPaused(true);const frozen=crystal.volume;music.update(3);expect(crystal.volume).toBe(frozen);
+ music.setPaused(false);await settle();advance(music,2);expect(crystal.volume).toBeCloseTo(.32,3);expect(sky.volume).toBeCloseTo(0);
+});
 
 it("fades out sky for two seconds, then starts the crystal intro and fades it in", async () => {
   const { sky, crystal, music } = pair();

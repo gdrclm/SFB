@@ -1,4 +1,5 @@
 import { breakImpactProfile } from "../collision/BreakResistance";
+import { BreakFlow } from "../collision/BreakFlow";
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { HorizontalInput } from "../input/HorizontalInput";
@@ -27,6 +28,11 @@ function moveTowards(current: number, target: number, maxDelta: number): number 
 }
 
 export class BallController implements FixedSimulationSystem {
+ readonly #flow=new BreakFlow();
+ public get breakFlow():number{return this.#flow.reserve;}
+ public get powerBreakSeconds():number{return this.#flow.powerSeconds;}
+ public get perfectBreaks():number{return this.#flow.streak;}
+ public recordBreak(resistance:number):void{this.#flow.hit(resistance);}
   readonly #transform: BallTransform;
   readonly #input: HorizontalInput;
   readonly #config: GameConfig["ball"];
@@ -144,6 +150,7 @@ export class BallController implements FixedSimulationSystem {
     if (this.isBouncing || !Number.isFinite(contactY)) {
       return false;
     }
+    this.#flow.reset();
 
     this.#bounceLaunchSpeed = Math.max(6, Math.min(10, this.#bounceConfig.bounceSpeed * this.#config.movementScale * 2 + this.#fallSpeed * this.#config.movementScale * .24));
     this.#bounceContactY = contactY;
@@ -161,6 +168,7 @@ export class BallController implements FixedSimulationSystem {
     fixedDeltaSeconds: number,
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
+    this.#flow.update(realFixedDeltaSeconds);
     this.#copyCurrentPositionToPrevious();
     const previousDrift=this.#lateralDrift;
     const gustActive=this.#impulseRemaining>0;

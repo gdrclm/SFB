@@ -345,6 +345,13 @@ it("keeps both weak and near-limit breaks moving while retaining a readable resi
   expect(distance(.2)).toBeGreaterThan(distance(.98));
 });
 
+it("clears earned break flow on a real bounce while leaving fall speed and input under normal control",()=>{
+ const ball=new BallController(createTransform(),createInput(),gameConfig);ball.fallSpeed=80;
+ for(let i=0;i<6;i++){ball.recordBreak(.3);ball.fixedUpdate(.02);}
+ expect(ball.powerBreakSeconds).toBeGreaterThan(2.9);expect(ball.breakFlow).toBeGreaterThan(.9);
+ ball.startBounce(0);expect(ball.powerBreakSeconds).toBe(0);expect(ball.breakFlow).toBe(0);
+});
+
 it.each([10, 45, 80])("uses gesture strength for fast traversals and gentle corrections at %s fall speed", speed => {
   const distances: number[] = [];
   for (const effort of [0, .5, 1]) {

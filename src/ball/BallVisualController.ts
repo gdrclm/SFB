@@ -20,6 +20,8 @@ interface BallMotion {
   readonly verticalVelocity?: number;
   readonly isBouncing?: boolean;
   readonly impactCompression?: number;
+  readonly breakFlow?:number;
+  readonly powerBreakSeconds?:number;
 }
 
 function clamp01(value: number): number {
@@ -140,8 +142,8 @@ export class BallVisualController implements FixedSimulationSystem {
     // Contact still deforms the body while a higher-priority facial pose is held.
     if (event === "hurt" || event === "break") {
       this.#impactElapsed = 0; this.#impactKind = event;
-      this.#anchorContact(true);
-      const sy = event === "hurt" ? .56 : .66, cross = 1 / Math.sqrt(sy);
+      this.#anchorContact(event==="hurt");
+      const sy = event === "hurt" ? .56 : 1.10, cross = 1 / Math.sqrt(sy);
       this.#ball.scaling.set(this.#baseScale.x * cross, this.#baseScale.y * sy, this.#baseScale.z * cross);
     }
     if (!this.#expression.react(event)) return;
@@ -214,7 +216,8 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#fx.update(realDeltaSeconds, { speed: this.#motion.isBouncing ? 0 : this.#motion.fallSpeed, look,
       boost: this.#motion.isBouncing || this.#boostElapsedSeconds === null ? 0 : this.#boostStrength,
       anticipating: this.#boostElapsedSeconds !== null && this.#boostElapsedSeconds < .1,
-      slow: this.#slowActive || this.#expression.current === "slow", danger: this.#danger });
+      slow: this.#slowActive || this.#expression.current === "slow", danger: this.#danger,power:(this.#motion.powerBreakSeconds??0)>0 });
+    (this.#ball.metadata as {breakPower:boolean}).breakPower=(this.#motion.powerBreakSeconds??0)>0;
     this.#impactElapsed += realDeltaSeconds;
     const targetSpeedIntensity =
       1 -
@@ -248,11 +251,11 @@ export class BallVisualController implements FixedSimulationSystem {
     const airborne = this.#motion.isBouncing === true && (this.#motion.verticalVelocity ?? 0) > 0;
     const rebound = this.#impactElapsed >= .045 && this.#impactElapsed < .19
       ? Math.sin((this.#impactElapsed - .045) / .145 * Math.PI) * (this.#impactKind === "hurt" ? .35 : .6) : 0;
-    const targetVerticalScale = contact > 0 ? (this.#impactKind === "hurt" ? .56 : .66)
+    const targetVerticalScale = contact > 0 ? (this.#impactKind === "hurt" ? .56 : 1.12)
       : airborne ? 1 + Math.min(.35, (this.#motion.verticalVelocity ?? 0) * .045)
       : Math.max(.55, movementStretch + boostStretch + rebound + Math.abs(look) * .08
         + (activePose ? Math.sin(this.#activityAge) * activity.pulse : 0)) * (blinking ? .9 : 1);
-    this.#anchorContact(contact > 0);
+    this.#anchorContact(contact > 0&&this.#impactKind==="hurt");
     const scaleAmount = smoothFactor(this.#config.scaleSharpness, fixedDeltaSeconds);
     const verticalScale = lerp(this.#ball.scaling.y / this.#baseScale.y, targetVerticalScale, scaleAmount);
     // Preserve volume throughout interpolation, not only at the target poses.

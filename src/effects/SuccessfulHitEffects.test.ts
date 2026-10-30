@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { SuccessfulHitEffects } from "./SuccessfulHitEffects";
 import { WATER_SPLASH_SECONDS } from "../platform/WaterSplashGeometry";
+import {DEBRIS_POOL_SIZE} from "./DirectedDebris";
 
 describe("SuccessfulHitEffects", () => {
   it("starts platform, ball and camera reactions", () => {
@@ -58,7 +59,7 @@ describe("SuccessfulHitEffects", () => {
     expect(camera.position).toEqual(initialCameraPosition);
 
     effects.dispose();
-    expect(scene.meshes.length).toBe(meshCountBeforeBreak);
+    expect(scene.meshes.length).toBe(meshCountBeforeBreak-DEBRIS_POOL_SIZE);
     scene.dispose();
     engine.dispose();
   });

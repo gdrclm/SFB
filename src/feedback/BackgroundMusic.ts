@@ -1,7 +1,7 @@
 type MusicMedia = Pick<HTMLAudioElement, "play" | "pause" | "loop" | "volume" | "currentTime">;
 interface MusicTrack { media: MusicMedia; requested: boolean; playing: boolean; failed: boolean; generation: number }
 interface MusicTransition { entering: boolean; elapsed: number; sky: number; crystal: number; introStarted: boolean }
-export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused">;
+export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused"> & Partial<Pick<BackgroundMusic,"duck">>;
 
 /** Enter crystal with two seconds of fade-out, then two seconds of fade-in. */
 export class BackgroundMusic {
@@ -14,6 +14,11 @@ export class BackgroundMusic {
   #skyGain = 1;
   #crystalGain = 0;
   #transition: MusicTransition | null = null;
+  #duck=1;#duckTarget=1;#duckHold=0;
+  public duck(depth=.28):void{
+    if(!this.#canPlay())return;
+    this.#duckTarget=Math.min(this.#duckTarget,1-Math.max(0,Math.min(.45,depth)));this.#duckHold=.06;
+  }
 
   public constructor(media: MusicMedia, crystal?: MusicMedia) {
     this.#tracks = [media, ...(crystal === undefined ? [] : [crystal])].map(audio => {
@@ -43,6 +48,13 @@ export class BackgroundMusic {
   }
   public update(seconds: number): void {
     if (!this.#canPlay() || !Number.isFinite(seconds) || seconds <= 0) return;
+    const dt=Math.min(.1,seconds);
+    const target=this.#duckHold>0?this.#duckTarget:1;
+    this.#duckHold=Math.max(0,this.#duckHold-dt);
+    if(this.#duckHold===0)this.#duckTarget=1;
+    this.#duck+=(target-this.#duck)*(1-Math.exp(-dt*(target< this.#duck?65:12)));
+    if(Math.abs(this.#duck-1)<.001)this.#duck=1;
+    this.#volumes();
     const transition = this.#transition;
     if (transition === null) return;
     const destination = this.#tracks[transition.entering ? 1 : 0];
@@ -75,8 +87,8 @@ export class BackgroundMusic {
   #volumes(): void {
     const crystalAvailable = this.#tracks[1]?.playing === true;
     const sky = this.#tracks[0];
-    if (sky !== undefined) sky.media.volume = .32 * (crystalAvailable ? this.#skyGain : 1);
-    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = .32 * (crystalAvailable ? this.#crystalGain : 0);
+    if (sky !== undefined) sky.media.volume = .32 * (crystalAvailable ? this.#skyGain : 1)*this.#duck;
+    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = .32 * (crystalAvailable ? this.#crystalGain : 0)*this.#duck;
   }
 
   #apply(): void {

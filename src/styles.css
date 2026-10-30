@@ -2130,6 +2130,8 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 .platform-strength-label[data-approach="danger"] { color: #fff; border: 2px solid #ff5b67; background: #8c2438e6; }
 #interface-layer #speed-value[data-power="rising"] { color: #a1fff1; }
 #interface-layer #speed-value[data-power="high"] { color: #ffe899; text-shadow: 0 0 12px #fff1a455, 0 2px 4px #075484; }
+#interface-layer #speed-value[data-power="flow"] { color:#e5ffff; text-shadow:0 0 10px #00ddff,0 2px 4px #075484; }
+#speed-panel:has(#speed-value[data-power="flow"])::after { content:"ПРОБОЙ"; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%); padding:2px 7px; border-radius:8px; background:#063c59; color:#baffff; font-size:9px; font-weight:900; letter-spacing:.07em; }
 #challenge-notice { display: none; }
 @media (orientation: landscape) { #energy-reserve { left: 110px; right: 145px; width: min(200px, 35vw); margin: auto; } }
 @media (prefers-reduced-motion: reduce) { #energy-fill { transition: none; } }

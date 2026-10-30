@@ -17,7 +17,7 @@ interface Particle {
   mesh: Mesh; offset: Vector3; velocity: Vector3; age: number; life: number; follow: boolean; scale: number;
 }
 export interface BallFXMotion {
-  speed: number; look: number; boost: number; anticipating: boolean; slow: boolean; danger: boolean;
+  speed: number; look: number; boost: number; anticipating: boolean; slow: boolean; danger: boolean; power?:boolean;
 }
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 
@@ -67,7 +67,6 @@ export class BallDynamicsFX {
   readonly #dots: Mesh[] = [];
   readonly #drops: Mesh[] = [];
   readonly #stars: Particle[] = [];
-  readonly #shards: Particle[] = [];
   readonly #embers: Particle[] = [];
   #emberClock = 0;
   #emberCursor = 0;
@@ -79,9 +78,9 @@ export class BallDynamicsFX {
   #hurtAge = 1;
   #coinAge = 1;
   #starCursor = 0;
-  #shardCursor = 0;
   #arcAmount = 0;
   #windAmount = 0;
+  #powerMode=false;
 
   public constructor(ball: Mesh, radius: number, reducedMotion = false, baselineSpeed = 10) {
     this.#ball = ball; this.#radius = radius; this.#reduced = reducedMotion;
@@ -99,9 +98,6 @@ export class BallDynamicsFX {
     const blue = material("BallFXBlue", new Color3(.03, .28, 1));
     const white = material("BallFXWhite", new Color3(.85, .97, 1));
     const gold = material("BallFXGold", new Color3(1, .72, .12), false);
-    const crystal = material("BallFXCrystal", new Color3(.08, .65, 1), false);
-    crystal.disableLighting = false; crystal.diffuseColor.set(.04, .22, .45);
-    crystal.emissiveColor.scaleInPlace(.28); crystal.specularColor.set(.3, .7, 1); crystal.specularPower = 24;
     for (let i = 0; i < 4; i++) {
       const path = Array.from({ length: 41 }, (_, j) => {
         const a = j / 40 * Math.PI * (i >= 2 ? 1.9 : 1.3);
@@ -131,9 +127,7 @@ export class BallDynamicsFX {
     for (let i = 0; i < 12; i++) {
       const spark = star(`BallFXStar-${String(i)}`, scene); spark.material = i % 3 === 0 ? white : gold; spark.visibility = 0;
       this.#stars.push({ mesh: spark, offset: Vector3.Zero(), velocity: Vector3.Zero(), age: 1, life: .5, follow: true, scale: radius * .16 });
-      const shard = MeshBuilder.CreatePolyhedron(`BallFXShard-${String(i)}`, { type: 1, size: radius * .12 }, scene);
-      shard.material = crystal; shard.isPickable = false; shard.visibility = 0;
-      this.#shards.push({ mesh: shard, offset: Vector3.Zero(), velocity: Vector3.Zero(), age: 1, life: .5, follow: false, scale: 1 });
+
     }
     for (let i = 0; i < 24; i++) {
       const mesh = star(`BallFXEmber-${String(i)}`, scene);
@@ -153,7 +147,6 @@ export class BallDynamicsFX {
       this.#flash.scaling.set(this.#radius, this.#radius * .35, this.#radius);
     }
     if (event === "hurt" || event === "defeat") this.#hurtAge = 0;
-    if (event === "break") this.#emit(this.#shards, this.#reduced ? 3 : 8, false, .45);
     if (event === "coin" && this.#coinAge >= .14) { this.#coinAge = 0; this.#emit(this.#stars, this.#reduced ? 2 : 5, true, .45); }
     if (event === "combo" || event === "heal") this.#emit(this.#stars, this.#reduced ? 3 : 8, true, .65);
     if (event === "hurt" || event === "defeat") this.#emit(this.#stars, this.#reduced ? 2 : 4, true, .7);
@@ -162,7 +155,7 @@ export class BallDynamicsFX {
   #emit(pool: Particle[], count: number, follow: boolean, life: number): void {
     if (getRenderQuality(this.#ball.getScene().getEngine()) === "low") count = Math.min(count, 3);
     for (let i = 0; i < count; i++) {
-      const cursor = follow ? this.#starCursor++ : this.#shardCursor++;
+      const cursor = this.#starCursor++;
       const particle = pool[cursor % pool.length]; if (!particle) continue;
       const angle = i / count * Math.PI * 2 + this.#time * .8, r = this.#radius;
       particle.age = 0; particle.life = life; particle.follow = follow;
@@ -186,10 +179,11 @@ export class BallDynamicsFX {
     this.#root.rotation.copyFrom(this.#ball.rotation);
     const smooth = 1 - Math.exp(-16 * delta);
     const burst = motion.anticipating ? .15 : motion.boost;
-    const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);
+    this.#powerMode=motion.power===true&&!motion.slow&&motion.speed>0;
+    const speedPower = Math.min(1,speedVisualPower(motion.speed, this.#baselineSpeed)+(this.#powerMode?.22:0));
     this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || motion.speed <= 0, this.#reduced);
     this.#updateEmbers(delta, speedPower, motion.speed > 0 && !motion.slow, low);
-    const arcTarget = motion.slow ? .8 : Math.max(Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
+    const arcTarget = motion.slow ? .8 : Math.max(this.#powerMode?.40:0,Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;
     const windTarget = motion.slow ? 0 : Math.max(speedPower > 0 ? .18 + speedPower * .82 : 0, burst);
     this.#windAmount += (windTarget - this.#windAmount) * smooth;
@@ -227,7 +221,7 @@ export class BallDynamicsFX {
     const flash = clamp(this.#impactAge / .16);
     this.#flash.visibility = (1 - flash) * (this.#reduced ? .25 : .8);
     this.#flash.scaling.set(r * (1 + flash * 1.5), r * (.35 + flash * .35), r);
-    for (const pool of [this.#stars, this.#shards]) for (const p of pool) {
+    for (const p of this.#stars) {
       if (p.age >= p.life) { p.mesh.visibility = 0; continue; }
       p.age += delta; const progress = clamp(p.age / p.life);
       p.offset.addInPlaceFromFloats(p.velocity.x * delta, p.velocity.y * delta, p.velocity.z * delta);
@@ -242,7 +236,7 @@ export class BallDynamicsFX {
 
   #updateEmbers(seconds: number, power: number, emitting: boolean, low: boolean): void {
     const r = this.#radius;
-    const rate = this.#reduced ? 3 : low ? 9 + power * 7 : 12 + power * 20;
+    const rate = this.#reduced ? 3 : low ? 9 + power * 7 : (12 + power * 20)*(this.#powerMode?1.65:1);
     this.#emberClock = emitting ? this.#emberClock + Math.min(.1, seconds) * rate : 0;
     const world = this.#root.computeWorldMatrix(true);
     while (this.#emberClock >= 1) {
@@ -270,7 +264,7 @@ export class BallDynamicsFX {
   public dispose(): void {
     this.#comet.dispose();
     this.#root.dispose();
-    for (const pool of [this.#stars, this.#shards, this.#embers]) for (const p of pool) p.mesh.dispose();
+    for (const pool of [this.#stars, this.#embers]) for (const p of pool) p.mesh.dispose();
     for (const material of this.#materials) material.dispose();
   }
 }

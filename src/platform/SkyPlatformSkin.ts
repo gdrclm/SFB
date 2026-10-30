@@ -27,6 +27,7 @@ void main(){vUV=uv;vWater=waterData;gl_Position=worldViewProjection*vec4(positio
 const fragment=`precision highp float;
 varying vec2 vUV;varying vec2 vWater;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
 uniform vec4 skyCloud;
+uniform vec2 skyPress;
 uniform sampler2D waterSheetSampler;
 uniform vec3 skyShadow;uniform vec3 skyFace;uniform vec3 skyEdge;
 vec3 surfaceColor(float light){return mix(skyShadow,skyFace,clamp(light,0.0,1.0));}
@@ -59,7 +60,9 @@ void main(){
   float splitEdge=smoothstep(-.035,.035,side*(cloudPoint.x-seam));
   alpha*=mix(1.0,splitEdge,smoothstep(0.0,.06,skyCloud.z));
  }else if(style<1.5){
-  vec2 q=p/vec2(skyParams.x*.43,min(1.3,max(.6,skyParams.x*.32)));float r=length(q);
+  vec2 liquidPoint=p;
+  liquidPoint.y+=skyPress.y*exp(-pow((p.x-skyPress.x)/.6,2.0))*smoothstep(-.2,.7,p.y);
+  vec2 q=liquidPoint/vec2(skyParams.x*.43,min(1.3,max(.6,skyParams.x*.32)));float r=length(q);
   float inside=1.0-smoothstep(.97,1.015,r);
   float rim=exp(-abs(r-.97)*45.0);
   float outer=exp(-abs(r-.99)*12.0)*.32;
@@ -142,7 +145,7 @@ void main(){
   }
  }
  // A slim cue at the actual collision surface preserves the ! / BOOST reading.
- if(style<1.5){float top=style<.5?.55:min(1.3,max(.6,skyParams.x*.32));float rim=exp(-abs(p.y-top)*70.0)*(1.0-smoothstep(skyParams.x*.36,skyParams.x*.42,abs(p.x)));if(style<.5)rim*=1.0-smoothstep(0.0,.12,skyCloud.z);color=mix(color,skyCue.rgb,rim*.8);alpha=max(alpha,rim*.7);}
+ if(style<1.5){float top=style<.5?.55:min(1.3,max(.6,skyParams.x*.32));float cueY=p.y;if(style>.5)cueY+=skyPress.y*exp(-pow((p.x-skyPress.x)/.6,2.0))*smoothstep(-.2,.7,p.y);float rim=exp(-abs(cueY-top)*70.0)*(1.0-smoothstep(skyParams.x*.36,skyParams.x*.42,abs(p.x)));if(style<.5)rim*=1.0-smoothstep(0.0,.12,skyCloud.z);color=mix(color,skyCue.rgb,rim*.8);alpha=max(alpha,rim*.7);}
  // Match PlatformCrystalSkin's grading equation after surface color and highlights.
  float crystalLum=dot(color,vec3(.2126,.7152,.0722));
  float crystalFacet=pow(clamp(crystalLum,0.0,1.0),.54);
@@ -150,7 +153,7 @@ void main(){
  color=mix(color,skyGrade.rgb*(crystalFacet*.85+crystalRim*.32)+color*.55,skyGrade.a);
  gl_FragColor=vec4(color,clamp(alpha*opacity,0.0,1.0));
 }`;
-interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number}
+interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number;pressX?:number;pressDepth?:number}
 const materials=new WeakMap<Scene,ShaderMaterial>();
 const sheetTextures=new WeakMap<Scene,Texture>();
 export function waterSplashTexture(scene:Scene):Texture{
@@ -163,7 +166,7 @@ export function waterSplashTexture(scene:Scene):Texture{
 export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  const cached=materials.get(scene);if(cached)return cached;
  const material=new ShaderMaterial("SkyPlatformMaterial",scene,{vertexSource:vertex,fragmentSource:fragment},{
-  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade","skyCloud"],needAlphaBlending:true,
+  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade","skyCloud","skyPress"],needAlphaBlending:true,
   samplers:["waterSheetSampler"],
  });
  material.setTexture("waterSheetSampler",waterSplashTexture(scene));
@@ -173,6 +176,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
   const effect=material.getEffect();effect.setFloat4("skyParams",data.width,data.height,data.style,data.opacity);
   effect.setFloat4("skyCue",data.cue[0],data.cue[1],data.cue[2],data.time);
   effect.setFloat4("skyCloud",data.cloudWidth??data.width,data.contactX??0,data.splitGap??0,data.waveForce??0);
+  effect.setFloat2("skyPress",data.pressX??0,data.pressDepth??0);
   const palette=paletteForRow(data.row),tint=getPlatformCrystalTint(data.row);
   effect.setFloat3("skyShadow",palette[0][0],palette[0][1],palette[0][2]);
   effect.setFloat3("skyFace",palette[1][0],palette[1][1],palette[1][2]);
@@ -208,6 +212,7 @@ export class SkyPlatformSkin {
  public hide():void{this.body.setEnabled(false);this.splash.setEnabled(false);this.#mist?.setEnabled(false);}
  public impact(elapsed:number,force=1,contactX=0):void{this.#impactAt=elapsed;this.#force=Math.max(.7,Math.min(1.6,force));this.#contactX=Math.max(-this.#width/2,Math.min(this.#width/2,contactX));}
  public render(appearance:SkyPlatformAppearance,width:number,state:ApproachState|null,elapsed:number,reduced:boolean):void{
+  this.#bodyData.pressDepth=0;
   this.#appearance=appearance;this.#width=width;this.#reduced=reduced;
   this.#bodyData.width=width+.35;this.#bodyData.style=appearance==="cloud"?0:1;
   this.#bodyData.height=appearance==="cloud"?2.4:Math.max(2.4,Math.min(4,(width+.35)*.9));
@@ -217,7 +222,14 @@ export class SkyPlatformSkin {
   this.#bodyData.time=reduced?0:elapsed*2;
   this.#renderContact(Math.max(0,elapsed-this.#impactAt),false);
  }
- public renderBreak(progress:number):void{this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:CLOUD_BURST_SECONDS),true);}
+ public renderPress(progress:number,contactX:number):void{
+  this.#bodyData.pressX=contactX;this.#bodyData.pressDepth=Math.max(0,Math.min(1,progress))*.40;
+  this.#renderContact(0,false);
+ }
+ public renderBreak(progress:number,pressDepth=0,contactX=0):void{
+  this.#bodyData.pressDepth=pressDepth;this.#bodyData.pressX=contactX;
+  this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:CLOUD_BURST_SECONDS),true);
+ }
  #renderContact(age:number,breaking:boolean):void{
   const cloud=this.#appearance==="cloud",active=Number.isFinite(age)&&age<(cloud?CLOUD_BURST_SECONDS:WATER_SPLASH_SECONDS);
   const envelope=active?Math.sin(Math.min(1,age/.48)*Math.PI)*this.#force:0;

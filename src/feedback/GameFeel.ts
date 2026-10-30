@@ -2,6 +2,7 @@ import { getRenderQuality } from "../rendering/AdaptiveQuality";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { getGameSounds } from "./GameSounds";
+import type { BreakMaterial } from "./GameSounds";
 
 export class GameFeel {
   readonly #scene: Scene;
@@ -90,17 +91,18 @@ export class GameFeel {
     ], 320);
     this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 300, false);
   }
-  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean): void {
-    getGameSounds().play("break", heavy ? 1.5 : 1);
+  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean,speed=10,material:BreakMaterial="stone",power=false): boolean {
+    const audible=getGameSounds().playBreak(material,speed,heavy?1.3:1,power);
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
-      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
-    if (this.#reduced || getRenderQuality(this.#scene.getEngine()) === "low") return;
+      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : power?"4":heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
+    if (this.#reduced || getRenderQuality(this.#scene.getEngine()) === "low") return audible;
     for (let i = 0; i < (heavy ? 5 : 3); i++) {
       const angle = i * 2.4;
       this.#particle(point, "spark", [{ opacity: 1, transform: "scale(1)" },
         { opacity: 0, transform: `translate(${String(Math.cos(angle) * 65)}px, ${String(Math.sin(angle) * 40)}px) rotate(130deg) scale(.2)` }], 230);
     }
+    return audible;
   }
   public setPaused(paused: boolean): void {
     if (this.#paused === paused) return;

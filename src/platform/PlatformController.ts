@@ -4,6 +4,7 @@ import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
 import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
 import { CLOUD_BURST_SECONDS } from "./CloudBurstGeometry";
+import { materialBreakTiming } from "../collision/BreakFlow";
 import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { locationAtDepth } from "../progression/WorldProgression";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
@@ -58,6 +59,7 @@ export class PlatformController {
   #machine: PlatformMechanicSkin | null = null;
   #sky: SkyPlatformSkin | null = null;
   #appearance: SkyPlatformAppearance | undefined;
+  #materialBreak=false;#pressSeconds=0;#ruptureSeconds=0;#breakContactX=0;#materialForce=1;
   readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
@@ -80,7 +82,15 @@ export class PlatformController {
   public get motionCenterX(): number { return this.#motionStartX; }
   public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
   public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
-  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:undefined; }
+  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
+  public get breakDelaySeconds():number{return this.#ruptureSeconds;}
+  public prepareMaterialBreak(speed:number,contactX:number,power=false):void{
+    if(this.#mechanic||this.#appearance==="cloud")return;
+    const timing=materialBreakTiming(speed,this.#strength);
+    this.#materialBreak=true;this.#pressSeconds=timing.press*(power?.7:1);this.#ruptureSeconds=timing.rupture*(power?.8:1);this.#materialForce=power?1.3:1;
+    this.#breakContactX=Math.max(-this.width/2,Math.min(this.width/2,contactX-this.mesh.position.x));
+    if(!this.#appearance)this.#sprite.startPress(this.width,this.#elapsed,this.#breakContactX);
+  }
   public setMechanicAim(x: number, y: number): void { this.#machine?.aim(x,y); }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;
@@ -143,6 +153,17 @@ export class PlatformController {
   }
 
   public renderBreak(progress: number): void {
+    if(this.#materialBreak){
+      const age=Math.max(0,progress)*(this.breakEffectSeconds??.48);
+      if(age<this.#ruptureSeconds){
+        const press=Math.min(1,age/this.#pressSeconds),hole=Math.min(1,Math.max(0,(age-this.#pressSeconds)/.018));
+        if(this.#appearance==="bubble")this.#sky?.renderPress(press,this.#breakContactX);
+        else this.#sprite.renderPress(press,this.#materialForce,hole);
+      }else if(this.#appearance==="bubble")this.#sky?.renderBreak((age-this.#ruptureSeconds)/WATER_SPLASH_SECONDS,
+        Math.max(0,1-(age-this.#ruptureSeconds)/.12)*.40,this.#breakContactX);
+      else this.#sprite.renderCollapse(this.width,age-this.#ruptureSeconds);
+      return;
+    }
     this.#sprite.renderBreak(this.width, progress);
     if(this.#mechanic)this.#machine?.renderBreak(progress);
     if(this.#appearance)this.#sky?.renderBreak(progress);
@@ -176,6 +197,7 @@ export class PlatformController {
     this.#body?.dispose(); this.#shape?.dispose(); this.#body = null; this.#shape = null;
   }
   #applyActivationProperties(properties: PlatformActivationProperties): void {
+    this.#materialBreak=false;this.#pressSeconds=0;this.#ruptureSeconds=0;
     this.#mechanic = properties.mechanic;
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";

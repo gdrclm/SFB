@@ -51,7 +51,7 @@ describe("SuccessfulPlatformHitHandler", () => {
     expect(ball.fallSpeed).toBeCloseTo(9.902);
     expect(beginRelease).toHaveBeenCalledWith(platform);
     expect(completeRelease).toHaveBeenCalledWith(platform);
-    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7);
+    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7,10,false);
     expect(feedback.playBallReaction).toHaveBeenCalledOnce();
     expect(feedback.playCameraReaction).toHaveBeenCalledWith(10 / 7);
   });
@@ -91,6 +91,13 @@ it("plasma breaks an otherwise impossible platform without impact braking or spe
   expect(handler.handle({ platform, ballSpeed: 180, assessment: "insufficient" }, true)).toBe(true);
   expect(pool.completeRelease).toHaveBeenCalledWith(platform);
   expect(ball.fallSpeed).toBe(180); expect(ball.startBreakImpact).not.toHaveBeenCalled();
+});
+it("keeps earned break power distinct from immunity and refuses an insufficient-speed platform",()=>{
+ const ball={fallSpeed:20,breakFlow:1,powerBreakSeconds:3};
+ const platform={isActive:true,strength:100} as PlatformController,pool={beginRelease:vi.fn(()=>true),completeRelease:vi.fn(()=>true)};
+ const feedback=createFeedback(),handler=new SuccessfulPlatformHitHandler(ball,pool,feedback.feedback,gameConfig);
+ expect(handler.handle({platform,ballSpeed:20,assessment:"insufficient"})).toBe(false);
+ expect(pool.beginRelease).not.toHaveBeenCalled();expect(ball.fallSpeed).toBe(20);
 });
 
 

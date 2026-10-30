@@ -916,7 +916,7 @@ export class GameApplication {
         && Math.abs(platform.mesh.position.y - this.#ballController.position.y) < 12 && effects < 3
         && pool.beginRelease(platform)) {
         effects += 1;
-        this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6);
+        this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6,this.#ballController.fallSpeed);
       } else pool.release(platform);
     }
   }
@@ -931,7 +931,10 @@ export class GameApplication {
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
       this.#ballVisualController?.react("break");
-      this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
+      const power=this.#ballController.powerBreakSeconds>0;
+      const audible=this.#feel?.breakAt(collision.contact??this.#ballController.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75,
+        collision.ballSpeed,collision.platform.appearance??"stone",power);
+      if(audible)this.#actions.music.duck?.(power?.40:.26);
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       // Invulnerable hits destroy scenery but do not masquerade as skill hits or recharge BOOST.
@@ -1438,7 +1441,7 @@ export class GameApplication {
     this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
     this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
     this.#comboView?.render(this.#combo);
-    this.#speedValueElement.dataset.power = ball.fallSpeed >= 30 ? "high" : ball.fallSpeed >= 18 ? "rising" : "base";
+    this.#speedValueElement.dataset.power = ball.powerBreakSeconds>0?"flow":ball.fallSpeed >= 30 ? "high" : ball.fallSpeed >= 18 ? "rising" : "base";
     this.#comboView?.setPaused(paused);
     const phase = this.#phaseOneController;
     if (phase !== null) {

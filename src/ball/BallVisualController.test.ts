@@ -84,7 +84,8 @@ describe("BallVisualController", () => {
     for (const fixture of [contact, free]) { fixture.controller.playBoostReaction(boost); updateFor(fixture.controller, .1); }
     contact.controller.react("break");
     for (const fixture of [contact, free]) updateFor(fixture.controller, .06);
-    expect(contact.ball.scaling.y).toBeLessThan(free.ball.scaling.y);
+    expect(contact.ball.scaling.y).toBeGreaterThan(free.ball.scaling.y);
+    expect(contact.ball.scaling.x*contact.ball.scaling.y*contact.ball.scaling.z).toBeCloseTo(1,8);
     expect(contact.ball.metadata).toMatchObject({ expression: "boost" });
     for (const fixture of [contact, free]) { fixture.controller.dispose(); fixture.scene.dispose(); fixture.engine.dispose(); }
   });
