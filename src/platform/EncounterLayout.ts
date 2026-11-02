@@ -56,6 +56,18 @@ export interface EncounterLayout {
   readonly islands: readonly Readonly<{ x: number; width: number; depthFraction: number }>[];
 }
 
+/** Two shuttles move together, so the narrow shortcut itself travels sideways.
+ * Its permanent intersection is smaller than the ball; the outside route stays
+ * open over the entire swept volume for players who choose the longer bypass. */
+export function createMovingGapLayout(halfWidth:number,radius:number,amplitude:number,previousX:number,variant:number):EncounterLayout{
+ const gap=Math.max(radius*2+1.2,2.2);
+ const side=Math.abs(previousX)>.2?Math.sign(previousX):variant%2===0?1:-1;
+ const bypass=Math.max(radius*2+.8,1.8);
+ const ledge=Math.max(.8,Math.min(1,halfWidth-.2-bypass-gap/2-amplitude));
+ return{passage:{x:side*(halfWidth-.2-bypass/2),width:bypass},rhythm:1.2,
+  islands:[{x:-(gap+ledge)/2,width:ledge,depthFraction:0},{x:(gap+ledge)/2,width:ledge,depthFraction:0}]};
+}
+
 /** A clear flight corridor through separate islands, never a full-width tiled wall. */
 export function createEncounterLayout(
   theme: PlatformEncounterTheme, step: number, variant: number, count: number,

@@ -24,6 +24,9 @@ export function worldProgression(depth: number): WorldProgression {
   const location = locationAtDepth(safeDepth);
   const [development, climax] = phases[location];
   const phase = safeDepth >= climax ? "climax" : safeDepth >= development ? "development" : "introduction";
+  return worldProgressionForPhase(location,phase);
+}
+export function worldProgressionForPhase(location:DepthLocation,phase:WorldPhase):WorldProgression{
   const tuning = phase === "introduction"
     ? { passageExtra: .65, routeScale: .65, spacingScale: 1.2, staggerScale: .65, safeStrengthRatio: .65 }
     : phase === "development"

@@ -18,6 +18,17 @@ it("increases physical challenge frequency during a long run without removing re
   expect(events.slice(3, 6)).toEqual([150, 180, 210]);
   expect(events.slice(6)).toEqual([235, 260]);
 });
+it("waits for both passed sequences and a time floor, then requests one challenge without accumulated timer debt",()=>{
+ let passed=0;const start=vi.fn<(challenge:Challenge)=>void>();
+ const director=new ChallengeDirector(start,()=>0,undefined,()=>passed);
+ director.fixedUpdate(100);expect(start).not.toHaveBeenCalled();
+ passed=2;director.fixedUpdate(.01);expect(start).toHaveBeenCalledTimes(1);
+ passed=20;director.fixedUpdate(.01);expect(start).toHaveBeenCalledTimes(1);
+ director.fixedUpdate(11.99);expect(start).toHaveBeenCalledTimes(2);
+ director.fixedUpdate(100);expect(start).toHaveBeenCalledTimes(2);
+ passed=0;director.fixedUpdate(1);passed=2;director.fixedUpdate(10);expect(start).toHaveBeenCalledTimes(2);
+ director.fixedUpdate(1);expect(start).toHaveBeenCalledTimes(3);
+});
 
 it("keeps world introductions gentle even late in a run and allows the complex challenges later", async () => {
   const { worldProgression } = await import("../progression/WorldProgression");

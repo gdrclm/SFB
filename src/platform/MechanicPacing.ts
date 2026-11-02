@@ -5,7 +5,7 @@ interface PacingBall { readonly position: {x:number;y:number}; readonly fallSpee
  * resetting earned speed. This changes descent only; steering and trap clocks run normally. */
 export class MechanicPacing {
   readonly #seen=new Set<string>();
-  #active:{platform:MechanicPlatform;activation:number;age:number}|null=null;
+  #active:{platform:MechanicPlatform;activation:number;age:number;readSeconds:number;volleyId?:string}|null=null;
   #scale=1;
   public get scale():number{return this.#scale;}
   public constructor(private readonly ball:PacingBall,private readonly platforms:()=>readonly MechanicPlatform[],
@@ -17,19 +17,28 @@ export class MechanicPacing {
     const active=this.#active;
     if(active) {
       active.age+=dt;
-      if(!active.platform.isActive||active.platform.activationId!==active.activation||active.platform.mesh.position.y>=this.ball.position.y+.5||active.age>6)this.#active=null;
+      const finished=active.volleyId!==undefined
+        ?!this.platforms().some(p=>p.isActive&&p.turretVolley?.id===active.volleyId&&p.mesh.position.y<this.ball.position.y+.5)
+        :!active.platform.isActive||active.platform.activationId!==active.activation||active.platform.mesh.position.y>=this.ball.position.y+.5;
+      if(finished||active.age>6)this.#active=null;
     }
     if(!this.#active) {
       const candidate=this.platforms().filter(p=>{
-        const key=p.mechanic?.startsWith("wind")?"wind":p.mechanic;
+        const key=p.turretVolley?`volley:${p.turretVolley.id.split("/cell:")[0]??p.turretVolley.id}`:p.encounterOverlay==="moving-gap"?"moving-gap":p.mechanic?.startsWith("wind")?"wind":p.mechanic;
         const gap=this.ball.position.y-p.mesh.position.y;
-        return p.isActive&&key&&!this.#seen.has(key)&&gap>0&&gap<below*1.5
+        return p.isActive&&(!p.turretVolley||p.turretVolley.index===0)&&key&&!this.#seen.has(key)&&gap>0&&gap<below*1.5
           &&Math.abs(p.mesh.position.x-this.ball.position.x)<p.width/2+4;
       }).sort((a,b)=>Math.abs(a.mesh.position.y-this.ball.position.y)-Math.abs(b.mesh.position.y-this.ball.position.y))[0];
-      if(candidate?.mechanic){this.#seen.add(candidate.mechanic.startsWith("wind")?"wind":candidate.mechanic);this.#active={platform:candidate,activation:candidate.activationId,age:0};this.onEncounter(candidate.mechanic);}
+      if(candidate?.mechanic){
+        const volley=candidate.turretVolley,firstVolley=volley!==undefined&&!this.#seen.has("volley");
+        this.#seen.add(volley?`volley:${volley.id.split("/cell:")[0]??volley.id}`:candidate.encounterOverlay==="moving-gap"?"moving-gap":candidate.mechanic.startsWith("wind")?"wind":candidate.mechanic);
+        if(volley)this.#seen.add("volley");
+        this.#active={platform:candidate,activation:candidate.activationId,age:0,readSeconds:volley&&!firstVolley?1.7:2.5,...(volley?{volleyId:volley.id}:{})};
+        if(!volley||firstVolley)this.onEncounter(candidate.mechanic);
+      }
     }
     const simulationScale=realSeconds>0?seconds/realSeconds:1;
-    const desired=this.#active?Math.min(1,Math.max(3.5,below/2.5)/Math.max(.001,this.ball.fallSpeed*this.movementScale*simulationScale)):1;
+    const desired=this.#active?Math.min(1,Math.max(3.5,below/this.#active.readSeconds)/Math.max(.001,this.ball.fallSpeed*this.movementScale*simulationScale)):1;
     this.#scale+=(desired-this.#scale)*(1-Math.exp(-(desired<this.#scale?12:5)*dt));
     this.ball.setEncounterTravelScale(this.#scale);
   }

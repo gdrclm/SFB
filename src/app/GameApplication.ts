@@ -525,7 +525,7 @@ export class GameApplication {
     this.#fixedStep.register(this.#baitZone);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
       this.#platformGenerator?.scheduleEncounter(challenge.theme);
-    }, Math.random, () => worldProgression(this.#runProgress.depth));
+    }, Math.random, () => this.#platformGenerator?.progression??worldProgression(this.#runProgress.depth),()=>this.#platformGenerator?.completedSequenceCount??0);
     this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
       () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),
       kind => {

@@ -1,10 +1,11 @@
-import { worldProgression, type WorldProgression, type WorldPhase } from "../progression/WorldProgression";
+import { worldProgression, worldProgressionForPhase, type WorldProgression, type WorldPhase } from "../progression/WorldProgression";
 import type { DepthLocation } from "../scene/DepthLocations";
 import { cascadeVariant, climaxTheme, courseSectionAt, sectionForTheme, sectionRows, sectionTheme, type CourseSection, type CascadeVariant } from "./CourseSections";
 import { speedAfterBreak } from "../collision/BreakResistance";
-import { courseMechanic, type PlatformMechanic } from "./PlatformMechanic";
+import { courseMechanic, type PlatformMechanic, type TurretVolley } from "./PlatformMechanic";
+import { courseOverlay, type CourseOverlay } from "./CourseOverlays";
 import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
-import { createEncounterLayout, type EncounterLayout } from "./EncounterLayout";
+import { createEncounterLayout, createMovingGapLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
   PlatformKind,
@@ -37,6 +38,11 @@ export interface PlannedCoinTrail {
 }
 
 export interface PlannedPlatform {
+  readonly sequenceId?:number;
+  readonly sequenceEnd?:boolean;
+  readonly overlay?:CourseOverlay;
+  readonly turretVolley?:TurretVolley;
+  readonly movingPassage?:Readonly<{x:number;width:number;amplitude:number;period:number;phase:number}>;
   readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly x: number;
@@ -64,6 +70,8 @@ export interface PlannedPlatform {
 }
 
 export interface PlannedPlatformChoice {
+  readonly turretVolley?:TurretVolley;
+  readonly lateralMotion?:Readonly<{amplitude:number;period:number;phase:number}>;
   readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly x: number;
@@ -136,6 +144,11 @@ export class PlatformRoutePlanner {
   #encounterVariant = 0;
   #pendingBlueprint: RowBlueprint | null = null;
   #previousMechanic = false;
+  #sequenceId=-1;
+  #nextSequenceId=0;
+  #trackCompletions=false;
+  readonly #completedSequences=new Map<DepthLocation,number>();
+  readonly #phaseBaselines=new Map<DepthLocation,WorldPhase>();
 
   public constructor(
     initialLowestY: number,
@@ -150,11 +163,20 @@ export class PlatformRoutePlanner {
     this.#config = config;
     this.#random = random;
     this.#progress = worldProgression(config.startDepth + config.ball.startPosition.y - initialLowestY);
+    this.#phaseBaselines.set(this.#progress.location,this.#progress.phase);
+  }
+
+  public get progression():WorldProgression{return this.#progress;}
+  public setCompletedSequences(count:number,location:DepthLocation=this.#progress.location):void{
+    if(!Number.isFinite(count)||count<0)return;
+    this.#trackCompletions=true;
+    this.#completedSequences.set(location,Math.max(this.#completedSequences.get(location)??0,Math.floor(count)));
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void {
     this.#syncProgression();
     this.#activeTheme = theme; this.#externalEncounter = true; this.#section = sectionForTheme(theme);
+    this.#sequenceId=this.#nextSequenceId++;
     this.#scheduledActive = false;
     this.#encounterVariant = this.#randomIndex(4);
     this.#encounterRowIndex = 0;
@@ -202,10 +224,11 @@ export class PlatformRoutePlanner {
     const cascading = layoutTheme === "break-run";
     const variant = cascadeVariant(this.#progress.phase);
     const structured = !this.#externalEncounter || this.#scheduledActive;
-    const mechanic = structured ? courseMechanic(layoutTheme, this.#progress.location, this.#progress.phase, theme==="climax"?themeRowIndex%4:themeRowIndex) : undefined;
-    const movingAmplitude = mechanic === "moving" ? .9 : structured && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
+    const overlay=structured?courseOverlay(this.#section,this.#progress.location,this.#progress.phase,themeRowIndex):undefined;
+    const mechanic = overlay==="moving-gap"?"moving":overlay==="turret-volley"?"turret":structured ? courseMechanic(layoutTheme, this.#progress.location, this.#progress.phase, theme==="climax"?themeRowIndex%4:themeRowIndex) : undefined;
+    const movingAmplitude = overlay==="moving-gap"?.75:mechanic === "moving" ? .9 : structured && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
       && (this.#section === "maneuver" || cascading) && Math.floor(themeRowIndex / 2) % 3 === 1 ? .35 : 0;
-    const layout = createEncounterLayout(layoutTheme, structured ? themeRowIndex : themeRowIndex + this.#zoneCycle * 3,
+    const layout = overlay==="moving-gap"?createMovingGapLayout(this.#config.playSpace.halfWidth,this.#config.ball.radius,movingAmplitude,this.#previousPassageX??0,this.#encounterVariant):createEncounterLayout(layoutTheme, structured ? themeRowIndex : themeRowIndex + this.#zoneCycle * 3,
       this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
       this.#config.ball.radius, generation.multiRowSideMargin, {
         passageExtra: this.#progress.passageExtra + (this.#section === "breather" ? .5 : 0),
@@ -223,7 +246,11 @@ export class PlatformRoutePlanner {
         mechanic ? 1.65 : this.#previousMechanic ? 1.1 : 0));
     this.#previousMechanic=mechanic!==undefined;
     this.#nextY -= clearSpacing + this.#previousBandDepth;
-    const bandDepth = (structured ? Math.min(1.5, Math.max(.65, worldSpeed * .08))
+    // A volley is one visible stair-step group. Local mechanic pacing retains
+    // the telegraph budget at high earned speed, rather than stretching these
+    // three sources across an entire screen for every increase in speed.
+    const turretStep=Math.min(4.5,Math.max(clearance+.1,worldSpeed*.32));
+    const bandDepth = overlay==="turret-volley"?turretStep*2:(structured ? Math.min(1.5, Math.max(.65, worldSpeed * .08))
       : Math.min(3, Math.max(1.15, worldSpeed * .20))) * this.#progress.staggerScale;
     this.#previousBandDepth = bandDepth;
     this.#previousPassageX = layout.passage.x;
@@ -238,8 +265,11 @@ export class PlatformRoutePlanner {
       const appearance=skyPlatformAppearance(this.#progress.location,member.kind,mechanic,this.#zoneCycle*8+Math.floor(themeRowIndex/2)+index);
       return {
       ...member,
+      ...(overlay==="moving-gap"?{yOffset:0}:overlay==="turret-volley"?{
+        yOffset:-index*turretStep,turretVolley:{id:`${this.#progress.location}:${String(this.#sequenceId)}:${String(themeRowIndex)}`,index,count:3},
+      }:{}),
       ...(appearance===undefined?{}:{appearance}),
-      ...(mechanic === undefined || (mechanic !== "moving" && !member.isPrimaryLane) ? {} : {
+      ...(mechanic === undefined || (mechanic !== "moving" && !member.isPrimaryLane&&overlay!=="turret-volley") ? {} : {
         mechanic: mechanic === "wind-right" && member.x > layout.passage.x ? "wind-left" as const : mechanic,
       }),
     };});
@@ -258,6 +288,10 @@ export class PlatformRoutePlanner {
       spacing: Math.min(blueprint.coinTrail.spacing, clearSpacing * .6 / Math.max(1, blueprint.coinTrail.count - 1)),
     };
     const plan: PlannedPlatform = {
+      sequenceId:this.#sequenceId,sequenceEnd:themeRowIndex+1>=this.#getEncounterLength(theme),
+      ...(overlay?{overlay}:{}),
+      ...(overlay==="moving-gap"?{movingPassage:{x:0,width:Math.max(this.#config.ball.radius*2+1.2,2.2),amplitude:movingAmplitude,
+        period:Math.max(1.35,Math.min(3.8,3.8*(20/Math.max(20,ballSpeed))**.35)),phase:0}}:{}),
       x: primary.x,
       y: this.#nextY,
       strength: primary.strength,
@@ -272,6 +306,7 @@ export class PlatformRoutePlanner {
       kind: primary.kind,
       ...(primary.mechanic === undefined ? {} : { mechanic: primary.mechanic }),
       ...(primary.appearance === undefined ? {} : { appearance: primary.appearance }),
+      ...(primary.turretVolley===undefined?{}:{turretVolley:primary.turretVolley}),
       encounterTheme: layoutTheme,
       section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
       ...(cascading ? { cascadeVariant: variant } : {}),
@@ -291,6 +326,8 @@ export class PlatformRoutePlanner {
           kind: member.kind,
           ...(member.mechanic === undefined ? {} : { mechanic: member.mechanic }),
           ...(member.appearance === undefined ? {} : { appearance: member.appearance }),
+          ...(member.turretVolley===undefined?{}:{turretVolley:member.turretVolley}),
+          ...(movingAmplitude>0?{lateralMotion:{amplitude:movingAmplitude,period:Math.max(1.35,Math.min(3.8,3.8*(20/Math.max(20,ballSpeed))**.35)),phase:0}}:{}),
           isTrap: member.isTrap,
         })),
     };
@@ -335,7 +372,11 @@ export class PlatformRoutePlanner {
         structured ? Math.floor(this.#encounterRowIndex / 2) : this.#encounterRowIndex,
       );
       const layoutTheme=theme==="climax"?climaxTheme(this.#encounterRowIndex):theme;
-      if(structured && courseMechanic(layoutTheme,this.#progress.location,this.#progress.phase,theme==="climax"?this.#encounterRowIndex%4:this.#encounterRowIndex)!==undefined) {
+      const overlay=structured?courseOverlay(this.#section,this.#progress.location,this.#progress.phase,this.#encounterRowIndex):undefined;
+      if(overlay==="turret-volley"){
+        this.#pendingBlueprint={...this.#pendingBlueprint,lanes:[SAFE_STANDARD,DEADLY_BLACK,DEADLY_BLACK],primaryLaneIndex:0,coinLaneIndex:0};
+      }
+      else if(overlay==="moving-gap"||structured && courseMechanic(layoutTheme,this.#progress.location,this.#progress.phase,theme==="climax"?this.#encounterRowIndex%4:this.#encounterRowIndex)!==undefined) {
         // Reserve room for the full shuttle sweep, instead of squeezing tiny cells.
         this.#pendingBlueprint={...this.#pendingBlueprint,lanes:[SAFE_STANDARD,DEADLY_BLACK],primaryLaneIndex:0,coinLaneIndex:0};
       }
@@ -344,7 +385,14 @@ export class PlatformRoutePlanner {
   }
 
   #syncProgression(): void {
-    const progress = worldProgression(this.#config.startDepth + this.#config.ball.startPosition.y - this.#nextY);
+    let progress = worldProgression(this.#config.startDepth + this.#config.ball.startPosition.y - this.#nextY);
+    if(this.#trackCompletions&&progress.location!=="sky"){
+      const baseline=this.#phaseBaselines.get(progress.location)??"introduction";
+      const completed=this.#completedSequences.get(progress.location)??0;
+      const effective=baseline==="introduction"&&completed<6?"introduction"
+        :baseline!=="climax"&&completed<12&&progress.phase==="climax"?"development":progress.phase;
+      if(effective!==progress.phase)progress=worldProgressionForPhase(progress.location,effective);
+    }
     const key = `${progress.location}:${progress.phase}`;
     if (key === this.#progressKey) return;
     // Even a fast arrival must see all three lessons before the crystal course
@@ -365,6 +413,7 @@ export class PlatformRoutePlanner {
   #getActiveTheme(): PlatformEncounterTheme {
     this.#syncProgression();
     if (this.#activeTheme === null) {
+      this.#sequenceId=this.#nextSequenceId++;
       this.#sectionAnchorX = this.#previousPassageX ?? 0;
       if (this.#needsRecovery) {
         this.#needsRecovery = false; this.#section = "breather";

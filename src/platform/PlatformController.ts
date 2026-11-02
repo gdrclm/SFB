@@ -1,5 +1,6 @@
 import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
-import type { PlatformMechanic } from "./PlatformMechanic";
+import type { PlatformMechanic, TurretVolley } from "./PlatformMechanic";
+import type {CourseOverlay} from "./CourseOverlays";
 import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
 import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
@@ -21,6 +22,8 @@ export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
 export interface PlatformActivationProperties {
   readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
+  readonly turretVolley?:TurretVolley;
+  readonly encounterOverlay?:CourseOverlay;
   readonly strength: number;
   readonly strengthLevel: PlatformStrengthLevel;
   readonly routeKind?: PlatformRouteKind;
@@ -56,6 +59,8 @@ export class PlatformController {
   #motionAge = 0;
   #motionStartX = 0;
   #mechanic: PlatformMechanic | undefined;
+  #turretVolley:TurretVolley|undefined;
+  #encounterOverlay:CourseOverlay|undefined;
   #machine: PlatformMechanicSkin | null = null;
   #sky: SkyPlatformSkin | null = null;
   #appearance: SkyPlatformAppearance | undefined;
@@ -81,6 +86,8 @@ export class PlatformController {
   public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
   public get motionCenterX(): number { return this.#motionStartX; }
   public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
+  public get turretVolley():TurretVolley|undefined{return this.#turretVolley;}
+  public get encounterOverlay():CourseOverlay|undefined{return this.#encounterOverlay;}
   public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
   public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
   public get breakDelaySeconds():number{return this.#ruptureSeconds;}
@@ -199,12 +206,15 @@ export class PlatformController {
   #applyActivationProperties(properties: PlatformActivationProperties): void {
     this.#materialBreak=false;this.#pressSeconds=0;this.#ruptureSeconds=0;
     this.#mechanic = properties.mechanic;
+    this.#turretVolley=properties.mechanic==="turret"?properties.turretVolley:undefined;
+    this.#encounterOverlay=properties.encounterOverlay;
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
     this.#appearance=this.#kind==="standard"&&this.#mechanic===undefined?properties.appearance:undefined;
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#tutorialDanger = properties.tutorialDanger === true;
     this.#motion = properties.lateralMotion; this.#motionAge = 0; this.#motionStartX = this.mesh.position.x;
+    if(this.#motion)this.mesh.position.x=this.#motionStartX+this.#motion.amplitude*Math.sin(this.#motion.phase);
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
