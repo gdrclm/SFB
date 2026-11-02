@@ -58,7 +58,7 @@ export class ToonBallMaterial extends MaterialPluginBase {
       ${wgsl?"let":"vec3"} torchShell = mix(${vector}(0.10,0.055,0.035),${vector}(0.70,0.32,0.10),0.5+0.5*sin(${local}.x*6.0+${local}.z*3.0));
       ${wgsl?"let":"vec3"} torchBody = mix(diffuseColor,${vector}(1.0,0.90,0.73),0.58);
       ${wgsl?"let":"vec3"} torchBall = mix(torchBody,torchShell,shellMask)*toonBand+emissiveColor*0.04
-        +${vector}(1.0,0.49,0.16)*(toonRim*0.64+shellSeam*0.25+torchKey*0.12)+${vector}(1.0,0.95,0.80)*toonShine*0.20;
+        +${vector}(1.0,0.88,0.68)*(toonRim*0.28+shellSeam*0.12+torchKey*0.06)+${vector}(1.0,0.95,0.80)*toonShine*0.20;
       color = ${wgsl?"vec4f":"vec4"}(mix(color.rgb,torchBall,${lava}),color.a);
     ` };
   }

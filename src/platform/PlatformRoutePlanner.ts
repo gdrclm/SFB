@@ -395,9 +395,9 @@ export class PlatformRoutePlanner {
     }
     const key = `${progress.location}:${progress.phase}`;
     if (key === this.#progressKey) return;
-    // Even a fast arrival must see all three lessons before the crystal course
-    // develops. Long row spacing must not skip wind or turrets at 1000 metres.
-    if (this.#progressKey !== "" && progress.location === "crystal" && this.#progress.location === "crystal"
+    // Even a fast arrival must see all three lessons before a later location
+    // develops. Long row spacing must not skip wind or turrets.
+    if (this.#progressKey !== "" && progress.location !== "sky" && progress.location === this.#progress.location
       && this.#progress.phase === "introduction" && this.#sectionCursor < 6) return;
     // A difficulty phase may develop the next phrase, but never cut this one off.
     if (progress.location === this.#progress.location && this.#activeTheme !== null) return;
@@ -419,7 +419,7 @@ export class PlatformRoutePlanner {
         this.#needsRecovery = false; this.#section = "breather";
         this.#activeTheme = "breather"; this.#externalEncounter = false;
       } else if (this.#scheduledTheme !== null && this.#section === "breather"
-        && !(this.#progress.location === "crystal" && this.#progress.phase === "introduction" && this.#sectionCursor < 6)) {
+        && !(this.#progress.location !== "sky" && this.#progress.phase === "introduction" && this.#sectionCursor < 6)) {
         this.#activeTheme = this.#scheduledTheme; this.#scheduledTheme = null;
         this.#section = sectionForTheme(this.#activeTheme);
         this.#externalEncounter = true; this.#scheduledActive = true;

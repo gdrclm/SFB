@@ -8,6 +8,7 @@ export class ComboView {
   readonly #heading: HTMLElement;
   readonly #flare: HTMLElement;
   #animations: Animation[] = [];
+  #count = 0;
   readonly #visibility = new ComboVisibility();
 
   public constructor(panel: HTMLElement) {
@@ -27,18 +28,25 @@ export class ComboView {
   }
 
   public render(combo: ComboController): void {
+    this.#count = combo.count;
+    this.#updateVisibility();
     this.#number.textContent = String(combo.count);
-    this.#multiplier.textContent = `×${String(combo.multiplier)}`;
+    this.#multiplier.textContent = `очки ×${String(combo.multiplier)}`;
     this.#panel.dataset.tier = String(combo.multiplier);
   }
 
   public hit(hit: ComboHit): void {
+    this.#count = hit.count;
+    this.#number.textContent = String(hit.count);
+    this.#multiplier.textContent = `очки ×${String(hit.multiplier)}`;
+    this.#panel.dataset.tier = String(hit.multiplier);
     this.#visibility.show(hit.tierIncreased ? 1.1 : .75);
     this.#updateVisibility();
     this.#animate(hit.tierIncreased);
   }
 
   public miss(): void {
+    this.#count = 0;
     this.#visibility.reset();
     this.#updateVisibility();
     for (const animation of this.#animations) animation.cancel();
@@ -68,8 +76,9 @@ export class ComboView {
   }
 
   #updateVisibility(): void {
-    this.#panel.dataset.visible = String(this.#visibility.visible);
-    this.#panel.setAttribute("aria-hidden", String(!this.#visibility.visible));
+    const visible = this.#count > 0 || this.#visibility.visible;
+    this.#panel.dataset.visible = String(visible);
+    this.#panel.setAttribute("aria-hidden", String(!visible));
   }
 
   public setPaused(paused: boolean): void {
@@ -79,6 +88,7 @@ export class ComboView {
     }
   }
   public dispose(): void {
+    this.#count = 0;
     for (const animation of this.#animations) animation.cancel();
     this.#flare.remove();
     this.#visibility.reset();

@@ -130,8 +130,8 @@ it.each([[20,.8],[45,.8],[80,.8],[80,1.8]])("introduces every new mechanic near 
   for (const start of [8,20]) expect(opening.slice(start,start+4).every(p => p.section === "breather" && !p.mechanic)).toBe(true);
 });
 
-it("keeps timed challenges from replacing the three crystal introduction lessons", () => {
-  const config = atStartDepth(gameConfig, 500);
+it.each([500,3000,12000])("keeps scheduled challenges from replacing the three introduction lessons at %s", (depth) => {
+  const config = atStartDepth(gameConfig, depth);
   const planner = new PlatformRoutePlanner(config.ball.startPosition.y, config, () => .3);
   const plans: PlannedPlatform[] = [];
   for (let i = 0; i < 42; i++) {

@@ -1,6 +1,6 @@
 import type { PowerKind, PowerUpController } from "./PowerUpController";
-const FULL_HOLD_MS = 2000;
-/** The left-hand slot supports taps and a deliberate, cancellable two-second hold. */
+export const FULL_HOLD_MS = 3000;
+/** The left-hand slot supports taps and a deliberate, cancellable three-second hold. */
 export class PowerUpView {
   readonly #button: HTMLButtonElement;
   readonly #powers: PowerUpController;
@@ -35,7 +35,7 @@ export class PowerUpView {
     if (this.#powers.annihilationCharges !== 4) return;
     this.#button.dataset.holding = "true";
     this.#holdTimer = setTimeout(() => {
-      if (this.#blocked || document.hidden || !document.hasFocus()) { this.#cancelPress(); return; }
+      if (this.#blocked || document.hidden) { this.#cancelPress(); return; }
       this.#ignoreClick = true; this.#powers.tryActivate("annihilation");
       this.#endPress(); this.render(this.#blocked);
     }, FULL_HOLD_MS);
@@ -52,9 +52,16 @@ export class PowerUpView {
   readonly #onVisibility = (): void => { if (document.hidden) this.#cancelPress(); };
   readonly #onPointerDown = (event: PointerEvent): void => {
     if (this.#kind !== "annihilation" || event.button !== 0 || this.#button.disabled) return;
+    event.preventDefault();
     this.#beginPress(); this.#button.setPointerCapture(event.pointerId);
   };
-  readonly #onPointerUp = (): void => { this.#endPress(); };
+  readonly #onPointerUp = (): void => {
+    if (!this.#pressing) return;
+    const short = performance.now() - this.#pressStart < FULL_HOLD_MS;
+    this.#endPress(); this.#ignoreClick = true;
+    if (short && !this.#blocked) this.#powers.tryMiniAnnihilation();
+    this.render(this.#blocked);
+  };
   readonly #onPointerMove = (event: PointerEvent): void => {
     if (!this.#pressing) return;
     const bounds = this.#button.getBoundingClientRect();
@@ -75,8 +82,7 @@ export class PowerUpView {
     else this.#onClick();
   }
   public keyboardUp(): void {
-    if (this.#kind !== "annihilation" || !this.#pressing) return;
-    this.#endPress(); this.#onClick();
+    if (this.#kind === "annihilation") this.#onPointerUp();
   }
   public cancelKeyboard(): void { this.#cancelPress(); }
   readonly #onKeyDown = (event: KeyboardEvent): void => {
@@ -99,7 +105,7 @@ export class PowerUpView {
     this.#button.dataset.spent = String(!this.#powers.available(this.#kind) && !active);
     const charges = this.#powers.annihilationCharges;
     const hint = this.#kind === "plasma" ? "Плазменный разгон: одна активация, 30 секунд"
-      : `Аннигиляция: ${String(charges)} из 4 зарядов. Нажми — очистить экран.${charges === 4 ? " Держи 2 секунды — радиус 200 метров за все заряды." : ""}`;
+      : `Аннигиляция: ${String(charges)} из 4 зарядов. Нажми — очистить экран.${charges === 4 ? " Держи 3 секунды — радиус 200 метров за все заряды." : ""}`;
     this.#button.setAttribute("aria-label", hint); this.#button.title = hint;
     if (this.#pressing && charges === 4) this.#button.style.setProperty("--hold-angle", `${String(Math.min(360, (performance.now() - this.#pressStart) / FULL_HOLD_MS * 360))}deg`);
     const label = this.#button.querySelector(".slow-mode-state");

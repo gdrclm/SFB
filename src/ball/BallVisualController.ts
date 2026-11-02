@@ -55,8 +55,8 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #phaseColor: Color3;
   readonly #baseOutlineColor: Color3;
   readonly #crystalOutlineColor = new Color3(.08, .92, 1);
-  readonly #torchOutlineColor=new Color3(1,.64,.22);
-  readonly #torchTrailColor=new Color3(1,.47,.12);
+  readonly #torchOutlineColor=new Color3(1,.92,.76);
+  readonly #torchTrailColor=new Color3(1,.86,.64);
   readonly #baseTrailColor = new Color3(.25, .9, 1);
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;

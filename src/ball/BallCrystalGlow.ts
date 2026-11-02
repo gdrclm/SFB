@@ -35,7 +35,7 @@ export class BallCrystalGlow {
           vec2 p=(haloUV-0.5)*2.0;
           float fade=pow(max(0.0,1.0-dot(p,p)),2.5);
           vec3 crystal=mix(vec3(0.30,0.12,1.0),vec3(0.02,0.85,1.0),haloUV.x);
-          vec3 torch=mix(vec3(1.0,0.28,0.035),vec3(1.0,0.78,0.28),haloUV.x);
+          vec3 torch=mix(vec3(1.0,0.84,0.62),vec3(1.0,0.96,0.86),haloUV.x);
           gl_FragColor=vec4(mix(crystal,torch,lavaMix),fade*0.65*glowBlend);
         }`,
     }, { attributes: ["position", "uv"], uniforms: ["worldViewProjection", "glowBlend","lavaMix"], needAlphaBlending: true });
@@ -60,7 +60,7 @@ export class BallCrystalGlow {
   }
   #applyLighting():void{
     const blend=this.#blend,lava=this.#lavaBlend;
-    const glow=Math.min(1,blend+lava*.72);
+    const glow=Math.min(1,blend+lava*.30);
     this.#haloMaterial.setFloat("glowBlend",glow);
     this.#haloMaterial.setFloat("lavaMix",lava/Math.max(.001,blend+lava));
     this.#halo.visibility=glow;this.#halo.setEnabled(glow>0);

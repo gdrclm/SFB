@@ -304,7 +304,7 @@ it("warms the hero and trail under torchlight, preserves the face and reuses lig
  controller.setLavaBlend(.5);const halfway=ball.outlineColor.clone();
  controller.setLavaBlend(1);expect(ball.outlineColor.r).toBeGreaterThan(halfway.r);
  expect(details.emissiveColor.r).toBeGreaterThan(details.emissiveColor.b*4);
- expect(halo?.visibility).toBeCloseTo(.72);expect(face.emissiveColor.equals(originalFace)).toBe(true);
+ expect(halo?.visibility).toBeCloseTo(.30);expect(face.emissiveColor.equals(originalFace)).toBe(true);
  for(let i=0;i<50;i++){controller.setCrystalBlend((i%2)*.5);controller.setLavaBlend((i%2)*.5);controller.fixedUpdate(1/60);}
  expect([scene.meshes.length,scene.materials.length,scene.textures.length]).toEqual(resources);
  controller.setCrystalBlend(0);controller.setLavaBlend(0);expect(halo?.isEnabled()).toBe(false);
