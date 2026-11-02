@@ -28,7 +28,7 @@ import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missio
 import { renderPinnedMission } from "../run/renderMissionBoard";
 import { waitForPlatformSprites } from "../platform/PlatformSprites";
 import { advanceIdleTime } from "../platform/PlatformIdle";
-import { setPlatformCrystalBlend } from "../platform/PlatformCrystalSkin";
+import { setPlatformCrystalBlend,setPlatformLavaBlend } from "../platform/PlatformCrystalSkin";
 import type { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -836,7 +836,9 @@ export class GameApplication {
     this.#actions.music.setPaused(isPaused);
     this.#actions.music.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
+    this.#ballVisualController?.setLavaBlend(this.#backdrop?.lavaBlend??0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
+    if(this.#scene!==null)setPlatformLavaBlend(this.#scene,this.#backdrop?.lavaBlend??0);
     this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
     if (this.#defeatPending && !isPaused) {
       this.#ballVisualController?.renderDefeat(realDeltaSeconds, this.#lifeFeedback?.deathAge ?? 0);

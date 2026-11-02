@@ -9,7 +9,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { ApproachState } from "./PlatformReadability";
 import type { SkyPlatformAppearance } from "./SkyPlatformAppearance";
 import { platformSpriteRow } from "./PlatformSpriteLayout";
-import { getPlatformCrystalBlend, getPlatformCrystalTint } from "./PlatformCrystalSkin";
+import { getPlatformCrystalBlend, getPlatformCrystalTint,getPlatformLavaBlend,getPlatformLavaTint } from "./PlatformCrystalSkin";
 import { WaterSplashGeometry, WATER_SPLASH_SECONDS, WATER_SHEET_COLUMNS, WATER_SHEET_ROWS } from "./WaterSplashGeometry";
 import { CloudBurstGeometry, CLOUD_BURST_SECONDS, cloudSplitGap } from "./CloudBurstGeometry";
 
@@ -26,6 +26,7 @@ attribute vec3 position;attribute vec2 uv;attribute vec2 waterData;uniform mat4 
 void main(){vUV=uv;vWater=waterData;gl_Position=worldViewProjection*vec4(position,1.0);}`;
 const fragment=`precision highp float;
 varying vec2 vUV;varying vec2 vWater;uniform vec4 skyParams;uniform vec4 skyCue;uniform vec4 skyGrade;
+uniform vec4 skyTorch;
 uniform vec4 skyCloud;
 uniform vec2 skyPress;
 uniform sampler2D waterSheetSampler;
@@ -151,6 +152,9 @@ void main(){
  float crystalFacet=pow(clamp(crystalLum,0.0,1.0),.54);
  float crystalRim=pow(max(max(color.r,color.g),color.b),3.0);
  color=mix(color,skyGrade.rgb*(crystalFacet*.85+crystalRim*.32)+color*.55,skyGrade.a);
+ float torchLum=dot(color,vec3(.2126,.7152,.0722));float torchFacet=pow(clamp(torchLum,0.0,1.0),.65);
+ float torchRim=pow(max(max(color.r,color.g),color.b),3.0);
+ color=mix(color,vec3(.09,.07,.06)+skyTorch.rgb*(torchFacet*.48+torchRim*.30)+color*.16,skyTorch.a);
  gl_FragColor=vec4(color,clamp(alpha*opacity,0.0,1.0));
 }`;
 interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number;pressX?:number;pressDepth?:number}
@@ -166,7 +170,7 @@ export function waterSplashTexture(scene:Scene):Texture{
 export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
  const cached=materials.get(scene);if(cached)return cached;
  const material=new ShaderMaterial("SkyPlatformMaterial",scene,{vertexSource:vertex,fragmentSource:fragment},{
-  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade","skyCloud","skyPress"],needAlphaBlending:true,
+  attributes:["position","uv","waterData"],uniforms:["worldViewProjection","skyParams","skyCue","skyShadow","skyFace","skyEdge","skyGrade","skyTorch","skyCloud","skyPress"],needAlphaBlending:true,
   samplers:["waterSheetSampler"],
  });
  material.setTexture("waterSheetSampler",waterSplashTexture(scene));
@@ -182,6 +186,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
   effect.setFloat3("skyFace",palette[1][0],palette[1][1],palette[1][2]);
   effect.setFloat3("skyEdge",palette[2][0],palette[2][1],palette[2][2]);
   effect.setFloat4("skyGrade",tint[0],tint[1],tint[2],getPlatformCrystalBlend(scene));
+  const torch=getPlatformLavaTint(data.row);effect.setFloat4("skyTorch",torch[0],torch[1],torch[2],getPlatformLavaBlend(scene));
  });
  materials.set(scene,material);material.onDisposeObservable.addOnce(()=>materials.delete(scene));return material;
 }

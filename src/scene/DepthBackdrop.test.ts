@@ -6,6 +6,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { afterEach, expect, it, vi } from "vitest";
 import { DepthBackdrop } from "./DepthBackdrop";
+const readiness=vi.hoisted(()=>({lava:true}));
 
 vi.mock("./createIllustratedBackdrop", () => ({ preloadCrystalBackdrop: vi.fn() }));
 vi.mock("./createPhaseOneBackdrop", async () => {
@@ -14,10 +15,11 @@ vi.mock("./createPhaseOneBackdrop", async () => {
   return { createPhaseOneBackdrop: (scene: Scene, rig: TransformNode, _appearance: unknown, location = "sky") => {
     const mesh = MeshBuilder.CreatePlane(location, { width: 28, height: 42 }, scene);
     mesh.parent = rig; mesh.material = new StandardMaterial(location, scene);
+    mesh.metadata={scenery:{isReady:()=>location!=="lava"||readiness.lava,update:()=>{}}};
     return mesh;
   } };
 });
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals();readiness.lava=true; });
 function setup(reduced: boolean, startDepth = 0) {
   vi.stubGlobal("matchMedia", () => ({ matches: reduced }));
   const engine = new NullEngine(); const scene = new Scene(engine);
@@ -72,5 +74,33 @@ it.each([[500, "crystal"], [3000, "lava"], [12000, "abyss"]] as const)("opens th
     world.backdrop.update(depth, 1 / 60);
     expect(world.scene.meshes).toHaveLength(1);
     expect(world.backdrop.crystalBlend).toBe(name === "crystal" ? 1 : 0);
+    expect(world.backdrop.lavaBlend).toBe(name==="lava"?1:0);
   } finally { world.dispose(); }
+});
+it("fades crystal into warm ruins on the same ready page transition and freezes that lighting on pause",()=>{
+ const world=setup(false,2999);
+ try{
+  world.backdrop.update(3000,0);expect(world.backdrop.crystalBlend).toBe(1);expect(world.backdrop.lavaBlend).toBe(0);
+  for(let i=0;i<60;i++)world.backdrop.update(3000,1/60);
+  expect(world.backdrop.lavaBlend).toBeCloseTo(.5);expect(world.backdrop.crystalBlend+world.backdrop.lavaBlend).toBeCloseTo(1);
+  world.backdrop.update(3000,0);expect(world.backdrop.lavaBlend).toBeCloseTo(.5);
+  for(let i=0;i<61;i++)world.backdrop.update(3000,1/60);expect(world.backdrop.lavaBlend).toBe(1);
+  for(let i=0;i<121;i++)world.backdrop.update(12000,1/60);expect(world.backdrop.lavaBlend).toBe(0);
+ }finally{world.dispose();}
+});
+it("waits for late ruins artwork before sliding the page or applying its warm lighting",()=>{
+ readiness.lava=false;
+ const world=setup(false,2999);
+ try{
+  for(let i=0;i<180;i++)world.backdrop.update(3000,1/60);
+  expect(world.root("lava").isEnabled()).toBe(false);
+  expect(world.backdrop.crystalBlend).toBe(1);expect(world.backdrop.lavaBlend).toBe(0);
+  readiness.lava=true;
+  for(let i=0;i<60;i++)world.backdrop.update(3000,1/60);
+  expect(world.root("lava").isEnabled()).toBe(true);
+  expect(world.backdrop.crystalBlend).toBeCloseTo(.5);expect(world.backdrop.lavaBlend).toBeCloseTo(.5);
+  world.backdrop.update(3000,0);expect(world.backdrop.lavaBlend).toBeCloseTo(.5);
+  for(let i=0;i<61;i++)world.backdrop.update(3000,1/60);
+  expect(world.backdrop.lavaBlend).toBe(1);expect(world.backdrop.crystalBlend).toBe(0);
+ }finally{world.dispose();}
 });

@@ -55,6 +55,8 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #phaseColor: Color3;
   readonly #baseOutlineColor: Color3;
   readonly #crystalOutlineColor = new Color3(.08, .92, 1);
+  readonly #torchOutlineColor=new Color3(1,.64,.22);
+  readonly #torchTrailColor=new Color3(1,.47,.12);
   readonly #baseTrailColor = new Color3(.25, .9, 1);
   readonly #phaseOutlineColor: Color3;
   #speedIntensity = 0;
@@ -68,6 +70,7 @@ export class BallVisualController implements FixedSimulationSystem {
   readonly #fx: BallDynamicsFX;
   readonly #crystalGlow: BallCrystalGlow;
   #crystalBlend = 0;
+  #lavaBlend=0;
   #slowActive = false;
   #impactElapsed = 1;
   #contactAnchored = false;
@@ -187,6 +190,11 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#crystalGlow.setBlend(weight);
     this.#applyMaterial(this.#speedIntensity);
   }
+  public setLavaBlend(blend:number):void{
+    const weight=Number.isFinite(blend)?clamp01(blend):0;
+    if(weight===this.#lavaBlend)return;
+    this.#lavaBlend=weight;this.#crystalGlow.setLavaBlend(weight);this.#applyMaterial(this.#speedIntensity);
+  }
 
   public setSlow(active: boolean): void { this.#slowActive = active; }
 
@@ -276,6 +284,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#phaseTransitionBlend = 0;
     this.#phaseTransitionTarget = 0;
     this.#crystalBlend = 0;
+    this.#lavaBlend=0;
     this.#boostElapsedSeconds = null;
     this.#boostStrength = 0;
     this.#applyMaterial(0);
@@ -334,6 +343,7 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#material.diffuseColor.copyFrom(displayColor);
     this.#material.emissiveColor.copyFrom(displayColor).scaleInPlace(emissiveStrength);
     Color3.LerpToRef(this.#baseTrailColor, displayColor, .35 + this.#trailIntensity * .35, this.#trailMaterial.emissiveColor);
+    Color3.LerpToRef(this.#trailMaterial.emissiveColor,this.#torchTrailColor,this.#lavaBlend*.70,this.#trailMaterial.emissiveColor);
     this.#trailMaterial.alpha = .85 + this.#trailIntensity * .1;
     this.#trail.diameter = this.#ballConfig.radius * this.#config.trailDiameterScale * (1 + this.#trailIntensity * 2.4 + this.#boostStrength * .4);
     this.#trail.visibility = Math.max(this.#boostStrength * .65, lerp(
@@ -350,7 +360,8 @@ export class BallVisualController implements FixedSimulationSystem {
       ),
     );
     Color3.LerpToRef(this.#ball.outlineColor, this.#crystalOutlineColor, this.#crystalBlend, this.#ball.outlineColor);
-    this.#ball.outlineWidth = this.#crystalBlend * .012 + lerp(
+    Color3.LerpToRef(this.#ball.outlineColor,this.#torchOutlineColor,this.#lavaBlend,this.#ball.outlineColor);
+    this.#ball.outlineWidth = this.#crystalBlend * .012+this.#lavaBlend*.010 + lerp(
       this.#config.baseOutlineWidth,
       this.#config.maximumOutlineWidth,
       speedIntensity,

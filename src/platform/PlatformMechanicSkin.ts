@@ -5,6 +5,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlatformMechanic } from "./PlatformMechanic";
 import type { ApproachState } from "./PlatformReadability";
+import {PlatformCrystalSkin} from "./PlatformCrystalSkin";
 
 type Paint = readonly [number, number, number];
 const DARK: Paint = [.045,.07,.14], METAL: Paint = [.38,.5,.63], LIGHT: Paint = [.82,.96,1];
@@ -14,6 +15,7 @@ export function prepareMechanicSkin(scene: Scene): StandardMaterial {
   const cached=materials.get(scene); if(cached)return cached;
   const material=new StandardMaterial("PlatformMachineMaterial",scene);
   material.disableLighting=true;material.emissiveColor=Color3.White();material.backFaceCulling=false;
+  new PlatformCrystalSkin(material,false);
   materials.set(scene,material);material.onDisposeObservable.addOnce(()=>materials.delete(scene));return material;
 }
 /** One vertex-colored silhouette and one animated part per pooled platform. */
@@ -78,7 +80,10 @@ export class PlatformMechanicSkin {
       rotor.apply(this.part);
       this.body.metadata={mechanic:kind,silhouette:moving?"thruster-carriage":wind?"turbine-grille":"armored-cannon"};
     }
-    for(const mesh of [this.body,this.part]) {mesh.setEnabled(true);mesh.visibility=1;mesh.scaling.set(1/this.parent.scaling.x,1,1);mesh.position.y=0;}
+    for(const mesh of [this.body,this.part]) {mesh.setEnabled(true);mesh.visibility=1;mesh.scaling.set(1/this.parent.scaling.x,1,1);mesh.position.y=0;
+      const row=state==="danger"?2:state==="boost"?1:0;
+      if(!mesh.metadata)mesh.metadata={row};else (mesh.metadata as {row:number}).row=row;
+    }
     this.part.position.set(0,this.height/2-(wind?.55:moving?.29:.28),this.body.position.z-.03);
     this.part.rotation.z=wind?(reduced?0:elapsed*8*(kind==="wind-left"?-1:1)):this.#aim?-Math.atan2(this.#aim.x-this.parent.position.x,this.#aim.y-this.parent.position.y):0;
   }
