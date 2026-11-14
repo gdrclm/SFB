@@ -1,0 +1,56 @@
+import { expect,it } from "vitest";
+import { WaterSplashGeometry,WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+function center(positions:Float32Array,quad:number):{x:number;y:number}{
+ let x=0,y=0;for(let i=0;i<4;i++){x+=positions[quad*12+i*3]??0;y+=positions[quad*12+i*3+1]??0;}return{x:x/4,y:y/4};
+}
+it("sends shaped droplets out from the hit, lets gravity bring them down and keeps continuous water jets",()=>{
+ const water=new WaterSplashGeometry(),positions=water.positions,attributes=water.waterData;
+ water.update(.1,1,1.2,.25,false);const early=center(water.positions,0);
+ water.update(.3,1,1.2,.25,false);const peak=center(water.positions,0);
+ expect(peak.x).toBeLessThan(early.x);expect(peak.y).toBeGreaterThan(early.y);
+ expect(Math.max(...water.positions.filter((_,i)=>i%3===1))).toBeGreaterThan(1.3);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape===1&&(water.waterData[i+1]??0)>0)).toBe(true);
+ water.update(.7,1,1.2,.25,false);expect(center(water.positions,0).y).toBeLessThan(peak.y);
+ expect(water.positions).toBe(positions);expect(water.waterData).toBe(attributes);
+ expect(water.update(WATER_SPLASH_SECONDS,1,1.2,.25,false)).toBe(0);
+ expect(water.waterData.every(value=>value===0)).toBe(true);
+});
+it("keeps reduced-motion splashes smaller and sparser and never exceeds its fixed batch",()=>{
+ const water=new WaterSplashGeometry();water.update(.2,1,0,0,false);
+ const fullRange=Math.max(...water.positions.filter((_,i)=>i%3===0));
+ const fullVisible=water.waterData.filter((_,i)=>i%2===1).filter(alpha=>alpha>0).length;
+ const length=water.positions.length;water.update(.2,1,0,0,true);
+ expect(Math.max(...water.positions.filter((_,i)=>i%3===0))).toBeLessThan(fullRange*.6);
+ expect(water.waterData.filter((_,i)=>i%2===1).filter(alpha=>alpha>0).length).toBeLessThan(fullVisible);
+ expect(water.positions.length).toBe(length);
+});
+it("eases droplets and the connected sheet in and out without an opaque first frame",()=>{
+ const water=new WaterSplashGeometry();
+ const sheetAlpha=()=>water.waterData[water.waterData.length-1]??0;
+ water.update(0,1,0,0,false,true);
+ expect(water.waterData[1]).toBe(0);expect(sheetAlpha()).toBe(0);
+ water.update(.01,1,0,0,false,true);
+ expect(water.waterData[1]).toBeGreaterThan(0);expect(water.waterData[1]).toBeLessThan(.1);
+ expect(sheetAlpha()).toBeGreaterThan(0);expect(sheetAlpha()).toBeLessThan(.1);
+ water.update(.1,1,0,0,false,true);expect(sheetAlpha()).toBeCloseTo(1);
+ water.update(.73,1,0,0,false,true);expect(water.waterData[1]).toBe(0);
+ water.update(WATER_SPLASH_SECONDS,1,0,0,false,true);expect(sheetAlpha()).toBe(0);
+});
+it("hands the sheet to shrinking fragments and splits large drops along their existing path",()=>{
+ const water=new WaterSplashGeometry();
+ water.update(.29,1,0,0,false,true);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape>=3&&(water.waterData[i+1]??0)>0)).toBe(false);
+ water.update(.41,1,0,0,false,true);
+ // First child belongs to the first large drop, rather than a fresh burst at origin.
+ const parent=center(water.positions,0),child=center(water.positions,28);
+ expect(Math.hypot(parent.x-child.x,parent.y-child.y)).toBeLessThan(.02);
+ const fragment=Array.from(water.waterData).findIndex((shape,i)=>i%8===0&&shape>=3&&(water.waterData[i+1]??0)>.1)/8;
+ expect(fragment).toBeGreaterThan(0);
+ const width=(water.positions[fragment*12+3]??0)-(water.positions[fragment*12]??0);
+ const alpha=water.waterData[fragment*8+1]??0;
+ water.update(.90,1,0,0,false,true);
+ expect((water.positions[fragment*12+3]??0)-(water.positions[fragment*12]??0)).toBeLessThan(width*.4);
+ expect(water.waterData[fragment*8+1]).toBeLessThan(alpha);
+ expect(water.waterData.some((shape,i)=>i%2===0&&shape>=3&&(water.waterData[i+1]??0)>0)).toBe(true);
+ water.update(WATER_SPLASH_SECONDS,1,0,0,false,true);expect(water.waterData.every(x=>x===0)).toBe(true);
+});

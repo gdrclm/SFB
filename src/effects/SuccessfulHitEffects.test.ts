@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { SuccessfulHitEffects } from "./SuccessfulHitEffects";
 import { breakFeedback } from "./BreakFeedback";
+import { WATER_SPLASH_SECONDS } from "../platform/WaterSplashGeometry";
+import {DEBRIS_POOL_SIZE} from "./DirectedDebris";
 
 describe("SuccessfulHitEffects", () => {
   it("holds the intact contact pose before fracture, then returns pooled artwork exactly once", () => {
@@ -16,7 +18,7 @@ describe("SuccessfulHitEffects", () => {
     const effects = new SuccessfulHitEffects(ball, camera, gameConfig);
     const platform = { renderBreak: vi.fn() }, done = vi.fn();
     const profile = breakFeedback(50, 48);
-    effects.playPlatformBreak(platform, done, profile.force, profile);
+    effects.playPlatformBreak(platform, done, profile.force, 50, false, profile);
     effects.fixedUpdate(.004, .04);
     expect(platform.renderBreak).toHaveBeenLastCalledWith(0);
     effects.fixedUpdate(.004, .04);
@@ -75,8 +77,20 @@ describe("SuccessfulHitEffects", () => {
     expect(camera.position).toEqual(initialCameraPosition);
 
     effects.dispose();
-    expect(scene.meshes.length).toBe(meshCountBeforeBreak);
+    expect(scene.meshes.length).toBe(meshCountBeforeBreak-DEBRIS_POOL_SIZE);
     scene.dispose();
     engine.dispose();
   });
+});
+
+it("lets water finish its arc before returning the already-broken platform to the pool",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),camera=new FreeCamera("camera",new Vector3(0,0,-10),scene);
+ const ball=MeshBuilder.CreateSphere("ball",{diameter:1},scene);
+ const platform={renderBreak:vi.fn(),breakEffectSeconds:WATER_SPLASH_SECONDS},complete=vi.fn();
+ const effects=new SuccessfulHitEffects(ball,camera,gameConfig);
+ effects.playPlatformBreak(platform,complete);effects.fixedUpdate(.6);
+ expect(complete).not.toHaveBeenCalled();expect(platform.renderBreak).toHaveBeenLastCalledWith(.6/WATER_SPLASH_SECONDS);
+ effects.fixedUpdate(.4);expect(complete).not.toHaveBeenCalled();
+ effects.fixedUpdate(WATER_SPLASH_SECONDS-1+.01);expect(complete).toHaveBeenCalledOnce();expect(platform.renderBreak).toHaveBeenLastCalledWith(1);
+ effects.dispose();scene.dispose();engine.dispose();
 });

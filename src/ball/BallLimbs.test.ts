@@ -28,15 +28,26 @@ it("increases limb movement frequency with speed using the same four meshes", ()
     const limbs = getBallLimbs(ball), hand = scene.getMeshByName("BallHandLeft");
     if (!limbs || !hand) throw new Error("Expected limbs");
     const resources = [scene.meshes.length, scene.materials.length];
-    let previous = hand.position.y + .04, crossings = 0;
+    let previous = hand.position.y, previousDelta = 0, crossings = 0;
     for (let i = 0; i < 240; i++) {
       limbs.update(1 / 60, speed);
-      const current = hand.position.y + .04;
-      if (previous * current < 0) crossings++;
-      previous = current;
+      const current = hand.position.y, delta=current-previous;
+      if (previousDelta * delta < 0) crossings++;
+      previous = current;previousDelta=delta;
     }
     expect([scene.meshes.length, scene.materials.length]).toEqual(resources);
     scene.dispose(); engine.dispose(); return crossings;
   };
   expect(count(160)).toBeGreaterThan(count(10) * 3);
+});
+
+it("changes the silhouette from relaxed arms to paddling, a dive and a high-speed brace",()=>{
+  const engine=new NullEngine(),scene=new Scene(engine),ball=createBallMesh(scene,gameConfig);
+  const limbs=getBallLimbs(ball),hand=scene.getMeshByName("BallHandLeft");
+  if(!limbs||!hand)throw new Error("Expected avatar limbs");
+  const poses=[10,30,60,120].map(speed=>{limbs.update(0,speed);return {y:hand.position.y,x:hand.position.x,mode:(hand.metadata as {activity:string}).activity};});
+  expect(poses.map(p=>p.mode)).toEqual(["drift","paddle","dive","surge"]);
+  expect(poses[2]?.y).toBeGreaterThan(poses[0]?.y??0);
+  expect(poses[2]?.x).not.toBe(poses[3]?.x);
+  scene.dispose();engine.dispose();
 });

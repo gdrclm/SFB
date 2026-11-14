@@ -2,7 +2,8 @@ import { getRenderQuality } from "../rendering/AdaptiveQuality";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { getGameSounds } from "./GameSounds";
-import type { BreakFeedback } from "../effects/BreakFeedback";
+import { breakFeedback, type BreakFeedback } from "../effects/BreakFeedback";
+import type { BreakMaterial } from "./GameSounds";
 
 export class GameFeel {
   readonly #scene: Scene;
@@ -91,19 +92,19 @@ export class GameFeel {
     ], 320);
     this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 300, false);
   }
-  public breakAt(position: { x: number; y: number; z: number }, feedback: BreakFeedback): void {
-    getGameSounds().play("break", feedback.force);
+  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean,speed=10,material:BreakMaterial="stone",power=false, feedback: BreakFeedback = breakFeedback(speed, 1, false)): boolean {
+    const audible=getGameSounds().playBreak(material,speed,feedback.force*(heavy?1.1:1),power);
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
-      { transform: `translate(-50%, -50%) scale(${String(this.#reduced ? 1 : 2 + feedback.power * 2.5)})`, opacity: 0 }], 150 + feedback.power * 80);
-    if (this.#reduced) return;
-    const lowQuality = getRenderQuality(this.#scene.getEngine()) === "low";
-    const count = lowQuality ? 2 : feedback.fragments;
+      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : power?"4":heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
+    if (this.#reduced) return audible;
+    const count = getRenderQuality(this.#scene.getEngine()) === "low" ? 2 : feedback.fragments;
     for (let i = 0; i < count; i++) {
       const angle = i * 2.4;
-      this.#particle(point, "shard", [{ opacity: 1, transform: `scale(${String(2.2 - feedback.power * .5)})` },
+      this.#particle(point, material === "stone" ? "shard" : "spark", [{ opacity: 1, transform: `scale(${String(2.2 - feedback.power * .5)})` },
         { opacity: 0, transform: `translate(${String(Math.cos(angle) * feedback.spread)}px, ${String(Math.sin(angle) * feedback.spread * .6 - feedback.power * 55)}px) rotate(190deg) scale(.15)` }], 520 - feedback.power * 180);
     }
+    return audible;
   }
   public setPaused(paused: boolean): void {
     if (this.#paused === paused) return;

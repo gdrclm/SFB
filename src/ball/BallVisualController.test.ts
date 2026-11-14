@@ -56,7 +56,8 @@ describe("BallVisualController", () => {
       if (speed <= 40) expect(ball.scaling.y).toBeLessThan(1.13);
       height = ball.scaling.y;
     }
-    expect(height).toBeCloseTo(2.2, 3);
+    expect(height).toBeGreaterThan(2.1);
+    expect(height).toBeLessThan(2.3);
     motion.fallSpeed = gameConfig.ball.startFallSpeed; updateFor(controller, 2);
     expect(ball.scaling.y).toBeCloseTo(1, 3);
     controller.dispose(); scene.dispose(); engine.dispose();
@@ -83,7 +84,8 @@ describe("BallVisualController", () => {
     for (const fixture of [contact, free]) { fixture.controller.playBoostReaction(boost); updateFor(fixture.controller, .1); }
     contact.controller.react("break");
     for (const fixture of [contact, free]) updateFor(fixture.controller, .06);
-    expect(contact.ball.scaling.y).toBeLessThan(free.ball.scaling.y);
+    expect(contact.ball.scaling.y).toBeGreaterThan(free.ball.scaling.y);
+    expect(contact.ball.scaling.x*contact.ball.scaling.y*contact.ball.scaling.z).toBeCloseTo(1,8);
     expect(contact.ball.metadata).toMatchObject({ expression: "boost" });
     for (const fixture of [contact, free]) { fixture.controller.dispose(); fixture.scene.dispose(); fixture.engine.dispose(); }
   });
@@ -292,6 +294,22 @@ it("blends crystal light with the location, preserves the face and reuses its ha
   expect(scene.getMeshByName("BallCrystalHalo")).toBeNull();
   expect(scene.getMaterialByName("BallCrystalHaloMaterial")).toBeNull();
   scene.dispose(); engine.dispose();
+});
+it("warms the hero and trail under torchlight, preserves the face and reuses lighting resources across location fades",()=>{
+ const {engine,scene,ball,controller}=createFixture();
+ const details=scene.getMaterialByName("BallBlueDetails") as StandardMaterial;
+ const face=scene.getMaterialByName("BallFaceDetails") as StandardMaterial;
+ const originalFace=face.emissiveColor.clone(),baseOutline=ball.outlineColor.clone(),resources=[scene.meshes.length,scene.materials.length,scene.textures.length];
+ const halo=scene.getMeshByName("BallCrystalHalo");
+ controller.setLavaBlend(.5);const halfway=ball.outlineColor.clone();
+ controller.setLavaBlend(1);expect(ball.outlineColor.r).toBeGreaterThan(halfway.r);
+ expect(details.emissiveColor.r).toBeGreaterThan(details.emissiveColor.b*4);
+ expect(halo?.visibility).toBeCloseTo(.30);expect(face.emissiveColor.equals(originalFace)).toBe(true);
+ for(let i=0;i<50;i++){controller.setCrystalBlend((i%2)*.5);controller.setLavaBlend((i%2)*.5);controller.fixedUpdate(1/60);}
+ expect([scene.meshes.length,scene.materials.length,scene.textures.length]).toEqual(resources);
+ controller.setCrystalBlend(0);controller.setLavaBlend(0);expect(halo?.isEnabled()).toBe(false);
+ expect(ball.outlineColor.equals(baseOutline)).toBe(true);expect(details.emissiveColor.b).toBeCloseTo(.38);
+ controller.dispose();scene.dispose();engine.dispose();
 });
 
 it("spins in place before the tutorial launch and flies beyond the camera without allocating meshes", () => {

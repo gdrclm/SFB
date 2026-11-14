@@ -1,4 +1,5 @@
 import { ActiveRunClock } from "../run/ActiveRunClock";
+import type { SceneMusic } from "../feedback/BackgroundMusic";
 import { WorldStep } from "../core/WorldStep";
 import { worldProgression } from "../progression/WorldProgression";
 import { BaitZoneController } from "../challenges/BaitZoneController";
@@ -19,7 +20,7 @@ import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
 import { getGameSounds } from "../feedback/GameSounds";
-import { ChallengeDirector } from "../challenges/ChallengeDirector";
+import { CHALLENGES, ChallengeDirector } from "../challenges/ChallengeDirector";
 import { BoostCoach } from "../boost/BoostCoach";
 import { describeFailedImpact } from "../run/FailedImpact";
 import { tutorialVisuals as tutorialArt } from "./TutorialController";
@@ -27,7 +28,7 @@ import { currentMission, MISSION_REWARD, type MissionEvent } from "../run/Missio
 import { renderPinnedMission } from "../run/renderMissionBoard";
 import { waitForPlatformSprites } from "../platform/PlatformSprites";
 import { advanceIdleTime } from "../platform/PlatformIdle";
-import { setPlatformCrystalBlend } from "../platform/PlatformCrystalSkin";
+import { setPlatformCrystalBlend,setPlatformLavaBlend } from "../platform/PlatformCrystalSkin";
 import type { RunSceneResources } from "../scene/RunSceneResources";
 import { getHaptics } from "../feedback/Haptics";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -59,6 +60,9 @@ import { RunWallet } from "../currency/RunWallet";
 import { SuccessfulHitEffects } from "../effects/SuccessfulHitEffects";
 import { UnsuccessfulHitEffects } from "../effects/UnsuccessfulHitEffects";
 import { PointerHorizontalInput } from "../input/HorizontalInput";
+import { PlatformMechanics } from "../platform/PlatformMechanics";
+import { PlatformMechanicsView } from "../platform/PlatformMechanicsView";
+import { MechanicPacing } from "../platform/MechanicPacing";
 import { PlatformLabels } from "../platform/PlatformLabels";
 import { nearestInCurrentLane } from "../platform/PlatformReadability";
 import { PlatformGenerator } from "../platform/PlatformGenerator";
@@ -86,6 +90,7 @@ export interface PauseMenuElements {
 }
 
 export interface GameApplicationActions {
+  readonly music: SceneMusic;
   readonly guided?: boolean;
   readonly developerStartDepth?: number | undefined;
   readonly ranked?: boolean;
@@ -234,6 +239,9 @@ export class GameApplication {
   #platformPool: PlatformPool | null = null;
   #platformLabels: PlatformLabels | null = null;
   #platformGenerator: PlatformGenerator | null = null;
+  #platformMechanics: PlatformMechanics | null = null;
+  #platformMechanicsView: PlatformMechanicsView | null = null;
+  #mechanicPacing: MechanicPacing | null = null;
   #phaseOneController: PhaseOneController | null = null;
   #collisionResolver: CollisionResolver | null = null;
   #successfulHitHandler: SuccessfulPlatformHitHandler | null = null;
@@ -386,6 +394,8 @@ export class GameApplication {
     this.#backdrop = new DepthBackdrop(this.#scene, mainScene.cameraRig, {
       theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
     }, this.#actions.developerStartDepth ?? 0);
+    this.#actions.music.setPaused(false);
+    this.#actions.music.setCrystalBlend(this.#backdrop.crystalBlend);
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = true;
@@ -491,6 +501,18 @@ export class GameApplication {
     this.#unsubscribePlatformGenerated = this.#platformGenerator.onPlatformGenerated(
       (plan, additionalCell) => {
         this.#coinGenerator?.handlePlatformGenerated(plan, additionalCell);
+        if (!additionalCell && plan.externalEncounter && plan.encounterRowIndex === 0) {
+          this.#baitZone?.cancel();
+          if (plan.encounterTheme === "bait") this.#baitZone?.arm();
+          const challenge = CHALLENGES.find(candidate => candidate.theme === plan.encounterTheme);
+          if (challenge !== undefined) {
+            const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
+            notice.dataset.theme = challenge.theme;
+            requireMenuElement(notice, "strong").textContent = challenge.title;
+            requireMenuElement(notice, "span").textContent = challenge.text;
+            this.#challengeRemaining = 7;
+          }
+        }
       },
     );
     this.#syncPlayfieldWidth();
@@ -502,15 +524,8 @@ export class GameApplication {
     }, () => { this.#platformGenerator?.queueEncounter("breather"); });
     this.#fixedStep.register(this.#baitZone);
     this.#challengeDirector = new ChallengeDirector((challenge) => {
-      this.#baitZone?.cancel();
-      if (challenge.theme === "bait") this.#baitZone?.arm();
-      this.#platformGenerator?.queueEncounter(challenge.theme);
-      const notice = requireMenuElement(this.#interfaceLayerElement, "#challenge-notice");
-      notice.dataset.theme = challenge.theme;
-      requireMenuElement(notice, "strong").textContent = challenge.title;
-      requireMenuElement(notice, "span").textContent = challenge.text;
-      this.#challengeRemaining = 7;
-    }, Math.random, () => worldProgression(this.#runProgress.depth));
+      this.#platformGenerator?.scheduleEncounter(challenge.theme);
+    }, Math.random, () => this.#platformGenerator?.progression??worldProgression(this.#runProgress.depth),()=>this.#platformGenerator?.completedSequenceCount??0);
     this.#powers = new PowerUpController(this.#config.powers, this.#ballController,
       () => !this.#ballController?.isBouncing && (this.#gameState.current === GameState.Playing || this.#gameState.current === GameState.SlowMode),
       kind => {
@@ -566,8 +581,36 @@ export class GameApplication {
     );
     this.#unsubscribeCollision = this.#collisionResolver.onCollision(this.#handleCollision);
     this.#fixedStep.register(this.#successfulHitHandler);
+    const mechanicViewport=()=>{
+      const camera=mainScene.camera,p=camera.globalPosition;
+      return {left:p.x+(camera.orthoLeft??-5),right:p.x+(camera.orthoRight??5),bottom:p.y+(camera.orthoBottom??-6),top:p.y+(camera.orthoTop??6)};
+    };
+    this.#mechanicPacing=new MechanicPacing(this.#ballController,()=>this.#platformPool?.platforms??[],mechanicViewport,
+      this.#config.ball.movementScale,()=>!this.#guidedRun&&!this.#powers?.invulnerable,kind=>{
+        const wind=kind.startsWith("wind"),notice=requireMenuElement(this.#interfaceLayerElement,"#challenge-notice");
+        notice.dataset.theme="trap";
+        requireMenuElement(notice,"strong").textContent=kind==="moving"?"↔ Подвижная каретка":wind?"➜ Ветровая турбина":"⊕ Бронированная турель";
+        requireMenuElement(notice,"span").textContent=kind==="moving"?"Посмотри на ход по направляющим. Затем пройди мимо или разбей каретку.":wind?"Струи показывают направление ветра. Удерживай траекторию против порыва.":"Ствол фиксирует цель перед выстрелом. Сместись с линии прицеливания.";
+        this.#challengeRemaining=6;
+      });
+    this.#fixedStep.register(this.#mechanicPacing);
     this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
       this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
+    const mechanicBall=this.#ballController;
+    this.#platformMechanics=new PlatformMechanics(mechanicBall,()=>this.#platformPool?.platforms??[],mechanicViewport,
+      this.#config.ball.movementScale,this.#config.ball.radius,direction=>{
+      if(this.#powers?.invulnerable||this.#powers?.covers(mechanicBall.position)||mechanicBall.isBouncing)return;
+      mechanicBall.applyLateralImpulse(direction*6,.4);
+      getGameSounds().play("zone-trap");
+      this.#status.textContent=direction<0?"Порыв ветра ← · удерживай траекторию":"Порыв ветра → · удерживай траекторию";
+    },platform=>{
+      if(this.#powers?.invulnerable||this.#powers?.covers(mechanicBall.position)||mechanicBall.isBouncing)return;
+      const source=this.#platformPool?.platforms.find(candidate=>candidate===platform);
+      if(source)this.#handleCollision({platform:source,ballSpeed:mechanicBall.fallSpeed,assessment:"insufficient",contact:{...mechanicBall.position}},true);
+    },()=>!this.#guidedRun && this.#gameState.current!==GameState.GameOver);
+    this.#platformMechanicsView=new PlatformMechanicsView(this.#scene,this.#platformMechanics);
+    this.#fixedStep.register(this.#platformMechanics);
+    this.#fixedStep.register(this.#platformMechanicsView);
     this.#fixedStep.register(updateRunState);
     this.#fixedStep.register(this.#ballVisualController);
     this.#fixedStep.register(this.#cameraController);
@@ -647,6 +690,8 @@ export class GameApplication {
   }
 
   #clearRun(keepScene: boolean): void {
+    this.#actions.music.setCrystalBlend(0);
+    this.#actions.music.setPaused(false);
     this.#runClock.setActive(false, performance.now());
     this.#runSeconds = this.#actions.ranked ? Math.min(120, this.#runClock.seconds) : this.#runClock.seconds;
     if (this.#runStarted) this.#finishRun(this.#lives.remainingLives === 0 ? "completed" : "interrupted");
@@ -654,6 +699,8 @@ export class GameApplication {
     this.#lifeFeedback?.dispose(); this.#lifeFeedback = null;
     if (this.#recordHapticTimer !== null) clearTimeout(this.#recordHapticTimer);
     this.#haptics.cancel();
+    this.#platformMechanicsView?.dispose();this.#platformMechanicsView=null;
+    this.#platformMechanics?.clear();this.#platformMechanics=null;
     this.#contextGuide?.dispose();
     this.#tutorialFinish?.remove(); this.#tutorialFinish = null; this.#tutorialFinishAge = null;
     this.#interfaceLayerElement.classList.remove("tutorial-finale");
@@ -717,6 +764,7 @@ export class GameApplication {
     }
     this.#horizontalInput = null;
     this.#ballController = null;
+    this.#mechanicPacing = null;
     this.#ballVisualController = null;
     this.#cameraController = null;
     this.#boostController = null;
@@ -789,8 +837,12 @@ export class GameApplication {
     this.#contextGuide?.setPaused(hideNotices);
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
     this.#backdrop?.update(this.#guidedRun ? 0 : this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
+    this.#actions.music.setPaused(isPaused);
+    this.#actions.music.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
+    this.#ballVisualController?.setLavaBlend(this.#backdrop?.lavaBlend??0);
     if (this.#scene !== null) setPlatformCrystalBlend(this.#scene, this.#backdrop?.crystalBlend ?? 0);
+    if(this.#scene!==null)setPlatformLavaBlend(this.#scene,this.#backdrop?.lavaBlend??0);
     this.#lifeFeedback?.render(realDeltaSeconds, isPaused);
     if (this.#defeatPending && !isPaused) {
       this.#ballVisualController?.renderDefeat(realDeltaSeconds, this.#lifeFeedback?.deathAge ?? 0);
@@ -870,23 +922,27 @@ export class GameApplication {
         && Math.abs(platform.mesh.position.y - this.#ballController.position.y) < 12 && effects < 3
         && pool.beginRelease(platform)) {
         effects += 1;
-        this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6);
+        this.#successfulHitEffects.playPlatformBreak(platform, () => { pool.completeRelease(platform); }, 1.6,this.#ballController.fallSpeed);
       } else pool.release(platform);
     }
   }
 
-  readonly #handleCollision = (collision: PlatformCollision): void => {
+  readonly #handleCollision = (collision: PlatformCollision, projectile = false): void => {
     if (this.#lives.remainingLives === 0) return;
     const boostWasAvailable = this.#boostController?.canBoost ?? false;
     if (this.#powers?.covers(collision.platform.mesh.position)) { this.#sweepAnnihilation(); return; }
     const powered = this.#powers?.invulnerable ?? false;
-    const destroyed = this.#successfulHitHandler?.handle(collision, powered) ?? false;
+    if(projectile && powered)return;
+    const destroyed = !projectile && (this.#successfulHitHandler?.handle(collision, powered) ?? false);
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
       const feedback = this.#successfulHitHandler?.lastFeedback;
       this.#ballVisualController?.react("break", feedback ?? undefined);
+      const power=this.#ballController.powerBreakSeconds>0;
+      const audible=this.#feel?.breakAt(collision.contact??this.#ballController.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75,
+        collision.ballSpeed,collision.platform.appearance??"stone",power,feedback ?? undefined);
+      if(audible)this.#actions.music.duck?.(power?.40:.26);
       if (feedback) {
-        this.#feel?.breakAt(collision.platform.mesh.position, feedback);
         this.#speedFeedback?.playBreak(feedback.power);
         if (!this.#reducedMotion) this.#cameraController?.playSpeedKick(.25 + feedback.power * .5, feedback.holdSeconds);
       }
@@ -935,9 +991,9 @@ export class GameApplication {
         this.#emitFailedImpact();
         this.#status.textContent = "Забег завершён · все жизни потеряны";
         this.#pauseButtonElement.disabled = true;
-        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
+        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = projectile ? "Попадание снаряда платформы-турели" : describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
-        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
+        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = projectile ? "Уходи с линии прицеливания или разрушай турель до выстрела." : boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
         this.#defeatPending = true;
         this.#lifeFeedback?.beginDefeat();
         return;
@@ -945,7 +1001,7 @@ export class GameApplication {
 
       this.#opening?.discover("life");
       this.#emitFailedImpact();
-      this.#status.textContent = `Ошибка · отскок · скорость ${collision.ballSpeed.toFixed(1)} ниже прочности ${strength} · сброс до ${this.#config.ball.startFallSpeed.toFixed(1)}`;
+      this.#status.textContent = projectile ? "Попадание снаряда · потеря жизни и отскок" : `Ошибка · отскок · скорость ${collision.ballSpeed.toFixed(1)} ниже прочности ${strength} · сброс до ${this.#config.ball.startFallSpeed.toFixed(1)}`;
       return;
     }
 
@@ -1155,6 +1211,7 @@ export class GameApplication {
     this.#gameState.transitionTo(GameState.Paused);
     getGameSounds().stop();
     this.#feel?.setPaused(true);
+    this.#actions.music.setPaused(true);
     this.#syncRunClock(performance.now());
     this.#pauseMenuElement.hidden = false;
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");
@@ -1169,6 +1226,7 @@ export class GameApplication {
     }
 
     this.#gameState.transitionTo(this.#stateBeforePause);
+    this.#actions.music.setPaused(false);
     this.#lastFrameTimeMs = performance.now(); this.#syncRunClock(this.#lastFrameTimeMs);
     this.#pauseMenuElement.hidden = true;
     this.#pauseButtonElement.setAttribute("aria-label", "Открыть меню паузы");
@@ -1396,7 +1454,7 @@ export class GameApplication {
     this.#boostButtonElement.classList.toggle("boost-opportunity", opportunity);
     this.#boostButtonElement.style.setProperty("--approach-glow", String((Math.sin(elapsed * Math.PI * 1.6) + 1) / 2));
     this.#comboView?.render(this.#combo);
-    this.#speedValueElement.dataset.power = ball.fallSpeed >= 30 ? "high" : ball.fallSpeed >= 18 ? "rising" : "base";
+    this.#speedValueElement.dataset.power = ball.powerBreakSeconds>0?"flow":ball.fallSpeed >= 30 ? "high" : ball.fallSpeed >= 18 ? "rising" : "base";
     this.#comboView?.setPaused(paused);
     const phase = this.#phaseOneController;
     if (phase !== null) {

@@ -10,6 +10,8 @@ import {
   type PlatformEncounterTheme,
 } from "./PlatformRoutePlanner";
 import type { PhaseOneController } from "../progression/PhaseOneController";
+import {CourseSequenceProgress} from "./CourseSequenceProgress";
+import type {WorldProgression} from "../progression/WorldProgression";
 
 type GeneratorBall = Pick<BallController, "fallSpeed" | "position"> & Partial<Pick<BallController, "previousPosition">>;
 type GeneratorPool = Pick<
@@ -20,6 +22,7 @@ type DifficultySource = Pick<PhaseOneController, "currentDifficulty">;
 export type PlatformGeneratedListener = (plan: PlannedPlatform, additionalCell: boolean) => void;
 
 interface RowLayout {
+  readonly createdAt:number;
   readonly y: number;
   lowestY: number;
   readonly members: readonly Readonly<{ x: number; yOffset: number; properties: PlatformActivationProperties }>[];
@@ -38,6 +41,11 @@ export class PlatformGenerator implements FixedSimulationSystem {
   readonly #rows = new Map<string, RowLayout>();
   readonly #bands = new WeakMap<PlatformController, { key: string; activationId: number }>();
   readonly #random: () => number;
+  #motionClock=0;
+  #motionAdvanced = false;
+  readonly #sequenceProgress=new CourseSequenceProgress();
+  public get completedSequenceCount():number{return this.#sequenceProgress.count;}
+  public get progression():WorldProgression{return this.#planner.progression;}
   public enabled = true;
   public allowSlowPlatforms = true;
   readonly #generatedListeners = new Set<PlatformGeneratedListener>();
@@ -62,6 +70,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       ? Math.min(...activeY)
       : ball.position.y;
     this.#planner = new PlatformRoutePlanner(initialLowestY, config, random);
+    this.#planner.setCompletedSequences(0);
     this.#rememberInitialRows();
   }
 
@@ -71,9 +80,12 @@ export class PlatformGenerator implements FixedSimulationSystem {
   }
 
   public queueEncounter(theme: PlatformEncounterTheme): void { this.#planner.queueEncounter(theme); }
+  public scheduleEncounter(theme: PlatformEncounterTheme): void { this.#planner.scheduleEncounter(theme); }
 
   public resumeFromCurrentPosition(): void {
     this.#planner = new PlatformRoutePlanner(this.#ball.position.y, this.#config, this.#random);
+    this.#sequenceProgress.reset();this.#planner.setCompletedSequences(0);
+    this.#motionClock=0;
     this.#rows.clear();
     this.#rememberInitialRows();
     this.enabled = true;
@@ -81,11 +93,16 @@ export class PlatformGenerator implements FixedSimulationSystem {
 
   public advanceMotion(seconds: number): void {
     if (!this.enabled) return;
+    this.#motionAdvanced = true;
     for (const platform of this.#pool.platforms) if (platform.isActive && platform.lateralMotion) platform.advanceMotion(seconds);
   }
 
-  public fixedUpdate(): void {
+  public fixedUpdate(seconds = 0): void {
     if (!this.enabled) return;
+    if (!this.#motionAdvanced) this.advanceMotion(seconds);
+    this.#motionAdvanced = false;
+    this.#motionClock+=Math.max(0,seconds);
+    this.#sequenceProgress.advance(this.#ball.position.y+this.#config.ball.radius,(location,count)=>{this.#planner.setCompletedSequences(count,location);});
     this.#pool.beginGeneration?.();
     this.#recyclePlatformsAbovePlayWindow();
     this.#fillLookAheadWindow();
@@ -135,6 +152,10 @@ export class PlatformGenerator implements FixedSimulationSystem {
         new Vector3(plan.x, plan.y, this.#config.playSpace.depth),
         {
           encounterTheme: plan.encounterTheme,
+          ...(plan.mechanic === undefined ? {} : { mechanic: plan.mechanic }),
+          ...(plan.turretVolley===undefined?{}:{turretVolley:plan.turretVolley}),
+          ...(plan.overlay?{encounterOverlay:plan.overlay}:{}),
+          ...(plan.appearance === undefined ? {} : { appearance: plan.appearance }),
           ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
           strength: plan.strength,
           strengthLevel: plan.strengthLevel,
@@ -158,7 +179,11 @@ export class PlatformGenerator implements FixedSimulationSystem {
           ),
           {
             encounterTheme: plan.encounterTheme,
-            ...(plan.lateralMotion ? { lateralMotion: plan.lateralMotion } : {}),
+            ...(choice.mechanic === undefined ? {} : { mechanic: choice.mechanic }),
+            ...(choice.turretVolley===undefined?{}:{turretVolley:choice.turretVolley}),
+            ...(plan.overlay?{encounterOverlay:plan.overlay}:{}),
+            ...(choice.appearance === undefined ? {} : { appearance: choice.appearance }),
+            ...this.#choiceMotion(plan,choice),
             strength: choice.strength,
             strengthLevel: choice.strengthLevel,
             routeKind: choice.routeKind,
@@ -171,6 +196,10 @@ export class PlatformGenerator implements FixedSimulationSystem {
       }
 
       this.#rememberRow(members, plan);
+      if(plan.sequenceId!==undefined&&plan.location!==undefined){
+        const bottom=Math.min(...members.map(member=>member.mesh.position.y))-Math.max(...this.#config.platforms.map(template=>template.size.height))/2;
+        this.#sequenceProgress.record(plan.sequenceId,plan.location,bottom,plan.sequenceEnd===true);
+      }
       activeAheadCount += 1;
       for (const listener of this.#generatedListeners) {
         listener(plan, false);
@@ -195,6 +224,10 @@ export class PlatformGenerator implements FixedSimulationSystem {
     }
     for (const members of grouped.values()) this.#rememberRow(members);
   }
+  #choiceMotion(plan:PlannedPlatform,choice:NonNullable<PlannedPlatform["choices"]>[number]):Partial<PlatformActivationProperties>{
+    const motion=choice.lateralMotion??(plan.overlay==="moving-gap"?undefined:plan.lateralMotion);
+    return motion?{lateralMotion:motion}:{};
+  }
 
   #rememberRow(platforms: readonly PlatformController[], plan?: PlannedPlatform): void {
     const first = platforms[0];
@@ -203,10 +236,14 @@ export class PlatformGenerator implements FixedSimulationSystem {
     // Store the original layout independently of live meshes: a broken platform
     // must not return when the camera zooms or its pool slot is reused.
     const members = platforms.map(platform => ({
-      x: platform.mesh.position.x,
+      x: platform.lateralMotion?platform.motionCenterX:platform.mesh.position.x,
       yOffset: platform.mesh.position.y - first.mesh.position.y,
       properties: {
         encounterTheme: platform.encounterTheme,
+        ...(platform.mechanic === undefined ? {} : { mechanic: platform.mechanic }),
+        ...(platform.turretVolley===undefined?{}:{turretVolley:platform.turretVolley}),
+        ...(platform.encounterOverlay?{encounterOverlay:platform.encounterOverlay}:{}),
+        ...(platform.appearance === undefined ? {} : { appearance: platform.appearance }),
         ...(platform.lateralMotion ? { lateralMotion: platform.lateralMotion } : {}),
         strength: platform.strength,
         strengthLevel: platform.strengthLevel,
@@ -219,6 +256,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
     const key = first.mesh.position.y.toFixed(4);
     for (const platform of platforms) this.#bands.set(platform, { key, activationId: platform.activationId });
     this.#rows.set(key, {
+      createdAt:this.#motionClock,
       y: first.mesh.position.y, lowestY: Math.min(...platforms.map(platform => platform.mesh.position.y)), members, plan,
       generated: new Set(members.map((_, index) => `0:${String(index)}`)),
       completedCells: new Set([0]),
@@ -243,13 +281,20 @@ export class PlatformGenerator implements FixedSimulationSystem {
           const mirror = Math.abs(cell) % 2 === 0 ? 1 : -1;
           const phase = ((cell * 2 + (row.plan?.encounterRowIndex ?? 0)) % 5 + 5) % 5;
           const depthShift = -.11 * phase * (row.plan?.bandDepth ?? 1);
+          if(row.plan?.overlay&&!row.members.some((_,index)=>row.generated.has(`${String(cell)}:${String(index)}`))&&this.#pool.availableCount<row.members.length)return;
           for (const [index, member] of row.members.entries()) {
             const key = `${String(cell)}:${String(index)}`;
             if (row.generated.has(key)) continue;
             if (this.#pool.availableCount < 1) return;
+            const mirroredProperties:PlatformActivationProperties={...member.properties,
+              ...(mirror<0&&member.properties.mechanic?.startsWith("wind")?{mechanic:member.properties.mechanic==="wind-left"?"wind-right":"wind-left"}:{}),
+              ...(member.properties.lateralMotion?{lateralMotion:{...member.properties.lateralMotion,
+                phase:member.properties.lateralMotion.phase+(this.#motionClock-row.createdAt)*Math.PI*2/member.properties.lateralMotion.period+(mirror<0?Math.PI:0)}}:{}),
+              ...(member.properties.turretVolley?{turretVolley:{...member.properties.turretVolley,id:`${member.properties.turretVolley.id}/cell:${String(cell)}`}}:{}),
+            };
             const platform = this.#pool.acquire(
               new Vector3(member.x * mirror + offset, row.y + member.yOffset + depthShift, this.#config.playSpace.depth),
-              member.properties,
+              mirroredProperties,
             );
             if (!platform) return;
             row.generated.add(key);
@@ -262,8 +307,15 @@ export class PlatformGenerator implements FixedSimulationSystem {
             for (const listener of this.#generatedListeners) {
               listener({
                 ...plan, x: plan.x * mirror + offset, y: plan.y + depthShift, safeLaneX: plan.safeLaneX * mirror + offset,
+                ...(plan.lateralMotion?{lateralMotion:this.#cellMotion(plan.lateralMotion,mirror,row.createdAt)}:{}),
+                ...(plan.turretVolley?{turretVolley:{...plan.turretVolley,id:`${plan.turretVolley.id}/cell:${String(cell)}`}}:{}),
+                ...(plan.movingPassage?{movingPassage:{...plan.movingPassage,x:plan.movingPassage.x*mirror+offset,
+                  phase:plan.movingPassage.phase+(this.#motionClock-row.createdAt)*Math.PI*2/plan.movingPassage.period+(mirror<0?Math.PI:0)}}:{}),
                 ...(plan.passage ? { passage: { ...plan.passage, x: plan.passage.x * mirror + offset } } : {}),
-                ...(plan.choices ? { choices: plan.choices.map(choice => ({ ...choice, x: choice.x * mirror + offset })) } : {}),
+                ...(plan.choices ? { choices: plan.choices.map(choice => ({ ...choice, x: choice.x * mirror + offset,
+                  ...(choice.lateralMotion?{lateralMotion:this.#cellMotion(choice.lateralMotion,mirror,row.createdAt)}:{}),
+                  ...(choice.turretVolley?{turretVolley:{...choice.turretVolley,id:`${choice.turretVolley.id}/cell:${String(cell)}`}}:{}),
+                })) } : {}),
                 ...(plan.coinTrail ? { coinTrail: { ...plan.coinTrail, x: plan.coinTrail.x * mirror + offset,
                   ...(plan.coinTrail.endX === undefined ? {} : { endX: plan.coinTrail.endX * mirror + offset }),
                   ...(plan.coinTrail.curve === undefined ? {} : { curve: plan.coinTrail.curve * mirror }) } } : {}),
@@ -280,6 +332,9 @@ export class PlatformGenerator implements FixedSimulationSystem {
       (platform) =>
         platform.isActive && platform.mesh.position.y < this.#ball.position.y,
     );
+  }
+  #cellMotion(motion:NonNullable<PlatformActivationProperties["lateralMotion"]>,mirror:number,createdAt:number):NonNullable<PlatformActivationProperties["lateralMotion"]>{
+    return {...motion,phase:motion.phase+(this.#motionClock-createdAt)*Math.PI*2/motion.period+(mirror<0?Math.PI:0)};
   }
 
   #countRows(platforms: readonly PlatformController[]): number {

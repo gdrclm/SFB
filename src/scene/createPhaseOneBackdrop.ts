@@ -20,7 +20,7 @@ export function createPhaseOneBackdrop(
   appearance: WorldAppearance = {},
   location: DepthLocation = "sky",
 ): Mesh {
-  if (location === "sky" || location === "crystal") return createIllustratedBackdrop(scene, cameraRig, appearance, location);
+  if (location === "sky" || location === "crystal"||location==="lava") return createIllustratedBackdrop(scene, cameraRig, appearance, location);
   const texture = new DynamicTexture(
     "PhaseOneBackdropTexture",
     { width: 1024, height: 1536 },
@@ -29,8 +29,7 @@ export function createPhaseOneBackdrop(
   );
   const context = texture.getContext() as unknown as CanvasRenderingContext2D;
   const sky = context.createLinearGradient(0, 0, 0, 1536);
-  const palette = location === "lava" ? ["#230c24", "#55223a", "#963d35", "#ed8749"]
-    : ["#050b22", "#131b45", "#2b2258", "#12345d"];
+  const palette = ["#050b22", "#131b45", "#2b2258", "#12345d"];
   for (const [index, color] of palette.entries()) sky.addColorStop(index / 3, color);
   context.fillStyle = sky;
   context.fillRect(0, 0, 1024, 1536);
@@ -62,26 +61,18 @@ export function createPhaseOneBackdrop(
     for (const side of [-1, 1]) {
       const x = side < 0 ? 0 : 1024;
       const reach = 85 + (i * 47 % 100);
-      context.fillStyle = location === "lava" ? "#341a30" : "#0a183a";
+      context.fillStyle = "#0a183a";
       context.beginPath(); context.moveTo(x, y - 50); context.lineTo(x - side * reach, y + 30);
       context.lineTo(x - side * reach * .65, y + 120); context.lineTo(x, y + 180); context.fill();
-      if (location === "lava") {
-        context.strokeStyle = "#ffb464"; context.lineWidth = 5; context.beginPath();
-        context.moveTo(x - side * 30, y); context.lineTo(x - side * 65, y + 55);
-        context.lineTo(x - side * 38, y + 110); context.stroke();
-      }
     }
   }
-  if (location === "abyss") {
-    for (let i = 0; i < 55; i++) {
+  for (let i = 0; i < 55; i++) {
       context.fillStyle = i % 3 ? "#77d5d488" : "#b8a5dfaa";
       context.beginPath(); context.arc((i * 173 + 41) % 1024, (i * 257 + 93) % 1536, i % 3 + 1, 0, Math.PI * 2); context.fill();
-    }
+  }
     context.strokeStyle = "#887bd344"; context.lineWidth = 22;
     context.beginPath(); context.moveTo(30, 100); context.bezierCurveTo(180, 500, 70, 900, 150, 1536); context.stroke();
     context.beginPath(); context.moveTo(1000, 0); context.bezierCurveTo(800, 600, 970, 900, 880, 1536); context.stroke();
-  }
-
   texture.update(false);
   texture.wrapU = Texture.CLAMP_ADDRESSMODE;
   texture.wrapV = Texture.CLAMP_ADDRESSMODE;

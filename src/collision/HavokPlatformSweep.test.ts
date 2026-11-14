@@ -247,3 +247,29 @@ it("moves the real Havok collider with the platform group without recreating mes
   platform.advanceMotion(1); expect(platform.mesh.position.x).toBe(2); expect(platform.lateralMotion).toBeUndefined();
   sweep.dispose(); platform.dispose(); scene.dispose(); engine.dispose();
 });
+
+it("keeps cloud and bubble collision boxes and strength while replacing rock break art and resetting pooled skins",async()=>{
+ const engine=new NullEngine(),scene=new Scene(engine);
+ const wasmFile=await readFile(new URL("../../node_modules/@babylonjs/havok/lib/esm/HavokPhysics.wasm",import.meta.url));
+ const instance=await HavokPhysics({wasmBinary:Uint8Array.from(wasmFile).buffer});
+ const plugin=new HavokPlugin(true,instance);scene.enablePhysics(Vector3.Zero(),plugin);
+ const template=gameConfig.platforms[0];if(!template)throw Error("Missing platform template");
+ const platform=new PlatformController(scene,gameConfig,template),sweep=new HavokPlatformSweep(scene,plugin,.5,[platform]);
+ for(const appearance of ["cloud","bubble"] as const){
+  platform.deactivate();platform.reactivate(new Vector3(0,0,0),{appearance,strength:9,strengthLevel:"low",widthScale:.4});
+  platform.setApproachFeedback(12,0);
+  expect(platform.strength).toBe(9);expect(platform.width).toBe(3);
+  expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})?.id).toBe(platform.id);
+  const rock=scene.getMeshByName(`${platform.id}-sprite`),body=scene.getMeshByName(`${platform.id}-sky-body`);
+  expect(rock?.isVisible).toBe(false);expect(body?.isEnabled()).toBe(true);
+  expect(platform.beginBreak()).toBe(true);platform.playImpact(1,.8);platform.renderBreak(.4);
+  expect(rock?.isVisible).toBe(false);expect(body?.isEnabled()).toBe(true);
+  expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})).toBeNull();
+  if(appearance==="bubble")expect(scene.getMeshByName(`${platform.id}-water-splash`)?.isEnabled()).toBe(true);
+  platform.finishBreak();
+ }
+ platform.reactivate(new Vector3(0,0,0),{strength:9,strengthLevel:"low"});
+ expect(platform.appearance).toBeUndefined();expect(scene.getMeshByName(`${platform.id}-sky-body`)?.isEnabled()).toBe(false);
+ expect(scene.getMeshByName(`${platform.id}-sprite`)?.isVisible).toBe(true);
+ platform.dispose();scene.dispose();engine.dispose();
+});

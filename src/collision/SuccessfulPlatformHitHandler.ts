@@ -7,11 +7,14 @@ import { breakFeedback, type BreakFeedback } from "../effects/BreakFeedback";
 
 export interface SuccessfulHitBall {
   fallSpeed: number;
+  readonly breakFlow?:number;
+  readonly powerBreakSeconds?:number;
+  recordBreak?(resistance:number):void;
   startBreakImpact?(contactY: number, resistance: number, contactX?: number, holdSeconds?: number): void;
 }
 
 export interface SuccessfulHitFeedback {
-  playPlatformBreak(platform: PlatformController, onComplete: () => void, force?: number, feedback?: BreakFeedback): void;
+  playPlatformBreak(platform: PlatformController, onComplete: () => void, force?: number, fallSpeed?:number,power?:boolean, feedback?: BreakFeedback): void;
   playBallReaction(): void;
   playCameraReaction(force?: number): void;
 }
@@ -58,21 +61,24 @@ export class SuccessfulPlatformHitHandler {
       return false;
     }
 
-    const feedback = breakFeedback(collision.ballSpeed, collision.platform.strength, !powered && !this.#reducedMotion && this.#perfectCooldown <= 0);
+    const flow=powered?0:this.#ball.breakFlow??0;
+    if(!powered)this.#ball.recordBreak?.(breakResistance(collision.ballSpeed,collision.platform.strength));
+    const chainPower = !powered && (this.#ball.powerBreakSeconds ?? 0) > 0;
+    const feedback = breakFeedback(collision.ballSpeed, collision.platform.strength,
+      !powered && !chainPower && !this.#reducedMotion && this.#perfectCooldown <= 0);
     this.#lastFeedback = feedback;
     if (feedback.perfect) this.#perfectCooldown = .65;
     const force = feedback.force;
-    this.#feedback.playPlatformBreak(collision.platform, () => {
-      this.#platformPool.completeRelease(collision.platform);
-    }, force, feedback);
-
-    if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction, this.#maximumSpeedLoss);
+    if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction, this.#maximumSpeedLoss,flow);
     if (!powered && this.#ball.startBreakImpact) {
       const contactY = collision.contact?.y ?? collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius;
-      const resistance = breakResistance(collision.ballSpeed, collision.platform.strength);
+      const resistance = breakResistance(collision.ballSpeed, collision.platform.strength) * (1 - flow * .5);
       if (feedback.perfect) this.#ball.startBreakImpact(contactY, resistance, collision.contact?.x, feedback.holdSeconds);
       else this.#ball.startBreakImpact(contactY, resistance, collision.contact?.x);
     }
+    this.#feedback.playPlatformBreak(collision.platform, () => {
+      this.#platformPool.completeRelease(collision.platform);
+    }, force, collision.ballSpeed, chainPower, feedback);
     this.#feedback.playBallReaction();
     this.#feedback.playCameraReaction(force);
     return true;

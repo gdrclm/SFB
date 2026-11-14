@@ -64,7 +64,7 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
 }
 const restartButton = restartButtonElement;
 initializeHudArt();
-initializeFeedbackControls();
+const music = initializeFeedbackControls();
 getGameSounds();
 const network = new NetworkView();
 let requestedGuidedRun = false;
@@ -96,6 +96,7 @@ const lifecycle = new ApplicationLifecycle(
       guided: requestedDeveloperDepth === undefined && !requestedRanked && (requestedGuidedRun || !hasFinishedOpening()),
       developerStartDepth: requestedDeveloperDepth,
       ranked: requestedRanked,
+      music,
       onFinished: (result, durationMs) => { const ticket = activeTicket; if (ticket !== null) network.online.enqueue({ticket,result,durationMs}); },
       restart: restartApplication,
       exit: exitApplication,

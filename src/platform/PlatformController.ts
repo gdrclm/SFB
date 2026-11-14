@@ -1,4 +1,13 @@
 import type { PlatformEncounterTheme } from "./PlatformRoutePlanner";
+import type { PlatformMechanic, TurretVolley } from "./PlatformMechanic";
+import type {CourseOverlay} from "./CourseOverlays";
+import { PlatformMechanicSkin } from "./PlatformMechanicSkin";
+import { SkyPlatformSkin } from "./SkyPlatformSkin";
+import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
+import { CLOUD_BURST_SECONDS } from "./CloudBurstGeometry";
+import { materialBreakTiming } from "../collision/BreakFlow";
+import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
+import { locationAtDepth } from "../progression/WorldProgression";
 import { approachState, requiredSpeed, type ApproachState } from "./PlatformReadability";
 import { platformSpriteRow, debrisSpriteRect } from "./PlatformSpriteLayout";
 import { PlatformSprite, createAtlasSprite, setAtlasQuad } from "./PlatformSprites";
@@ -11,6 +20,10 @@ import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformCon
 
 export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
 export interface PlatformActivationProperties {
+  readonly appearance?: SkyPlatformAppearance;
+  readonly mechanic?: PlatformMechanic;
+  readonly turretVolley?:TurretVolley;
+  readonly encounterOverlay?:CourseOverlay;
   readonly strength: number;
   readonly strengthLevel: PlatformStrengthLevel;
   readonly routeKind?: PlatformRouteKind;
@@ -45,6 +58,14 @@ export class PlatformController {
   #motion: PlatformActivationProperties["lateralMotion"];
   #motionAge = 0;
   #motionStartX = 0;
+  #mechanic: PlatformMechanic | undefined;
+  #turretVolley:TurretVolley|undefined;
+  #encounterOverlay:CourseOverlay|undefined;
+  #machine: PlatformMechanicSkin | null = null;
+  #sky: SkyPlatformSkin | null = null;
+  #appearance: SkyPlatformAppearance | undefined;
+  #materialBreak=false;#pressSeconds=0;#ruptureSeconds=0;#breakContactX=0;#materialForce=1;
+  readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, config: GameConfig, platform: StaticPlatformConfig, active = true) {
     this.id = platform.id; this.size = platform.size; this.#scene = scene;
@@ -55,12 +76,29 @@ export class PlatformController {
     this.mesh.position.copyFrom(this.#startPosition);
     this.mesh.isVisible = false; this.mesh.isPickable = false;
     this.#sprite = new PlatformSprite(this.mesh, this.size.height, this.size.depth, scene);
-    this.#applyActivationProperties({ strength: platform.strength, strengthLevel: platform.strengthLevel });
+    const initialAppearance=skyPlatformAppearance(locationAtDepth(config.startDepth+config.ball.startPosition.y-platform.position.y),"standard",undefined,config.platforms.indexOf(platform));
+    this.#applyActivationProperties({ strength: platform.strength, strengthLevel: platform.strengthLevel,
+      ...(initialAppearance===undefined?{}:{appearance:initialAppearance}) });
     this.#isActive = active;
     this.mesh.setEnabled(active);
     if (active) this.#createPhysicsResources();
   }
   public get lateralMotion(): PlatformActivationProperties["lateralMotion"] { return this.#motion; }
+  public get motionCenterX(): number { return this.#motionStartX; }
+  public get mechanic(): PlatformMechanic | undefined { return this.#mechanic; }
+  public get turretVolley():TurretVolley|undefined{return this.#turretVolley;}
+  public get encounterOverlay():CourseOverlay|undefined{return this.#encounterOverlay;}
+  public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
+  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
+  public get breakDelaySeconds():number{return this.#ruptureSeconds;}
+  public prepareMaterialBreak(speed:number,contactX:number,power=false):void{
+    if(this.#mechanic||this.#appearance==="cloud")return;
+    const timing=materialBreakTiming(speed,this.#strength);
+    this.#materialBreak=true;this.#pressSeconds=timing.press*(power?.7:1);this.#ruptureSeconds=timing.rupture*(power?.8:1);this.#materialForce=power?1.3:1;
+    this.#breakContactX=Math.max(-this.width/2,Math.min(this.width/2,contactX-this.mesh.position.x));
+    if(!this.#appearance)this.#sprite.startPress(this.width,this.#elapsed,this.#breakContactX);
+  }
+  public setMechanicAim(x: number, y: number): void { this.#machine?.aim(x,y); }
   public advanceMotion(seconds: number): void {
     if (!this.#isActive || !this.#motion) return;
     this.#motionAge += Math.max(0, seconds);
@@ -89,6 +127,13 @@ export class PlatformController {
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.
     this.#sprite.mesh.visibility = 1;
+    if(this.#mechanic) {
+      this.#machine?.render(this.#mechanic,this.width,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sprite.mesh.isVisible=false;
+    } else if(this.#appearance) {
+      this.#sky?.render(this.#appearance,this.width,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sprite.mesh.isVisible=false;
+    }
   }
 
   public createBreakFragment(index: number, fragmentWidth: number): Mesh {
@@ -105,12 +150,31 @@ export class PlatformController {
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
     this.#sprite.renderBreak(this.width, 0);
+    if(this.#mechanic||this.#appearance)this.#sprite.mesh.isVisible=false;
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
-  public playImpact(force = 1): void { this.#sprite.impact(this.#elapsed, force); }
+  public playImpact(force = 1, contactX = this.mesh.position.x): void {
+    this.#sprite.impact(this.#elapsed, force);
+    if(this.#appearance)this.#sky?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
+  }
 
-  public renderBreak(progress: number): void { this.#sprite.renderBreak(this.width, progress); }
+  public renderBreak(progress: number): void {
+    if(this.#materialBreak){
+      const age=Math.max(0,progress)*(this.breakEffectSeconds??.48);
+      if(age<this.#ruptureSeconds){
+        const press=Math.min(1,age/this.#pressSeconds),hole=Math.min(1,Math.max(0,(age-this.#pressSeconds)/.018));
+        if(this.#appearance==="bubble")this.#sky?.renderPress(press,this.#breakContactX);
+        else this.#sprite.renderPress(press,this.#materialForce,hole);
+      }else if(this.#appearance==="bubble")this.#sky?.renderBreak((age-this.#ruptureSeconds)/WATER_SPLASH_SECONDS,
+        Math.max(0,1-(age-this.#ruptureSeconds)/.12)*.40,this.#breakContactX);
+      else this.#sprite.renderCollapse(this.width,age-this.#ruptureSeconds);
+      return;
+    }
+    this.#sprite.renderBreak(this.width, progress);
+    if(this.#mechanic)this.#machine?.renderBreak(progress);
+    if(this.#appearance)this.#sky?.renderBreak(progress);
+  }
   public finishBreak(): boolean {
     if (!this.#isBreaking) return false;
     this.mesh.setEnabled(false); this.#isBreaking = false;
@@ -141,15 +205,32 @@ export class PlatformController {
     this.#body?.dispose(); this.#shape?.dispose(); this.#body = null; this.#shape = null;
   }
   #applyActivationProperties(properties: PlatformActivationProperties): void {
+    this.#materialBreak=false;this.#pressSeconds=0;this.#ruptureSeconds=0;
+    this.#mechanic = properties.mechanic;
+    this.#turretVolley=properties.mechanic==="turret"?properties.turretVolley:undefined;
+    this.#encounterOverlay=properties.encounterOverlay;
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
+    this.#appearance=this.#kind==="standard"&&this.#mechanic===undefined?properties.appearance:undefined;
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#tutorialDanger = properties.tutorialDanger === true;
     this.#motion = properties.lateralMotion; this.#motionAge = 0; this.#motionStartX = this.mesh.position.x;
+    if(this.#motion)this.mesh.position.x=this.#motionStartX+this.#motion.amplitude*Math.sin(this.#motion.phase);
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
+    this.#sprite.mesh.isVisible=this.#mechanic===undefined&&this.#appearance===undefined;
+    this.#machine?.reset();
+    this.#sky?.reset();
+    if(this.#mechanic) {
+      this.#machine??=new PlatformMechanicSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
+      this.#machine.render(this.#mechanic,this.width,null,this.#elapsed,this.#reduced);
+    } else this.#machine?.hide();
+    if(this.#appearance){
+      this.#sky??=new SkyPlatformSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
+      this.#sky.render(this.#appearance,this.width,null,this.#elapsed,this.#reduced);
+    }
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,
-      routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
+      routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, appearance:this.#appearance??"island", widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
   }
 }

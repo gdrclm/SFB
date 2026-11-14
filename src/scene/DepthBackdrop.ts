@@ -4,10 +4,10 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { BackdropScenery } from "./BackdropScenery";
 import { advancePageTime, pageProgress } from "./BackdropMotion";
 import { DepthLocations, type DepthLocation } from "./DepthLocations";
 import { createPhaseOneBackdrop, type WorldAppearance } from "./createPhaseOneBackdrop";
+interface BackdropLayer {isReady():boolean;update(travel:number,x:number,y:number,height:number,reduced:boolean,seconds?:number):void}
 
 export class DepthBackdrop {
   readonly #scene: Scene;
@@ -36,8 +36,12 @@ export class DepthBackdrop {
     preloadCrystalBackdrop();
   }
   public get crystalBlend(): number {
-    if (this.#next === null) return this.#currentLocation === "crystal" ? 1 : 0;
-    return (this.#currentLocation === "crystal" ? 1 - this.#blend : 0) + (this.#location === "crystal" ? this.#blend : 0);
+    return this.#locationBlend("crystal");
+  }
+  public get lavaBlend():number{return this.#locationBlend("lava");}
+  #locationBlend(location:DepthLocation):number{
+    if(this.#next===null)return this.#currentLocation===location?1:0;
+    return (this.#currentLocation===location?1-this.#blend:0)+(this.#location===location?this.#blend:0);
   }
   public update(depth: number, realSeconds: number, cameraX = 0): void {
     const location = this.#locations.observe(depth);
@@ -63,8 +67,8 @@ export class DepthBackdrop {
       // That preference still reduces scenery parallax, without skipping the location animation.
       this.#blend = pageProgress(this.#elapsed);
     }
-    this.#place(this.#current, width, height, this.#blend * height);
-    if (this.#next !== null) this.#place(this.#next, width, height, (this.#blend - 1) * height);
+    this.#place(this.#current, width, height, this.#blend * height,realSeconds);
+    if (this.#next !== null) this.#place(this.#next, width, height, (this.#blend - 1) * height,realSeconds);
     if (ready && this.#blend >= 1 && this.#next !== null) {
       this.#current.dispose(false, true);
       this.#current = this.#next; this.#next = null;
@@ -80,13 +84,13 @@ export class DepthBackdrop {
     return (mesh.material as StandardMaterial).diffuseTexture?.isReady() !== false
       && this.#scenery(mesh)?.isReady() !== false;
   }
-  #scenery(mesh: Mesh): BackdropScenery | undefined {
-    return (mesh.metadata as { scenery?: BackdropScenery } | null)?.scenery;
+  #scenery(mesh: Mesh): BackdropLayer | undefined {
+    return (mesh.metadata as { scenery?: BackdropLayer } | null)?.scenery;
   }
-  #place(mesh: Mesh, width: number, height: number, offset: number): void {
+  #place(mesh: Mesh, width: number, height: number, offset: number,seconds:number): void {
     mesh.scaling.set(width / 28, height / 42, 1);
     mesh.position.y = offset;
-    this.#scenery(mesh)?.update(this.#travel, this.#steeringX, this.#rig.position.y + offset, height, this.#reduced);
+    this.#scenery(mesh)?.update(this.#travel, this.#steeringX, this.#rig.position.y + offset, height, this.#reduced,seconds);
   }
   public dispose(): void { this.#birds?.dispose(); this.#next?.dispose(false, true); this.#current.dispose(false, true); }
 }
