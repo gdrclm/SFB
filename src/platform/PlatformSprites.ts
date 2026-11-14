@@ -9,7 +9,7 @@ import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
 import { PlatformImpactSkin } from "./PlatformImpactSkin";
 import { PLATFORM_IMPACT_SECONDS, platformImpactMotion } from "./PlatformImpactMotion";
 import { prepareMechanicSkin } from "./PlatformMechanicSkin";
-import { prepareSurfaceSkin } from "./SurfaceSkin";
+import { prepareSurfaceSkin, surfaceArtTextures } from "./SurfaceSkin";
 import { prepareSkyPlatformSkin, waterSplashTexture } from "./SkyPlatformSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Material } from "@babylonjs/core/Materials/material";
@@ -73,7 +73,7 @@ export function preparePlatformSprites(scene: Scene): void {
 /** Begin falling only after the collision surfaces have visible artwork. */
 export async function waitForPlatformSprites(scene: Scene): Promise<void> {
   await Promise.all([waitForTexture(atlasMaterial(scene, "idle").diffuseTexture),
-    waitForTexture(atlasMaterial(scene, "destroy").diffuseTexture),waitForTexture(atlasMaterial(scene,"debris").diffuseTexture),waitForTexture(waterSplashTexture(scene))]);
+    waitForTexture(atlasMaterial(scene, "destroy").diffuseTexture),waitForTexture(atlasMaterial(scene,"debris").diffuseTexture),waitForTexture(waterSplashTexture(scene)),...surfaceArtTextures(scene).map(waitForTexture)]);
 }
 
 async function waitForTexture(texture: StandardMaterial["diffuseTexture"]): Promise<void> {

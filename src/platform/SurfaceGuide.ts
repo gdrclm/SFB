@@ -1,4 +1,5 @@
 import { SURFACE_INFO, type PlatformSurface } from "./PlatformSurfaces";
+import { SURFACE_ART, SURFACE_ART_URLS, SURFACE_ATLAS_SIZE } from "./SurfaceArt";
 const pictures:Record<PlatformSurface,string>={
  island:'<path d="M12 22H108L89 51 35 55Z" fill="#608597"/><path d="M12 22H108L101 29H20Z" fill="#7ddc42"/><path d="m40 50-6 12m42-12 7 11" stroke="#674521"/>',
  cloud:'<path d="M20 45C1 40 8 24 25 25 26 8 49 7 57 20 70 9 85 20 85 27 108 19 119 45 99 48Z" fill="#c7edff"/>',
@@ -16,7 +17,11 @@ const pictures:Record<PlatformSurface,string>={
  liquid:'<ellipse cx="60" cy="40" rx="48" ry="12" fill="#7450d9" stroke="#e0adff"/><path d="M35 35q12-10 26 0t26 0" fill="none" stroke="#d5adff"/>',
  resonance:'<rect x="17" y="13" width="86" height="38" rx="6" fill="#44276e" stroke="#e280ff"/><circle cx="60" cy="32" r="11" fill="none" stroke="#f2baff" stroke-width="3"/>',
 };
-export function surfacePreview(surface:PlatformSurface):string{return `<svg class="tutorial-platform" viewBox="0 0 120 65" role="img" aria-label="${SURFACE_INFO[surface][0]}">${pictures[surface]}</svg>`;}
+export function surfacePreview(surface:PlatformSurface):string{
+ const art=SURFACE_ART[surface];
+ if(art){const [x,y,w,h]=art.rect;return `<svg class="tutorial-platform" viewBox="${String(x)} ${String(y)} ${String(w)} ${String(h)}" role="img" aria-label="${SURFACE_INFO[surface][0]}"><image href="${SURFACE_ART_URLS[art.atlas]}" width="${String(SURFACE_ATLAS_SIZE)}" height="${String(SURFACE_ATLAS_SIZE)}"/></svg>`;}
+ return `<svg class="tutorial-platform" viewBox="0 0 120 65" role="img" aria-label="${SURFACE_INFO[surface][0]}">${pictures[surface]}</svg>`;
+}
 export function surfaceGuide(surfaces:readonly PlatformSurface[]):string{
  return `<div class="tutorial-platform-list">${surfaces.map(s=>`<article>${surfacePreview(s)}<div><h2>${SURFACE_INFO[s][0]}</h2><p>${SURFACE_INFO[s][1]}</p></div></article>`).join("")}</div>`;
 }
