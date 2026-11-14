@@ -1,4 +1,4 @@
-import { AdaptiveQuality, deviceQuality } from "./AdaptiveQuality";
+import { AdaptiveQuality, initialRenderQuality } from "./AdaptiveQuality";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
@@ -14,6 +14,10 @@ export interface EngineResult {
 function requestsWebGpu(): boolean {
   return new URLSearchParams(window.location.search).get("renderer") === "webgpu";
 }
+function requestsAntialias(): boolean {
+  const quality = initialRenderQuality();
+  return quality === "high" || quality === "ultra";
+}
 
 async function tryCreateWebGpuEngine(canvas: HTMLCanvasElement): Promise<WebGPUEngine | null> {
   if (!requestsWebGpu() || !(await WebGPUEngine.IsSupportedAsync)) {
@@ -22,7 +26,7 @@ async function tryCreateWebGpuEngine(canvas: HTMLCanvasElement): Promise<WebGPUE
 
   const engine = new WebGPUEngine(canvas, {
     adaptToDeviceRatio: false,
-    antialias: deviceQuality() === "high",
+    antialias: requestsAntialias(),
   });
   await engine.initAsync();
   return engine;
@@ -36,7 +40,7 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<EngineRes
 
   const engine = new Engine(
     canvas,
-    deviceQuality() === "high",
+    requestsAntialias(),
     {
       disableWebGL2Support: false,
       preserveDrawingBuffer: false,

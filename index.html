@@ -201,6 +201,17 @@
       </dialog>
       <dialog id="game-settings" class="arcade-records" aria-labelledby="settings-title">
         <header class="records-header"><h1 id="settings-title">Настройки</h1><button id="settings-close" class="settings-close" type="button" aria-label="Закрыть настройки">×</button></header>
+        <div class="graphics-settings">
+          <label for="graphics-quality">Графика</label>
+          <select id="graphics-quality" aria-describedby="graphics-quality-hint">
+            <option value="auto">Авто</option>
+            <option value="low">Низкая</option>
+            <option value="medium">Средняя</option>
+            <option value="high">Высокая</option>
+            <option value="ultra">Ультра</option>
+          </select>
+          <p id="graphics-quality-hint" role="status">Подбирает чёткость по скорости устройства.</p>
+        </div>
         <div class="feedback-controls">
           <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
           <button class="pause-setting" type="button" data-feedback-setting="effects" aria-pressed="true"><span aria-hidden="true">♪</span><span>Эффекты</span><strong class="setting-state">ВКЛ</strong></button>

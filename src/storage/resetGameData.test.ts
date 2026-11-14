@@ -6,6 +6,7 @@ function storageFixture() {
     ["speed-fall-ball.profile.v1", "purchases, coins, missions"],
     ["speed-fall-ball.run-history.v1", "records"],
     ["speed-fall-ball.music-enabled", "false"],
+    ["speed-fall-ball.graphics-quality", "ultra"],
     ["speed-fall-ball.guided-opening.v1", "true"],
     ["other-project.save", "keep"],
   ]);

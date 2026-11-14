@@ -18,6 +18,7 @@ import { GameApplication } from "./app/GameApplication";
 import { getPlayerProfile } from "./shop/PlayerProfile";
 import { renderMissionBoard } from "./run/renderMissionBoard";
 import { resetGameData } from "./storage/resetGameData";
+import { initializeGraphicsControls } from "./rendering/GraphicsControls";
 
 function requireElement(selector: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(selector);
@@ -64,6 +65,7 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
 }
 const restartButton = restartButtonElement;
 initializeHudArt();
+initializeGraphicsControls();
 const music = initializeFeedbackControls();
 getGameSounds();
 const network = new NetworkView();

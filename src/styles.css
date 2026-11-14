@@ -2267,6 +2267,11 @@ html[data-quality="low"] .feel-shard { filter: none; }
 #game-settings .records-header h1, #records-title { color: #efffff; text-shadow: 0 2px 1px #001126, 0 0 12px #00c8ff66; }
 #records-close, #settings-close { border: 2px solid #1ee4ff; background: linear-gradient(#0c5c9b, #032951); box-shadow: 0 0 7px #00c8ff88, inset 0 1px 2px #b8f9ff; }
 #game-settings .feedback-controls { gap: 10px; }
+.graphics-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(130px, 1fr); align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #29c6f0; border-radius: 14px; background: linear-gradient(#084679, #032347); box-shadow: inset 0 1px 2px #a0eaff88; text-align: left; }
+.graphics-settings label { color: #d9faff; font-size: .9rem; font-weight: 800; }
+#graphics-quality { width: 100%; min-width: 0; min-height: 44px; padding: 7px 10px; border: 1px solid #55ddff; border-radius: 10px; background: #032347; color: #f0ffff; color-scheme: dark; font: inherit; font-size: 1rem; cursor: pointer; }
+#graphics-quality:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }
+#graphics-quality-hint { grid-column: 1 / -1; margin: 0; color: #a2d7ed; font-size: .7rem; line-height: 1.35; }
 #game-settings .feedback-controls button { min-height: 48px; border: 1px solid #29c6f0; border-radius: 14px; background: linear-gradient(#084679, #032347); box-shadow: inset 0 1px 2px #a0eaff88, 0 2px 0 #01152e; padding: 9px 12px; }
 #game-settings .feedback-controls button > :first-child { color: #68e9ff; font-size: 20px; }
 #game-settings .feedback-controls .setting-state { min-width: 45px; padding: 4px 7px; border: 1px solid #b5ffed; border-radius: 11px; background: linear-gradient(#72ffda, #00dc9d 40%, #00946e); color: #003f36; font-size: .62rem; box-shadow: 0 0 7px #00e8aa55, inset 0 1px 2px #e2fff7; }

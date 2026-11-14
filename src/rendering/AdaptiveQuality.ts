@@ -1,14 +1,24 @@
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
+import { getGraphicsSettings, type GraphicsSettings, type RenderQuality } from "./GraphicsSettings";
 
 export type QualityTier = "low" | "medium" | "high";
+const RENDER_BUDGETS = {
+  low: { ratio: .85, pixels: 500_000 },
+  medium: { ratio: 1.15, pixels: 900_000 },
+  high: { ratio: 2, pixels: 3_000_000 },
+  ultra: { ratio: 4, pixels: 8_500_000 },
+} as const;
+const AUTO_HIGH_BUDGET = { ratio: 1.5, pixels: 1_500_000 };
 export function initialQuality(memory?: number, cores?: number): QualityTier {
   if (memory !== undefined && memory <= 2 || cores !== undefined && cores <= 4) return "low";
   return memory !== undefined && memory <= 4 ? "medium" : "high";
 }
-export function renderScale(tier: QualityTier, width: number, height: number, dpr: number): number {
-  const ratio = Math.min(Math.max(1, dpr), tier === "high" ? 1.5 : tier === "medium" ? 1.15 : .85);
-  const pixels = tier === "high" ? 1_500_000 : tier === "medium" ? 900_000 : 500_000;
-  return Math.max(1 / ratio, Math.sqrt(Math.max(1, width * height) / pixels));
+export function renderScale(tier: RenderQuality, width: number, height: number, dpr: number, manual = false): number {
+  // Auto retains its conservative budget. Explicit High/Ultra allow a sharper
+  // framebuffer without adding game objects or changing their collision range.
+  const budget = tier === "high" && !manual ? AUTO_HIGH_BUDGET : RENDER_BUDGETS[tier];
+  const ratio = Math.min(Math.max(1, Number.isFinite(dpr) ? dpr : 1), budget.ratio);
+  return Math.max(1 / ratio, Math.sqrt(Math.max(1, width * height) / budget.pixels));
 }
 /** Sustained frame times drive quality, never an isolated collection/loading stall. */
 export class QualityBudget {
@@ -39,25 +49,37 @@ export class QualityBudget {
   }
 }
 const qualities = new WeakMap<AbstractEngine, AdaptiveQuality>();
-export function getRenderQuality(engine: AbstractEngine): QualityTier { return qualities.get(engine)?.tier ?? "high"; }
+export function getRenderQuality(engine: AbstractEngine): RenderQuality { return qualities.get(engine)?.tier ?? "high"; }
 export function deviceQuality(): QualityTier {
   return initialQuality((navigator as Navigator & { deviceMemory?: number }).deviceMemory, navigator.hardwareConcurrency);
+}
+export function initialRenderQuality(): RenderQuality {
+  const mode = getGraphicsSettings().mode;
+  return mode === "auto" ? deviceQuality() : mode;
 }
 export class AdaptiveQuality {
   readonly #engine: AbstractEngine;
   readonly #canvas: HTMLCanvasElement;
-  readonly #budget: QualityBudget;
-  public constructor(engine: AbstractEngine, canvas: HTMLCanvasElement) {
-    this.#engine = engine; this.#canvas = canvas; this.#budget = new QualityBudget(deviceQuality());
+  #budget: QualityBudget;
+  readonly #settings: GraphicsSettings;
+  public constructor(engine: AbstractEngine, canvas: HTMLCanvasElement, settings = getGraphicsSettings()) {
+    this.#engine = engine; this.#canvas = canvas; this.#settings = settings; this.#budget = new QualityBudget(deviceQuality());
+    const unsubscribe = settings.subscribe(() => {
+      this.#budget = new QualityBudget(deviceQuality());
+      this.resize();
+    });
+    engine.onDisposeObservable.addOnce(() => { unsubscribe(); qualities.delete(engine); });
     qualities.set(engine, this); this.resize();
   }
-  public get tier(): QualityTier { return this.#budget.tier; }
+  public get tier(): RenderQuality { return this.#settings.mode === "auto" ? this.#budget.tier : this.#settings.mode; }
+  public get mode(): GraphicsSettings["mode"] { return this.#settings.mode; }
   public update(seconds: number, active: boolean): void {
-    if (this.#budget.observe(seconds, active)) this.resize();
+    if (this.mode === "auto" && this.#budget.observe(seconds, active)) this.resize();
   }
   public resize(): void {
     const bounds = this.#canvas.getBoundingClientRect();
-    this.#engine.setHardwareScalingLevel(renderScale(this.tier, bounds.width, bounds.height, window.devicePixelRatio || 1));
+    this.#engine.setHardwareScalingLevel(renderScale(this.tier, bounds.width, bounds.height, window.devicePixelRatio || 1, this.mode !== "auto"));
     document.documentElement.dataset.quality = this.tier;
+    document.documentElement.dataset.graphicsMode = this.mode;
   }
 }
