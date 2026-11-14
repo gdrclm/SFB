@@ -164,10 +164,10 @@ export class PlatformController {
       const age=Math.max(0,progress)*(this.breakEffectSeconds??.48);
       if(age<this.#ruptureSeconds){
         const press=Math.min(1,age/this.#pressSeconds),hole=Math.min(1,Math.max(0,(age-this.#pressSeconds)/.018));
-        if(this.#appearance==="bubble")this.#sky?.renderPress(press,this.#breakContactX);
+        if(this.#appearance==="bubble")this.#sky?.renderPress(press,this.#breakContactX,age);
         else this.#sprite.renderPress(press,this.#materialForce,hole);
       }else if(this.#appearance==="bubble")this.#sky?.renderBreak((age-this.#ruptureSeconds)/WATER_SPLASH_SECONDS,
-        Math.max(0,1-(age-this.#ruptureSeconds)/.12)*.40,this.#breakContactX);
+        Math.max(0,1-(age-this.#ruptureSeconds)/.12)*.40,this.#breakContactX,age);
       else this.#sprite.renderCollapse(this.width,age-this.#ruptureSeconds);
       return;
     }

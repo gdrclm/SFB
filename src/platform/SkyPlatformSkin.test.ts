@@ -7,6 +7,57 @@ import { SkyPlatformSkin } from "./SkyPlatformSkin";
 import { skyPlatformAppearance } from "./SkyPlatformAppearance";
 import { WATER_SPLASH_SECONDS } from "./WaterSplashGeometry";
 import { CLOUD_BURST_SECONDS } from "./CloudBurstGeometry";
+import { PlatformSprite } from "./PlatformSprites";
+import { platformImpactMotion } from "./PlatformImpactMotion";
+
+it.each(["cloud", "bubble"] as const)("gives %s the same settling contact kick as rock without moving its collider or allocating per hit", appearance=>{
+ const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh(appearance,scene),stoneParent=new Mesh("stone",scene);
+ parent.position.set(3,-5,0);parent.scaling.x=.4;stoneParent.scaling.x=.4;
+ const skin=new SkyPlatformSkin(parent,.3,1,scene),stone=new PlatformSprite(stoneParent,.3,1,scene);
+ skin.render(appearance,3,null,10,false);stone.render(3,0,10);
+ const root=scene.getTransformNodeByName(`${appearance}-sky-impact`);if(!root)throw Error("Missing visual impact rig");
+ const resources=[scene.meshes.length,scene.transformNodes.length,scene.materials.length];
+ const baseY=skin.body.position.y;
+ for(let hit=0;hit<5;hit++){
+  const elapsed=10+hit;
+  skin.impact(elapsed,1.6);stone.impact(elapsed,1.6);
+  for(const age of [.025,.07,.15,.30,.44,.6]){
+   skin.render(appearance,3,null,elapsed+age,false);stone.render(3,0,elapsed+age);
+   expect(root.position.y).toBeCloseTo(stone.mesh.position.y,10);
+   expect(root.rotation.z).toBeCloseTo(stone.mesh.rotation.z,10);
+   if(age===.07){expect(root.position.y).toBeLessThan(-.1);expect(root.rotation.z).not.toBe(0);}
+  }
+ }
+ expect(root.position.y).toBe(0);expect(root.rotation.z).toBe(0);
+ expect(skin.body.position.y).toBe(baseY);expect(parent.position.asArray()).toEqual([3,-5,0]);
+ expect(parent.scaling.asArray()).toEqual([.4,1,1]);
+ expect([scene.meshes.length,scene.transformNodes.length,scene.materials.length]).toEqual(resources);
+ skin.impact(20);skin.render(appearance,3,null,20.07,false);skin.reset();
+ expect(root.position.y).toBe(0);expect(root.rotation.z).toBe(0);
+ skin.render(appearance,3,null,21,false);expect(root.position.y).toBe(0);
+ scene.dispose();engine.dispose();
+});
+
+it("continues a bubble's impact through compression and rupture without restarting the shake",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("bubble",scene),skin=new SkyPlatformSkin(parent,.3,1,scene);
+ skin.render("bubble",3,null,0,false);skin.impact(0,1.4,.6);
+ const root=scene.getTransformNodeByName("bubble-sky-impact");if(!root)throw Error("Missing impact rig");
+ skin.renderPress(.7,.6,.06);expect(root.position.y).toBeCloseTo(platformImpactMotion(.06,1.4).y);
+ skin.renderBreak(.01,0,.6,.15);expect(root.position.y).toBeCloseTo(platformImpactMotion(.15,1.4).y);
+ skin.renderBreak(.7,0,.6,.8);expect(root.position.y).toBe(0);expect(root.rotation.z).toBe(0);
+ scene.dispose();engine.dispose();
+});
+
+it("keeps reduced-motion cloud and bubble reactions free of the added shake",()=>{
+ const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("reduced",scene),skin=new SkyPlatformSkin(parent,.3,1,scene);
+ for(const appearance of ["cloud","bubble"] as const){
+  skin.reset();skin.render(appearance,3,null,0,true);skin.impact(0,1.6);
+  skin.render(appearance,3,null,.06,true);skin.renderBreak(.1);
+  const root=scene.getTransformNodeByName("reduced-sky-impact");
+  expect(root?.position.y).toBe(0);expect(root?.rotation.z).toBe(0);
+ }
+ scene.dispose();engine.dispose();
+});
 
 it("mixes islands, clouds and bubbles only among ordinary sky platforms",()=>{
  const appearances=Array.from({length:40},(_,i)=>skyPlatformAppearance("sky","standard",undefined,i));

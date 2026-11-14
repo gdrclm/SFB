@@ -1,4 +1,5 @@
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
@@ -12,6 +13,7 @@ import { platformSpriteRow } from "./PlatformSpriteLayout";
 import { getPlatformCrystalBlend, getPlatformCrystalTint,getPlatformLavaBlend,getPlatformLavaTint } from "./PlatformCrystalSkin";
 import { WaterSplashGeometry, WATER_SPLASH_SECONDS, WATER_SHEET_COLUMNS, WATER_SHEET_ROWS } from "./WaterSplashGeometry";
 import { CloudBurstGeometry, CLOUD_BURST_SECONDS, cloudSplitGap } from "./CloudBurstGeometry";
+import { platformImpactMotion } from "./PlatformImpactMotion";
 
 // Soft icy colors for sky shapes; ordinary orange/red safety cues remain shared.
 const palettes = [
@@ -195,6 +197,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
 export class SkyPlatformSkin {
  public readonly body:Mesh;
  public readonly splash:Mesh;
+ readonly #impactRoot:TransformNode;
  readonly #water=new WaterSplashGeometry();
  readonly #cloud=new CloudBurstGeometry();
  #mist:Mesh|null=null;
@@ -203,19 +206,22 @@ export class SkyPlatformSkin {
  readonly #splashData:SkyUniforms={width:1,height:1,style:2,opacity:0,cue:palettes[0][2],time:0,row:0};
  #appearance:SkyPlatformAppearance="cloud";
  #width=3;#impactAt=-Infinity;#force=1;#reduced=false;#contactX=0;
+ #shakeForce=1;
  public constructor(private readonly parent:Mesh,private readonly height:number,depth:number,scene:Scene){
+  this.#impactRoot=new TransformNode(`${parent.name}-sky-impact`,scene);
+  this.#impactRoot.parent=parent;
   this.body=MeshBuilder.CreatePlane(`${parent.name}-sky-body`,{size:1},scene);
   this.body.setVerticesData("waterData",[0,1,0,1,0,1,0,1],false,2);
   this.splash=new Mesh(`${parent.name}-water-splash`,scene);
   const data=new VertexData();data.positions=this.#water.positions;data.uvs=this.#water.uvs;data.indices=this.#water.indices;data.applyToMesh(this.splash,true);
   this.splash.setVerticesData("waterData",this.#water.waterData,true,2);
   this.body.metadata={sky:this.#bodyData};this.splash.metadata={sky:this.#splashData};
-  for(const mesh of [this.body,this.splash]){mesh.parent=parent;mesh.material=prepareSkyPlatformSkin(scene);mesh.isPickable=false;mesh.position.z=-depth/2-.075;mesh.setEnabled(false);}
+  for(const mesh of [this.body,this.splash]){mesh.parent=this.#impactRoot;mesh.material=prepareSkyPlatformSkin(scene);mesh.isPickable=false;mesh.position.z=-depth/2-.075;mesh.setEnabled(false);}
  }
  public get cloudBurst():Mesh|null{return this.#mist;}
- public reset():void{this.#impactAt=-Infinity;this.#contactX=0;this.hide();}
+ public reset():void{this.#impactAt=-Infinity;this.#contactX=0;this.#impactRoot.position.setAll(0);this.#impactRoot.rotation.setAll(0);this.hide();}
  public hide():void{this.body.setEnabled(false);this.splash.setEnabled(false);this.#mist?.setEnabled(false);}
- public impact(elapsed:number,force=1,contactX=0):void{this.#impactAt=elapsed;this.#force=Math.max(.7,Math.min(1.6,force));this.#contactX=Math.max(-this.#width/2,Math.min(this.#width/2,contactX));}
+ public impact(elapsed:number,force=1,contactX=0):void{this.#impactAt=elapsed;this.#shakeForce=force;this.#force=Math.max(.7,Math.min(1.6,force));this.#contactX=Math.max(-this.#width/2,Math.min(this.#width/2,contactX));}
  public render(appearance:SkyPlatformAppearance,width:number,state:ApproachState|null,elapsed:number,reduced:boolean):void{
   this.#bodyData.pressDepth=0;
   this.#appearance=appearance;this.#width=width;this.#reduced=reduced;
@@ -227,15 +233,17 @@ export class SkyPlatformSkin {
   this.#bodyData.time=reduced?0:elapsed*2;
   this.#renderContact(Math.max(0,elapsed-this.#impactAt),false);
  }
- public renderPress(progress:number,contactX:number):void{
+ public renderPress(progress:number,contactX:number,impactAge=0):void{
   this.#bodyData.pressX=contactX;this.#bodyData.pressDepth=Math.max(0,Math.min(1,progress))*.40;
-  this.#renderContact(0,false);
+  this.#renderContact(0,false,impactAge);
  }
- public renderBreak(progress:number,pressDepth=0,contactX=0):void{
+ public renderBreak(progress:number,pressDepth=0,contactX=0,impactAge?:number):void{
   this.#bodyData.pressDepth=pressDepth;this.#bodyData.pressX=contactX;
-  this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:CLOUD_BURST_SECONDS),true);
+  this.#renderContact(Math.max(0,Math.min(1,progress))*(this.#appearance==="bubble"?WATER_SPLASH_SECONDS:CLOUD_BURST_SECONDS),true,impactAge);
  }
- #renderContact(age:number,breaking:boolean):void{
+ #renderContact(age:number,breaking:boolean,impactAge=age):void{
+  const shake=platformImpactMotion(impactAge,this.#shakeForce,this.#reduced);
+  this.#impactRoot.position.y=shake.y;this.#impactRoot.rotation.z=shake.rotation;
   const cloud=this.#appearance==="cloud",active=Number.isFinite(age)&&age<(cloud?CLOUD_BURST_SECONDS:WATER_SPLASH_SECONDS);
   const envelope=active?Math.sin(Math.min(1,age/.48)*Math.PI)*this.#force:0;
   const motion=this.#reduced ? .25 : 1;
@@ -269,7 +277,7 @@ export class SkyPlatformSkin {
    const data=new VertexData();data.positions=this.#cloud.positions;data.uvs=this.#cloud.uvs;data.indices=this.#cloud.indices;data.applyToMesh(this.#mist,true);
    this.#mist.setVerticesData("waterData",this.#cloud.waterData,true,2);
    this.#mist.metadata={sky:this.#mistData};this.#mist.material=this.body.material;
-   this.#mist.parent=this.parent;this.#mist.position.z=this.body.position.z-.005;this.#mist.isPickable=false;
+   this.#mist.parent=this.#impactRoot;this.#mist.position.z=this.body.position.z-.005;this.#mist.isPickable=false;
   }
   this.#mist.setEnabled(active);if(!active)return;
   this.#mistData.opacity=this.#cloud.update(age,this.#width,this.#contactX,this.body.position.y,this.#force,this.#reduced);

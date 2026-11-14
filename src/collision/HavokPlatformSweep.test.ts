@@ -262,7 +262,20 @@ it("keeps cloud and bubble collision boxes and strength while replacing rock bre
   expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})?.id).toBe(platform.id);
   const rock=scene.getMeshByName(`${platform.id}-sprite`),body=scene.getMeshByName(`${platform.id}-sky-body`);
   expect(rock?.isVisible).toBe(false);expect(body?.isEnabled()).toBe(true);
-  expect(platform.beginBreak()).toBe(true);platform.playImpact(1,.8);platform.renderBreak(.4);
+  platform.playImpact(1.4,.8);platform.setApproachFeedback(12,.06);
+  const impact=scene.getTransformNodeByName(`${platform.id}-sky-impact`);
+  expect(impact?.position.y).toBeLessThan(-.1);expect(impact?.rotation.z).not.toBe(0);
+  expect(platform.mesh.position.asArray()).toEqual([0,0,0]);
+  expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})?.id).toBe(platform.id);
+  expect(platform.beginBreak()).toBe(true);platform.prepareMaterialBreak(50,.8);platform.playImpact(1,.8);
+  const duration=platform.breakEffectSeconds??.48;
+  platform.renderBreak(.06/duration);
+  expect(impact?.position.y).toBeLessThan(-.1);
+  if(appearance==="bubble"){
+   platform.renderBreak((platform.breakDelaySeconds+.02)/duration);
+   expect(Math.abs(impact?.rotation.z??0)).toBeGreaterThan(0);
+  }
+  platform.renderBreak(.4);
   expect(rock?.isVisible).toBe(false);expect(body?.isEnabled()).toBe(true);
   expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})).toBeNull();
   if(appearance==="bubble")expect(scene.getMeshByName(`${platform.id}-water-splash`)?.isEnabled()).toBe(true);

@@ -7,6 +7,7 @@ import { IDLE_ATLAS_SIZE, idleSample, idlePhase, idleSpriteRect } from "./Platfo
 import { PlatformIdleBlend } from "./PlatformIdleBlend";
 import { PlatformCrystalSkin } from "./PlatformCrystalSkin";
 import { PlatformImpactSkin } from "./PlatformImpactSkin";
+import { PLATFORM_IMPACT_SECONDS, platformImpactMotion } from "./PlatformImpactMotion";
 import { prepareMechanicSkin } from "./PlatformMechanicSkin";
 import { prepareSkyPlatformSkin, waterSplashTexture } from "./SkyPlatformSkin";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -128,6 +129,7 @@ export class PlatformSprite {
   #destroying = false;
   #impactAt = -Infinity;
   #impactForce = 1;
+  readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   #bendBase:Float32Array|null=null;
   #bendPositions:Float32Array|null=null;
   #bendX=0;
@@ -136,9 +138,10 @@ export class PlatformSprite {
   #updateImpact(elapsed: number): void {
     if (this.#impactAt === -Infinity) return;
     const t = Math.max(0, elapsed - this.#impactAt);
-    if (t >= .45) { this.resetImpact(); return; }
-    this.mesh.position.y = -.25 * this.#impactForce * Math.exp(-9 * t) * Math.sin(t * 27);
-    this.mesh.rotation.z = .025 * this.#impactForce * Math.exp(-11 * t) * Math.sin(t * 23);
+    if (t >= PLATFORM_IMPACT_SECONDS) { this.resetImpact(); return; }
+    const motion = platformImpactMotion(t, this.#impactForce, this.#reduced);
+    this.mesh.position.y = motion.y;
+    this.mesh.rotation.z = motion.rotation;
   }
   public constructor(parent: Mesh, height: number, depth: number, scene: Scene) {
     this.#parent = parent; this.#height = height; this.#phase = idlePhase(parent.name);
