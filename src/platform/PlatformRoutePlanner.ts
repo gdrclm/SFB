@@ -5,6 +5,7 @@ import { speedAfterBreak } from "../collision/BreakResistance";
 import { courseMechanic, type PlatformMechanic, type TurretVolley } from "./PlatformMechanic";
 import { courseOverlay, type CourseOverlay } from "./CourseOverlays";
 import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
+import { surfaceForCourse, type PlatformSurface } from "./PlatformSurfaces";
 import { createEncounterLayout, createMovingGapLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
@@ -38,6 +39,8 @@ export interface PlannedCoinTrail {
 }
 
 export interface PlannedPlatform {
+  readonly surface?:PlatformSurface;
+  readonly surfaceSeed?:number;
   readonly sequenceId?:number;
   readonly sequenceEnd?:boolean;
   readonly overlay?:CourseOverlay;
@@ -70,6 +73,8 @@ export interface PlannedPlatform {
 }
 
 export interface PlannedPlatformChoice {
+  readonly surface?:PlatformSurface;
+  readonly surfaceSeed?:number;
   readonly turretVolley?:TurretVolley;
   readonly lateralMotion?:Readonly<{amplitude:number;period:number;phase:number}>;
   readonly appearance?: SkyPlatformAppearance;
@@ -267,10 +272,18 @@ export class PlatformRoutePlanner {
         Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction, this.#config.successfulHit.maximumSpeedLoss);
     }
     const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
+    // A stride coprime to both the six- and eight-type palettes avoids repeating
+    // only the first few surfaces whenever a short encounter phrase restarts.
+    const surfaceBase=this.#zoneCycle*5+Math.floor(themeRowIndex/2);
     const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map((member,index) => {
       const appearance=skyPlatformAppearance(this.#progress.location,member.kind,mechanic,this.#zoneCycle*8+Math.floor(themeRowIndex/2)+index);
+      const ordinal=surfaceBase+index;
+      const depth=this.#config.startDepth+this.#config.ball.startPosition.y-this.#nextY;
+      const groupSurface=surfaceForCourse(this.#progress.location,depth,surfaceBase);
+      const surface=member.kind==="standard"&&!mechanic?(groupSurface==="resonance"?groupSurface:surfaceForCourse(this.#progress.location,depth,ordinal)):undefined;
       return {
       ...member,
+      ...(surface?{surface,surfaceSeed:surface==="resonance"?Math.floor(themeRowIndex/2)%3:ordinal}:{}),
       ...(overlay==="moving-gap"?{yOffset:0}:overlay==="turret-volley"?{
         yOffset:-index*turretStep,turretVolley:{id:`${this.#progress.location}:${String(this.#sequenceId)}:${String(themeRowIndex)}`,index,count:3},
       }:{}),
@@ -312,6 +325,7 @@ export class PlatformRoutePlanner {
       kind: primary.kind,
       ...(primary.mechanic === undefined ? {} : { mechanic: primary.mechanic }),
       ...(primary.appearance === undefined ? {} : { appearance: primary.appearance }),
+      ...(primary.surface?{surface:primary.surface,surfaceSeed:primary.surfaceSeed??0}:{}),
       ...(primary.turretVolley===undefined?{}:{turretVolley:primary.turretVolley}),
       encounterTheme: layoutTheme,
       section: this.#section, worldPhase: this.#progress.phase, location: this.#progress.location,
@@ -332,6 +346,7 @@ export class PlatformRoutePlanner {
           kind: member.kind,
           ...(member.mechanic === undefined ? {} : { mechanic: member.mechanic }),
           ...(member.appearance === undefined ? {} : { appearance: member.appearance }),
+          ...(member.surface?{surface:member.surface,surfaceSeed:member.surfaceSeed??0}:{}),
           ...(member.turretVolley===undefined?{}:{turretVolley:member.turretVolley}),
           ...(movingAmplitude>0?{lateralMotion:{amplitude:movingAmplitude,period:Math.max(1.35,Math.min(3.8,3.8*(20/Math.max(20,ballSpeed))**.35)),phase:0}}:{}),
           isTrap: member.isTrap,

@@ -58,6 +58,12 @@ export class BallController implements FixedSimulationSystem {
   #lateralDrift = 0;
   #wasInputActive = false;
   #encounterTravelScale = 1;
+  #contactDrag=1;#contactDragRemaining=0;#feather=false;
+  #springBounce=false;
+  public applyContactDrag(factor:number,duration:number):void{
+    this.#contactDrag=Math.max(.1,Math.min(this.#contactDrag,factor));this.#contactDragRemaining=Math.max(this.#contactDragRemaining,duration);
+  }
+  public grantFeather():void{this.#feather=true;}
   public setEncounterTravelScale(scale: number): void {
     this.#encounterTravelScale=Number.isFinite(scale)?Math.max(.01,Math.min(1,scale)):1;
   }
@@ -146,19 +152,21 @@ export class BallController implements FixedSimulationSystem {
     return this.#previousPosition;
   }
 
-  public startBounce(contactY: number, contactX?: number): boolean {
+  public startBounce(contactY: number, contactX?: number, preserveSpeed=false): boolean {
     if (this.isBouncing || !Number.isFinite(contactY)) {
       return false;
     }
-    this.#flow.reset();
+    if(!preserveSpeed)this.#flow.reset();
+    this.#springBounce=preserveSpeed;
 
     this.#bounceLaunchSpeed = Math.max(6, Math.min(10, this.#bounceConfig.bounceSpeed * this.#config.movementScale * 2 + this.#fallSpeed * this.#config.movementScale * .24));
+    if(this.#feather){this.#bounceLaunchSpeed*=1.45;this.#feather=false;}
     this.#bounceContactY = contactY;
     this.#breakElapsed = null;
     this.#verticalVelocity = 0;
     this.#transform.position.y = contactY;
     if (contactX !== undefined) this.#transform.position.x = contactX;
-    this.#bounceRecoverySpeed = this.#config.startFallSpeed + Math.max(0, this.#fallSpeed - this.#config.startFallSpeed) * this.#impactRetention;
+    this.#bounceRecoverySpeed = preserveSpeed?this.#fallSpeed:this.#config.startFallSpeed + Math.max(0, this.#fallSpeed - this.#config.startFallSpeed) * this.#impactRetention;
     this.#fallSpeed = this.#bounceRecoverySpeed;
     this.#bounceElapsedSeconds = 0;
     return true;
@@ -169,6 +177,8 @@ export class BallController implements FixedSimulationSystem {
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
     this.#flow.update(realFixedDeltaSeconds);
+    this.#contactDragRemaining=Math.max(0,this.#contactDragRemaining-realFixedDeltaSeconds);
+    if(this.#contactDragRemaining===0)this.#contactDrag=1;
     this.#copyCurrentPositionToPrevious();
     const previousDrift=this.#lateralDrift;
     const gustActive=this.#impulseRemaining>0;
@@ -219,7 +229,7 @@ export class BallController implements FixedSimulationSystem {
       transmission = t >= 1 ? 1 : this.#breakTransmission + (1 - this.#breakTransmission) * t * t * (3 - 2 * t);
       if (t >= 1) this.#breakElapsed = null;
     }
-    this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission * this.#encounterTravelScale;
+    this.#verticalVelocity = transmission === 0 ? 0 : -this.#fallSpeed * this.#config.movementScale * transmission * this.#encounterTravelScale * this.#contactDrag;
     this.#transform.position.y += this.#verticalVelocity * fixedDeltaSeconds;
   }
 
@@ -236,8 +246,14 @@ export class BallController implements FixedSimulationSystem {
     const flight = Math.max(0, nextElapsed - hold);
     // Match the downward velocity to ordinary falling at the end of recovery.
     const gravity = (this.#bounceLaunchSpeed + this.#bounceRecoverySpeed * this.#config.movementScale) / (duration - hold);
-    this.#transform.position.y = this.#bounceContactY + this.#bounceLaunchSpeed * flight - .5 * gravity * flight * flight;
-    this.#verticalVelocity = flight === 0 ? 0 : this.#bounceLaunchSpeed - gravity * flight;
+    if(this.#springBounce){
+      const u=Math.min(1,flight/(duration-hold)),a=this.#bounceLaunchSpeed,b=this.#bounceRecoverySpeed*this.#config.movementScale;
+      this.#transform.position.y=this.#bounceContactY+(duration-hold)*u*(1-u)*(a*(1-u)+b*u);
+      this.#verticalVelocity=flight===0?0:a+2*(b-2*a)*u+3*(a-b)*u*u;
+    }else{
+      this.#transform.position.y = this.#bounceContactY + this.#bounceLaunchSpeed * flight - .5 * gravity * flight * flight;
+      this.#verticalVelocity = flight === 0 ? 0 : this.#bounceLaunchSpeed - gravity * flight;
+    }
     if (nextElapsed + Number.EPSILON >= duration) {
       this.#bounceElapsedSeconds = null;
       this.#fallSpeed = this.#bounceRecoverySpeed;

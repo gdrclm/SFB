@@ -2,9 +2,28 @@ import { describe, expect, it } from "vitest";
 import { platformSpriteSlices, platformSpriteRect } from "./PlatformSpriteLayout";
 import { gameConfig } from "../config/gameConfig";
 import { PlatformRoutePlanner, type PlannedPlatform, type PlatformEncounterTheme } from "./PlatformRoutePlanner";
+import { SURFACES, type PlatformSurface } from "./PlatformSurfaces";
 
 const themes: readonly PlatformEncounterTheme[] = ["chaos", "trap", "deception", "rich-lane", "danger-lane", "death-tunnel", "break-run"];
 const difficulty = { stageNumber: 6, platformStrength: 12, reactionWindowSeconds: .8 };
+it("actually schedules every surface across short world phrases and carries matching resonance groups",()=>{
+  const found=new Set<PlatformSurface>();
+  for(const startDepth of [0,500,1000,2200]){
+    const planner=new PlatformRoutePlanner(0,{...gameConfig,startDepth},()=>.3);
+    for(let i=0;i<220;i++){
+      const plan=planner.planNext(15,0,difficulty);
+      const row=[plan,...plan.choices??[]];
+      for(const member of row)if(member.surface){
+        found.add(member.surface);
+        expect(member.kind).toBe("standard");expect(member.mechanic).toBeUndefined();
+        expect(member.surfaceSeed).toBeGreaterThanOrEqual(0);
+      }
+      const resonance=row.filter(member=>member.surface==="resonance");
+      if(resonance.length>0)expect(new Set(resonance.map(member=>(member.surfaceSeed??0)%3)).size).toBe(1);
+    }
+  }
+  expect([...found].sort()).toEqual([...SURFACES].sort());
+});
 function plannerFor(theme: PlatformEncounterTheme, variant = 0): PlatformRoutePlanner {
   const planner = new PlatformRoutePlanner(0, gameConfig, () => variant / 4);
   planner.queueEncounter(theme);

@@ -159,7 +159,7 @@ void main(){
  color=mix(color,vec3(.09,.07,.06)+skyTorch.rgb*(torchFacet*.48+torchRim*.30)+color*.16,skyTorch.a);
  gl_FragColor=vec4(color,clamp(alpha*opacity,0.0,1.0));
 }`;
-interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number;pressX?:number;pressDepth?:number}
+interface SkyUniforms {width:number;height:number;style:number;opacity:number;cue:readonly [number,number,number];time:number;row:number;infection?:number;cloudWidth?:number;contactX?:number;splitGap?:number;waveForce?:number;pressX?:number;pressDepth?:number}
 const materials=new WeakMap<Scene,ShaderMaterial>();
 const sheetTextures=new WeakMap<Scene,Texture>();
 export function waterSplashTexture(scene:Scene):Texture{
@@ -187,7 +187,7 @@ export function prepareSkyPlatformSkin(scene:Scene):ShaderMaterial {
   effect.setFloat3("skyShadow",palette[0][0],palette[0][1],palette[0][2]);
   effect.setFloat3("skyFace",palette[1][0],palette[1][1],palette[1][2]);
   effect.setFloat3("skyEdge",palette[2][0],palette[2][1],palette[2][2]);
-  effect.setFloat4("skyGrade",tint[0],tint[1],tint[2],getPlatformCrystalBlend(scene));
+  effect.setFloat4("skyGrade",tint[0],tint[1],tint[2],Math.max(getPlatformCrystalBlend(scene),data.infection??0));
   const torch=getPlatformLavaTint(data.row);effect.setFloat4("skyTorch",torch[0],torch[1],torch[2],getPlatformLavaBlend(scene));
  });
  materials.set(scene,material);material.onDisposeObservable.addOnce(()=>materials.delete(scene));return material;
@@ -222,7 +222,8 @@ export class SkyPlatformSkin {
  public reset():void{this.#impactAt=-Infinity;this.#contactX=0;this.#impactRoot.position.setAll(0);this.#impactRoot.rotation.setAll(0);this.hide();}
  public hide():void{this.body.setEnabled(false);this.splash.setEnabled(false);this.#mist?.setEnabled(false);}
  public impact(elapsed:number,force=1,contactX=0):void{this.#impactAt=elapsed;this.#shakeForce=force;this.#force=Math.max(.7,Math.min(1.6,force));this.#contactX=Math.max(-this.#width/2,Math.min(this.#width/2,contactX));}
- public render(appearance:SkyPlatformAppearance,width:number,state:ApproachState|null,elapsed:number,reduced:boolean):void{
+ public render(appearance:SkyPlatformAppearance,width:number,state:ApproachState|null,elapsed:number,reduced:boolean,infection=0):void{
+  this.#bodyData.infection=infection;
   this.#bodyData.pressDepth=0;
   this.#appearance=appearance;this.#width=width;this.#reduced=reduced;
   this.#bodyData.width=width+.35;this.#bodyData.style=appearance==="cloud"?0:1;

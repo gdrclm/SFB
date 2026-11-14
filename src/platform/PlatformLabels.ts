@@ -1,4 +1,5 @@
 import { approachSymbol } from "./PlatformReadability";
+import { surfaceUsesStrength } from "./PlatformSurfaces";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlatformController } from "./PlatformController";
@@ -41,12 +42,12 @@ export class PlatformLabels {
     const bounds = this.#canvas.getBoundingClientRect();
     const transform = this.#scene.getTransformMatrix();
     for (const { platform, label } of this.#labels) {
-      if (!platform.isActive) { label.hidden = true; continue; }
+      if (!platform.isActive || platform.surface==="hologram") { label.hidden = true; continue; }
       const point = Vector3.Project(platform.mesh.getAbsolutePosition(), Matrix.IdentityReadOnly, transform, viewport);
       const projectedHalfWidth = platform.width / Math.max(.001, (camera.orthoRight ?? 5) - (camera.orthoLeft ?? -5)) * width / 2;
       const visible = point.z >= 0 && point.z <= 1 && point.x + projectedHalfWidth >= 0 && point.x - projectedHalfWidth <= width && point.y >= 0 && point.y <= height;
       const numbers = document.body.dataset.platformNumbers === "true";
-      label.hidden = !visible || !numbers && approachSymbol(platform.approachState) === "";
+      label.hidden = !visible || !surfaceUsesStrength(platform.surface) || !numbers && approachSymbol(platform.approachState) === "";
       if (!visible) continue;
       this.#visible.push(platform);
       if (label.hidden) continue;

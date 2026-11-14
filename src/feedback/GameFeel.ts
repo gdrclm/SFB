@@ -4,6 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { getGameSounds } from "./GameSounds";
 import { breakFeedback, type BreakFeedback } from "../effects/BreakFeedback";
 import type { BreakMaterial } from "./GameSounds";
+import type { PlatformSurface } from "../platform/PlatformSurfaces";
 
 export class GameFeel {
   readonly #scene: Scene;
@@ -92,8 +93,9 @@ export class GameFeel {
     ], 320);
     this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 300, false);
   }
-  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean,speed=10,material:BreakMaterial="stone",power=false, feedback: BreakFeedback = breakFeedback(speed, 1, false)): boolean {
-    const audible=getGameSounds().playBreak(material,speed,feedback.force*(heavy?1.1:1),power);
+  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean,speed=10,material:BreakMaterial="stone",power=false, feedback: BreakFeedback = breakFeedback(speed, 1, false),surface?:PlatformSurface): boolean {
+    const sounds=getGameSounds();
+    const audible=surface?sounds.playSurface(surface,speed,feedback.force*(heavy?1.1:1),power):sounds.playBreak(material,speed,feedback.force*(heavy?1.1:1),power);
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
       { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : power?"4":heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);

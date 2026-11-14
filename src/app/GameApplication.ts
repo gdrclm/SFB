@@ -1,6 +1,9 @@
 import { ActiveRunClock } from "../run/ActiveRunClock";
 import type { SceneMusic } from "../feedback/BackgroundMusic";
 import { WorldStep } from "../core/WorldStep";
+import { SurfaceInteractions } from "../platform/SurfaceInteractions";
+import { SurfaceFXView } from "../platform/SurfaceFXView";
+import { SURFACE_INFO } from "../platform/PlatformSurfaces";
 import { worldProgression } from "../progression/WorldProgression";
 import { BaitZoneController } from "../challenges/BaitZoneController";
 import { EncounterFeedback } from "../feedback/EncounterFeedback";
@@ -239,6 +242,8 @@ export class GameApplication {
   #platformPool: PlatformPool | null = null;
   #platformLabels: PlatformLabels | null = null;
   #platformGenerator: PlatformGenerator | null = null;
+  #surfaces:SurfaceInteractions|null=null;
+  #surfaceFX:SurfaceFXView|null=null;
   #platformMechanics: PlatformMechanics | null = null;
   #platformMechanicsView: PlatformMechanicsView | null = null;
   #mechanicPacing: MechanicPacing | null = null;
@@ -596,6 +601,26 @@ export class GameApplication {
     this.#fixedStep.register(this.#mechanicPacing);
     this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
       this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
+    this.#surfaces=new SurfaceInteractions(this.#ballController,()=>this.#platformPool?.platforms??[],{
+      bounce:()=>{this.#gameState.transitionTo(GameState.BounceRecovery);this.#ballVisualController?.react("combo");this.#haptics.request("bounce");},
+      chip:p=>{
+        p.playImpact(1.3,this.#ballController?.position.x);this.#haptics.request("weakBreak");
+        this.#ballVisualController?.react("break");this.#successfulHitEffects?.playCameraReaction(.85);
+        getGameSounds().playSurface(p.surface??"island",this.#ballController?.fallSpeed??10,.8);
+      },
+      destroy:p=>{this.#clearAnnihilationPlatforms(other=>other===p);},
+      hurt:p=>{const b=this.#ballController;if(b)this.#handleCollision({platform:p,ballSpeed:b.fallSpeed,assessment:"insufficient",contact:{x:b.position.x,y:b.position.y,z:b.position.z}},true);},
+      feather:()=>{this.#ballVisualController?.react("combo");getGameSounds().play("heal");this.#haptics.request("heal");},
+      discover:surface=>{
+        if(this.#challengeRemaining>0)return false;
+        const info=SURFACE_INFO[surface],notice=requireMenuElement(this.#interfaceLayerElement,"#challenge-notice");
+        notice.dataset.theme=surface==="storm"||surface==="spikes"?"trap":"shatter";
+        requireMenuElement(notice,"strong").textContent=`${info[2]} ${info[0]}`;
+        requireMenuElement(notice,"span").textContent=info[1];this.#challengeRemaining=2.2;return true;
+      },
+    },()=>!this.#guidedRun,()=>this.#powers?.invulnerable??false,()=>this.#runProgress.depth,this.#config.ball.movementScale);
+    this.#surfaceFX=new SurfaceFXView(this.#scene,this.#surfaces);
+    this.#fixedStep.register(this.#surfaces);this.#fixedStep.register(this.#surfaceFX);
     const mechanicBall=this.#ballController;
     this.#platformMechanics=new PlatformMechanics(mechanicBall,()=>this.#platformPool?.platforms??[],mechanicViewport,
       this.#config.ball.movementScale,this.#config.ball.radius,direction=>{
@@ -706,6 +731,7 @@ export class GameApplication {
     this.#interfaceLayerElement.classList.remove("tutorial-finale");
     document.body.dataset.guideStage = "off"; document.body.dataset.training = "false";
     this.#platformLabels?.dispose();
+    this.#surfaceFX?.dispose();this.#surfaceFX=null;this.#surfaces=null;
     this.#desktopControls?.dispose(); this.#desktopControls = null;
     this.#powerView?.dispose(); this.#powerView = null;
     this.#powerVisuals?.dispose(); this.#powerVisuals = null; this.#powers = null;
@@ -917,6 +943,7 @@ export class GameApplication {
     let effects = 0;
     for (const platform of pool.platforms) {
       if (!platform.isActive || !contains(platform)) continue;
+      if(platform.surface==="hologram"){pool.release(platform);continue;}
       this.#destroyedPlatformCount += 1;
       if (this.#successfulHitEffects !== null && this.#ballController !== null
         && Math.abs(platform.mesh.position.y - this.#ballController.position.y) < 12 && effects < 3
@@ -929,18 +956,25 @@ export class GameApplication {
 
   readonly #handleCollision = (collision: PlatformCollision, projectile = false): void => {
     if (this.#lives.remainingLives === 0) return;
+    const hazard=projectile?collision.platform.surface:undefined;
+    const hazardReason=hazard==="storm"?"Разряд грозовой тучи":hazard==="spikes"?"Взрыв кристальных шипов":hazard==="crystal"?"Кристальный осколок":"Попадание снаряда платформы-турели";
     const boostWasAvailable = this.#boostController?.canBoost ?? false;
     if (this.#powers?.covers(collision.platform.mesh.position)) { this.#sweepAnnihilation(); return; }
     const powered = this.#powers?.invulnerable ?? false;
     if(projectile && powered)return;
+    if(!projectile){
+      if(this.#surfaces?.beforeHit(collision,powered))return;
+      collision={...collision,assessment:collision.ballSpeed>=collision.platform.strength?"sufficient":"insufficient"};
+    }
     const destroyed = !projectile && (this.#successfulHitHandler?.handle(collision, powered) ?? false);
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
+      this.#surfaces?.destroyed(collision.platform,powered);
       const feedback = this.#successfulHitHandler?.lastFeedback;
       this.#ballVisualController?.react("break", feedback ?? undefined);
       const power=this.#ballController.powerBreakSeconds>0;
       const audible=this.#feel?.breakAt(collision.contact??this.#ballController.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75,
-        collision.ballSpeed,collision.platform.appearance??"stone",power,feedback ?? undefined);
+        collision.ballSpeed,collision.platform.appearance??"stone",power,feedback ?? undefined,collision.platform.surface);
       if(audible)this.#actions.music.duck?.(power?.40:.26);
       if (feedback) {
         this.#speedFeedback?.playBreak(feedback.power);
@@ -991,9 +1025,9 @@ export class GameApplication {
         this.#emitFailedImpact();
         this.#status.textContent = "Забег завершён · все жизни потеряны";
         this.#pauseButtonElement.disabled = true;
-        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = projectile ? "Попадание снаряда платформы-турели" : describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
+        requireMenuElement(this.#gameOverElement, "#death-reason").textContent = projectile ? hazardReason : describeFailedImpact(collision.ballSpeed, collision.platform.strength, this.#config.boost.speedMultiplier);
         requireMenuElement(this.#gameOverElement, "#death-platform").innerHTML = tutorialArt.platform(collision.platform.kind, collision.platform.strength);
-        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = projectile ? "Уходи с линии прицеливания или разрушай турель до выстрела." : boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
+        requireMenuElement(this.#gameOverElement, "#death-hint").textContent = projectile ? hazard?"Уходи из предупреждающего кольца или с траектории осколков.":"Уходи с линии прицеливания или разрушай турель до выстрела." : boostWasAvailable && collision.ballSpeed * this.#config.boost.speedMultiplier >= collision.platform.strength ? "Не хватило скорости · сохрани BOOST для удара" : "Слишком прочная · смени дорожку";
         this.#defeatPending = true;
         this.#lifeFeedback?.beginDefeat();
         return;

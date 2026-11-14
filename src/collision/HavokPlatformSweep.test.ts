@@ -248,7 +248,7 @@ it("moves the real Havok collider with the platform group without recreating mes
   sweep.dispose(); platform.dispose(); scene.dispose(); engine.dispose();
 });
 
-it("keeps cloud and bubble collision boxes and strength while replacing rock break art and resetting pooled skins",async()=>{
+it("keeps cloud and bubble collision boxes, makes clouds harmless and resets pooled break skins",async()=>{
  const engine=new NullEngine(),scene=new Scene(engine);
  const wasmFile=await readFile(new URL("../../node_modules/@babylonjs/havok/lib/esm/HavokPhysics.wasm",import.meta.url));
  const instance=await HavokPhysics({wasmBinary:Uint8Array.from(wasmFile).buffer});
@@ -258,7 +258,7 @@ it("keeps cloud and bubble collision boxes and strength while replacing rock bre
  for(const appearance of ["cloud","bubble"] as const){
   platform.deactivate();platform.reactivate(new Vector3(0,0,0),{appearance,strength:9,strengthLevel:"low",widthScale:.4});
   platform.setApproachFeedback(12,0);
-  expect(platform.strength).toBe(9);expect(platform.width).toBe(3);
+  expect(platform.strength).toBe(appearance==="cloud"?1:9);expect(platform.width).toBe(3);
   expect(sweep.cast({x:0,y:3,z:0},{x:0,y:-3,z:0})?.id).toBe(platform.id);
   const rock=scene.getMeshByName(`${platform.id}-sprite`),body=scene.getMeshByName(`${platform.id}-sky-body`);
   expect(rock?.isVisible).toBe(false);expect(body?.isEnabled()).toBe(true);

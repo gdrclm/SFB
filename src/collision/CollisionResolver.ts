@@ -36,7 +36,7 @@ export class CollisionResolver implements FixedSimulationSystem {
   readonly #ball: CollisionBallState;
   readonly #sweep: PlatformSweep;
   readonly #listeners = new Set<PlatformCollisionListener>();
-  readonly #reportedActivations = new Map<PlatformController, number>();
+  readonly #reportedActivations = new Map<PlatformController, string>();
 
   public constructor(ball: CollisionBallState, sweep: PlatformSweep) {
     this.#ball = ball;
@@ -64,8 +64,10 @@ export class CollisionResolver implements FixedSimulationSystem {
     for (;;) {
       const platform = this.#sweep.cast(start, end);
       if (platform === null) { this.#reportedActivations.clear(); return; }
-      if (this.#reportedActivations.get(platform) === platform.activationId) return;
-      this.#reportedActivations.set(platform, platform.activationId);
+      const revision=platform.collisionRevision;
+      const key=`${String(platform.activationId)}:${String(revision)}`;
+      if (this.#reportedActivations.get(platform) === key) return;
+      this.#reportedActivations.set(platform, key);
       const fraction = this.#sweep.hitFraction;
       const collision: PlatformCollision = {
         platform, ballSpeed: this.#ball.fallSpeed,
@@ -77,7 +79,7 @@ export class CollisionResolver implements FixedSimulationSystem {
         } }),
       };
       for (const listener of this.#listeners) listener(collision);
-      if (platform.isActive || this.#ball.position.x !== end.x || this.#ball.position.y !== end.y || this.#ball.position.z !== end.z) return;
+      if (platform.isActive&&platform.collisionRevision===revision || this.#ball.position.x !== end.x || this.#ball.position.y !== end.y || this.#ball.position.z !== end.z) return;
     }
   }
 

@@ -1,10 +1,11 @@
 export type GameSound = "coin" | "boost" | "break" | "impact" | "heal" | "zone-trap" | "zone-reward" | "zone-shatter";
-export type BreakMaterial="stone"|"bubble"|"cloud";
+import type { PlatformSurface } from "../platform/PlatformSurfaces";
+export type BreakMaterial="stone"|"bubble"|"cloud"|"crystal"|"energy"|"organic";
 export function breakSoundProfile(material:BreakMaterial,speed:number,power=false){
  const energy=Math.max(0,Math.min(1,(speed-10)/100));
  return{duration:(.19-energy*.095)*(power?.82:1),gain:(.75+energy*.40)*(power?1.12:1),
-  thump:material==="stone"?105:material==="bubble"?155:72,
-  crack:material==="stone"?2400:material==="bubble"?680:1100,
+  thump:material==="stone"?105:material==="bubble"?155:material==="energy"?180:72,
+  crack:material==="stone"?2400:material==="bubble"?680:material==="crystal"?4200:material==="energy"?3300:1100,
   whistle:700+energy*1100+(power?350:0)};
 }
 const tones: Record<GameSound, readonly [number, number, number]> = {
@@ -186,6 +187,11 @@ export class GameSounds {
     air.gain.setValueAtTime(.001,now);air.gain.linearRampToValueAtTime(.035*level,now+d*.25);air.gain.exponentialRampToValueAtTime(.001,now+d);
     whistle.connect(air);air.connect(this.#bus??ctx.destination);finish(whistle,[air],now+d);
     return true;
+  }
+  public playSurface(surface:PlatformSurface,speed:number,force=1,power=false):boolean{
+    const materials:Record<PlatformSurface,BreakMaterial>={island:"stone",cloud:"cloud",bubble:"bubble",storm:"energy",nest:"organic",balloons:"bubble",web:"cloud",
+      crystal:"crystal",hologram:"energy",laser:"energy",honeycomb:"crystal",spikes:"crystal",magnet:"energy",liquid:"bubble",resonance:"energy"};
+    return this.playBreak(materials[surface],speed,force,power);
   }
   public stop(): void {
     this.#stopSpeed();

@@ -9,7 +9,7 @@ import { DirectedDebris } from "./DirectedDebris";
 import type { BreakFeedback } from "./BreakFeedback";
 import { platformSpriteRow } from "../platform/PlatformSpriteLayout";
 
-type BreakPlatform=Pick<PlatformController,"renderBreak"> & Partial<Pick<PlatformController,"playImpact"|"breakEffectSeconds"|"prepareMaterialBreak"|"breakDelaySeconds"|"mesh"|"width"|"appearance"|"mechanic"|"kind"|"approachState"|"size">>;
+type BreakPlatform=Pick<PlatformController,"renderBreak"> & Partial<Pick<PlatformController,"surface"|"playImpact"|"breakEffectSeconds"|"prepareMaterialBreak"|"breakDelaySeconds"|"mesh"|"width"|"appearance"|"mechanic"|"kind"|"approachState"|"size">>;
 
 interface PlatformBreakState {
   readonly platform: BreakPlatform;
@@ -105,7 +105,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
       const platform=state.platform;
       if(!state.emitted&&state.elapsedSeconds>=state.holdSeconds+(platform.breakDelaySeconds??0)){
         state.emitted=true;
-        if(!platform.appearance&&!platform.mechanic&&platform.mesh&&platform.width!==undefined){
+        if(!platform.appearance&&!platform.mechanic&&(!platform.surface||platform.surface==="crystal")&&platform.mesh&&platform.width!==undefined){
           const p=platform.mesh.position;
           this.#debris.emit(p.x,p.y,p.z-(platform.size?.depth??1)/2-.05,platform.width,state.contactX,state.fallSpeed*(state.power?1.1:1),
             platformSpriteRow(platform.kind??"standard",platform.approachState??null));

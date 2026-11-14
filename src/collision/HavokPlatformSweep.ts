@@ -67,16 +67,18 @@ export class HavokPlatformSweep implements PlatformSweep {
     let nearest = body === undefined ? null : (this.#platformByTransform.get(body.transformNode) ?? null);
     this.#fraction = nearest ? Math.max(0, Math.min(1, this.#hitResult.hitFraction)) : 1;
     for (const platform of this.#platforms) {
-      if (!platform.isActive || !platform.lateralMotion) continue;
+      if (!platform.isActive || (!platform.lateralMotion && !platform.requiresSurfaceSweep)) continue;
       const center = platform.mesh.position;
       if (Math.min(start.y, end.y) - this.#radius > center.y + platform.size.height / 2
         || Math.max(start.y, end.y) + this.#radius < center.y - platform.size.height / 2
         || Math.min(start.x, end.x) - this.#radius > center.x + platform.width / 2
         || Math.max(start.x, end.x) + this.#radius < center.x - platform.width / 2) continue;
-      const fraction = sphereBoxFraction(start, end,
-        center, { x: platform.width / 2, y: platform.size.height / 2, z: platform.size.depth / 2 }, this.#radius);
-      if (fraction !== null && (nearest === null || fraction < this.#fraction)) {
-        nearest = platform; this.#fraction = fraction;
+      for(const span of platform.collisionSpans){
+        const fraction = sphereBoxFraction(start, end,
+          {x:center.x+span.offset,y:center.y,z:center.z}, { x: span.width / 2, y: platform.size.height / 2, z: platform.size.depth / 2 }, this.#radius);
+        if (fraction !== null && (nearest === null || fraction < this.#fraction)) {
+          nearest = platform; this.#fraction = fraction;
+        }
       }
     }
     return nearest;

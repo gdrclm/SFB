@@ -152,6 +152,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
         new Vector3(plan.x, plan.y, this.#config.playSpace.depth),
         {
           encounterTheme: plan.encounterTheme,
+          ...(plan.surface?{surface:plan.surface,surfaceSeed:plan.surfaceSeed??0}:{}),
           ...(plan.mechanic === undefined ? {} : { mechanic: plan.mechanic }),
           ...(plan.turretVolley===undefined?{}:{turretVolley:plan.turretVolley}),
           ...(plan.overlay?{encounterOverlay:plan.overlay}:{}),
@@ -179,6 +180,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
           ),
           {
             encounterTheme: plan.encounterTheme,
+            ...(choice.surface?{surface:choice.surface,surfaceSeed:choice.surfaceSeed??0}:{}),
             ...(choice.mechanic === undefined ? {} : { mechanic: choice.mechanic }),
             ...(choice.turretVolley===undefined?{}:{turretVolley:choice.turretVolley}),
             ...(plan.overlay?{encounterOverlay:plan.overlay}:{}),
@@ -240,6 +242,7 @@ export class PlatformGenerator implements FixedSimulationSystem {
       yOffset: platform.mesh.position.y - first.mesh.position.y,
       properties: {
         encounterTheme: platform.encounterTheme,
+        ...(platform.surface?{surface:platform.surface,surfaceSeed:platform.surfaceSeed}:{}),
         ...(platform.mechanic === undefined ? {} : { mechanic: platform.mechanic }),
         ...(platform.turretVolley===undefined?{}:{turretVolley:platform.turretVolley}),
         ...(platform.encounterOverlay?{encounterOverlay:platform.encounterOverlay}:{}),

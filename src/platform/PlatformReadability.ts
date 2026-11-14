@@ -8,6 +8,8 @@ export function approachState(speed: number, strength: number, boostAvailable = 
   return secondsToImpact <= .7 ? "danger" : "neutral";
 }
 interface LanePlatform {
+  readonly surfaceCollidable?:boolean;
+  readonly collisionSpans?:readonly {readonly offset:number;readonly width:number}[];
   readonly isActive: boolean;
   readonly width: number;
   readonly strength?: number;
@@ -18,8 +20,9 @@ export function nearestInCurrentLane<T extends LanePlatform>(
 ): T | null {
   let nearest: T | null = null;
   for (const platform of platforms) {
-    if (!platform.isActive || platform.mesh.position.y >= ball.y ||
+    if (!platform.isActive || platform.surfaceCollidable===false || platform.mesh.position.y >= ball.y ||
       Math.abs(platform.mesh.position.x - ball.x) > platform.width / 2 + radius) continue;
+    if(platform.collisionSpans&&!platform.collisionSpans.some(span=>Math.abs(platform.mesh.position.x+span.offset-ball.x)<=span.width/2+radius))continue;
     if (nearest === null || platform.mesh.position.y > nearest.mesh.position.y ||
       Math.abs(platform.mesh.position.y - nearest.mesh.position.y) < 1e-6 && (platform.strength ?? 0) > (nearest.strength ?? 0)) nearest = platform;
   }

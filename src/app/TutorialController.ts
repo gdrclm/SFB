@@ -1,4 +1,5 @@
 import { tutorialInput } from "../tutorial/GuideHints";
+import { surfaceGuide } from "../platform/SurfaceGuide";
 import type { PlatformKind } from "../config/gameConfig";
 import { platformPreviewMarkup } from "../platform/PlatformSprites";
 import { platformSpriteRow } from "../platform/PlatformSpriteLayout";
@@ -54,6 +55,8 @@ const steps = [
     title: "Способности",
     content: '<p><span class="tutorial-key">◉ Аннигиляция</span> Нажми — очистить экран. Держи 3 секунды — взрыв на 200 м за все 4 заряда.</p><p><span class="tutorial-key">✺ Плазма</span> 30 секунд разгона и неуязвимости.</p><p>Одну способность выбираешь в магазине. В забеге она слева внизу.</p>',
   },
+  {title:"Небесные платформы",content:surfaceGuide(["island","cloud","bubble","storm","nest","balloons","web"])},
+  {title:"Кристальные платформы",content:surfaceGuide(["crystal","hologram","laser","honeycomb","spikes","magnet","liquid","resonance"])},
   {
     title: "Комбо и рекорды",
     content: `<p><span class="tutorial-key">КОМБО</span> Комбо заряжает BOOST. Ошибка сбрасывает серию.</p>

@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { approachSymbol, approachState, nearestInCurrentLane, requiredSpeed } from "./PlatformReadability";
 
 describe("platform readability", () => {
+  it("ignores a hologram and an open honeycomb gap when selecting the next real threat",()=>{
+    const ghost={isActive:true,surfaceCollidable:false,width:4,mesh:{position:{x:0,y:3}}};
+    const cells={isActive:true,width:4,collisionSpans:[{offset:-1.5,width:1},{offset:1.5,width:1}],mesh:{position:{x:0,y:2}}};
+    const lower={isActive:true,width:4,mesh:{position:{x:0,y:0}}};
+    expect(nearestInCurrentLane([ghost,cells,lower],{x:0,y:4},.5)).toBe(lower);
+    expect(nearestInCurrentLane([ghost,cells,lower],{x:1.5,y:4},.5)).toBe(cells);
+  });
   it("uses the same integer threshold for the displayed number and the actual platform", () => {
     expect(requiredSpeed(7.1)).toBe(8);
     expect(approachState(7.99, 7.1)).toBe("boost");

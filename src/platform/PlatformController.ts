@@ -16,10 +16,14 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { HavokPlugin, PhysicsBody, PhysicsMotionType, PhysicsShapeBox } from "@babylonjs/core/Physics";
 import type { Scene } from "@babylonjs/core/scene";
+import { customSurfaceArt, surfaceHits, surfaceUsesStrength, type PlatformSurface, type SurfaceState } from "./PlatformSurfaces";
+import { SurfaceSkin } from "./SurfaceSkin";
 import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformConfig } from "../config/gameConfig";
 
 export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
 export interface PlatformActivationProperties {
+  readonly surface?: PlatformSurface;
+  readonly surfaceSeed?: number;
   readonly appearance?: SkyPlatformAppearance;
   readonly mechanic?: PlatformMechanic;
   readonly turretVolley?:TurretVolley;
@@ -63,6 +67,12 @@ export class PlatformController {
   #encounterOverlay:CourseOverlay|undefined;
   #machine: PlatformMechanicSkin | null = null;
   #sky: SkyPlatformSkin | null = null;
+  #surface: PlatformSurface | undefined;
+  #surfaceSeed=0;
+  #surfaceSkin: SurfaceSkin | null = null;
+  readonly #surfaceState:SurfaceState={hits:1,cells:255,charge:0,infection:0};
+  #collisionRevision=0;
+  #surfaceSpans: {offset:number;width:number}[]=[];
   #appearance: SkyPlatformAppearance | undefined;
   #materialBreak=false;#pressSeconds=0;#ruptureSeconds=0;#breakContactX=0;#materialForce=1;
   readonly #reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -89,10 +99,40 @@ export class PlatformController {
   public get turretVolley():TurretVolley|undefined{return this.#turretVolley;}
   public get encounterOverlay():CourseOverlay|undefined{return this.#encounterOverlay;}
   public get appearance(): SkyPlatformAppearance | undefined { return this.#appearance; }
-  public get breakEffectSeconds(): number | undefined { return this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
+  public get surface():PlatformSurface|undefined{return this.#surface;}
+  public get surfaceSeed():number{return this.#surfaceSeed;}
+  public get surfaceState():Readonly<SurfaceState>{return this.#surfaceState;}
+  public get surfaceLockX():number{return (this.#surfaceSeed%3-1)*this.width*.22;}
+  public get collisionRevision():number{return this.#collisionRevision;}
+  public get surfaceCollidable():boolean{return this.#surface!=="hologram"&&this.#surfaceSpans.length>0;}
+  public get requiresSurfaceSweep():boolean{return this.#surface==="hologram"||this.#surface==="honeycomb";}
+  public get collisionSpans():readonly {offset:number;width:number}[]{return this.#surfaceSpans;}
+  public setSurfaceStrength(value:number):void{this.#strength=requiredSpeed(Math.max(1,value));Object.assign(this.mesh.metadata,{strength:this.#strength});}
+  public setSurfaceVisual(state:Partial<SurfaceState>):void{Object.assign(this.#surfaceState,state);}
+  public setSurfaceCells(mask:number):void{
+    if(this.#surfaceState.cells===(mask&255))return;
+    this.#surfaceState.cells=mask&255;this.#collisionRevision++;this.#updateSurfaceSpans();
+  }
+  #updateSurfaceSpans():void{
+    this.#surfaceSpans=[];
+    if(this.#surface==="hologram")return;
+    if(this.#surface!=="honeycomb"){this.#surfaceSpans.push({offset:0,width:this.width});return;}
+    let start=-1;
+    for(let i=0;i<=8;i++){
+      const solid=i<8&&(this.#surfaceState.cells&(1<<i))!==0;
+      if(solid&&start<0)start=i;
+      if(!solid&&start>=0){this.#surfaceSpans.push({offset:(start+i)/16*this.width-this.width/2,width:(i-start)/8*this.width});start=-1;}
+    }
+  }
+  public transmuteSurface(surface:PlatformSurface,strength:number):void{
+    this.#surface=surface;this.#appearance=surface==="cloud"||surface==="bubble"?surface:undefined;
+    this.setSurfaceStrength(strength);this.#updateSurfaceSpans();this.#sky?.hide();
+    this.#renderSurface(this.#elapsed);
+  }
+  public get breakEffectSeconds(): number | undefined { return customSurfaceArt(this.#surface)?.85:this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
   public get breakDelaySeconds():number{return this.#ruptureSeconds;}
   public prepareMaterialBreak(speed:number,contactX:number,power=false):void{
-    if(this.#mechanic||this.#appearance==="cloud")return;
+    if(this.#mechanic||this.#appearance==="cloud"||customSurfaceArt(this.#surface))return;
     const timing=materialBreakTiming(speed,this.#strength);
     this.#materialBreak=true;this.#pressSeconds=timing.press*(power?.7:1);this.#ruptureSeconds=timing.rupture*(power?.8:1);this.#materialForce=power?1.3:1;
     this.#breakContactX=Math.max(-this.width/2,Math.min(this.width/2,contactX-this.mesh.position.x));
@@ -123,16 +163,27 @@ export class PlatformController {
     if (!this.#isActive) return;
     this.#elapsed = elapsedSeconds;
     this.#approachState = scannerWarning || this.#tutorialDanger ? "danger" : speed === null ? null : approachState(speed, this.#strength, boostAvailable, boostMultiplier, secondsToImpact);
+    if(!surfaceUsesStrength(this.#surface))this.#approachState=speed===null?null:"neutral";
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, this.#approachState), elapsedSeconds);
     // Health/slow sprites retain their green/ripple identity; the existing !/ϟ cue
     // remains attached to the nearest collision point rather than every lane.
     this.#sprite.mesh.visibility = 1;
+    this.#renderSurface(elapsedSeconds);
+  }
+  #renderSurface(elapsedSeconds:number):void{
+    this.#surfaceSkin?.hide();
     if(this.#mechanic) {
       this.#machine?.render(this.#mechanic,this.width,this.#approachState,elapsedSeconds,this.#reduced);
       this.#sprite.mesh.isVisible=false;
     } else if(this.#appearance) {
-      this.#sky?.render(this.#appearance,this.width,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sky?.render(this.#appearance,this.width,this.#approachState,elapsedSeconds,this.#reduced,this.#surfaceState.infection);
       this.#sprite.mesh.isVisible=false;
+    } else if(customSurfaceArt(this.#surface)&&this.#surface){
+      this.#surfaceSkin??=new SurfaceSkin(this.mesh,this.#scene);
+      this.#surfaceSkin.render(this.#surface,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,elapsedSeconds,this.#reduced);
+      this.#sprite.mesh.isVisible=false;
+    } else {
+      this.#sprite.mesh.isVisible=true;
     }
   }
 
@@ -150,16 +201,21 @@ export class PlatformController {
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
     this.#sprite.renderBreak(this.width, 0);
-    if(this.#mechanic||this.#appearance)this.#sprite.mesh.isVisible=false;
+    if(this.#mechanic||this.#appearance||customSurfaceArt(this.#surface))this.#sprite.mesh.isVisible=false;
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
   public playImpact(force = 1, contactX = this.mesh.position.x): void {
     this.#sprite.impact(this.#elapsed, force);
+    this.#surfaceSkin?.impact(this.#elapsed,force);
     if(this.#appearance)this.#sky?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
   }
 
   public renderBreak(progress: number): void {
+    if(customSurfaceArt(this.#surface)&&this.#surface){
+      this.#surfaceSkin?.render(this.#surface,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,this.#elapsed+progress,this.#reduced,progress);
+      return;
+    }
     if(this.#materialBreak){
       const age=Math.max(0,progress)*(this.breakEffectSeconds??.48);
       if(age<this.#ruptureSeconds){
@@ -198,7 +254,7 @@ export class PlatformController {
     this.#body = new PhysicsBody(this.mesh, PhysicsMotionType.STATIC, false, this.#scene);
     this.#shape = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), new Vector3(this.width, this.size.height, this.size.depth), this.#scene);
     this.#body.shape = this.#shape;
-    this.#shape.filterMembershipMask = this.#motion ? 2 : 1;
+    this.#shape.filterMembershipMask = this.requiresSurfaceSweep ? 4 : this.#motion ? 2 : 1;
     if (this.#motion) this.#body.disablePreStep = false;
   }
   #disposePhysicsResources(): void {
@@ -212,16 +268,23 @@ export class PlatformController {
     this.#strength = requiredSpeed(properties.strength); this.#strengthLevel = properties.strengthLevel;
     this.#routeKind = properties.routeKind ?? "mandatory"; this.#kind = properties.kind ?? "standard";
     this.#appearance=this.#kind==="standard"&&this.#mechanic===undefined?properties.appearance:undefined;
+    this.#surface=this.#kind==="standard"&&this.#mechanic===undefined?(properties.surface??this.#appearance):undefined;
+    if(this.#surface)this.#appearance=this.#surface==="cloud"||this.#surface==="bubble"?this.#surface:undefined;
+    if(this.#surface==="cloud"||this.#surface==="liquid")this.#strength=1;
+    this.#surfaceSeed=Math.max(0,Math.floor(properties.surfaceSeed??0));this.#collisionRevision=0;
+    Object.assign(this.#surfaceState,{hits:surfaceHits(this.#surface,this.#surfaceSeed),cells:255,charge:0,infection:0});
     this.#encounterTheme = properties.encounterTheme ?? "chaos";
     this.#tutorialDanger = properties.tutorialDanger === true;
     this.#motion = properties.lateralMotion; this.#motionAge = 0; this.#motionStartX = this.mesh.position.x;
     if(this.#motion)this.mesh.position.x=this.#motionStartX+this.#motion.amplitude*Math.sin(this.#motion.phase);
     this.#sprite.resetImpact();
     this.#approachState = null; this.mesh.scaling.x = properties.widthScale ?? 1;
+    this.#updateSurfaceSpans();
     this.#sprite.render(this.width, platformSpriteRow(this.#kind, null), this.#elapsed);
     this.#sprite.mesh.isVisible=this.#mechanic===undefined&&this.#appearance===undefined;
     this.#machine?.reset();
     this.#sky?.reset();
+    this.#surfaceSkin?.reset();
     if(this.#mechanic) {
       this.#machine??=new PlatformMechanicSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
       this.#machine.render(this.#mechanic,this.width,null,this.#elapsed,this.#reduced);
@@ -230,6 +293,7 @@ export class PlatformController {
       this.#sky??=new SkyPlatformSkin(this.mesh,this.size.height,this.size.depth,this.#scene);
       this.#sky.render(this.#appearance,this.width,null,this.#elapsed,this.#reduced);
     }
+    this.#renderSurface(this.#elapsed);
     this.mesh.metadata = { platformId: this.id, strength: this.#strength, strengthLevel: this.#strengthLevel,
       routeKind: this.#routeKind, encounterTheme: this.#encounterTheme, kind: this.#kind, appearance:this.#appearance??"island", widthScale: this.mesh.scaling.x, isTrap: properties.isTrap === true };
   }
