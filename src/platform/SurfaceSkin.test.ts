@@ -26,12 +26,12 @@ it("gives every new type an illustrated atlas region, a collision anchor and a m
  }
 });
 
-it("keeps four shared atlases, the same quad and the collider through idle, impact and all breakup frames",()=>{
+it("keeps six shared atlases, the same quad and the collider through idle, impact and all breakup frames",()=>{
  const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("painted",scene);parent.scaling.x=.4;parent.position.set(2,-7,0);
  const skin=new SurfaceSkin(parent,scene),other=new SurfaceSkin(new Mesh("another",scene),scene);
  const state={hits:3,cells:255,charge:0,infection:0};
  skin.render("island",3,3,state,null,10,false);other.render("storm",4,2,state,null,10,false);
- expect(skin.mesh.material).toBe(other.mesh.material);expect(surfaceArtTextures(scene)).toHaveLength(4);
+ expect(skin.mesh.material).toBe(other.mesh.material);expect(surfaceArtTextures(scene)).toHaveLength(6);
  const textures=surfaceArtTextures(scene),buffer=skin.mesh.getVertexBuffer(VertexBuffer.PositionKind),count=[scene.meshes.length,scene.textures.length,scene.materials.length];
  skin.impact(10,1.5);skin.render("island",3,3,state,null,10.07,false);
  expect(skin.mesh.position.y+.7).toBeCloseTo(platformImpactMotion(.07,1.5).y);
@@ -51,8 +51,8 @@ it("smoothly blends breakup keyframes and resets pops and removed cells on reuse
  expect(paint.time-paint.popAt).toBe(1);
  skin.reset();skin.render("honeycomb",4,0,state,null,5,false);state.cells=131;skin.render("honeycomb",4,0,state,null,6,false);
  expect(paint.previousCells).toBe(255);expect(paint.cellsAt).toBe(6);
- skin.render("honeycomb",4,0,state,null,6.2,false,.5);expect(paint.frames).toEqual([1,2,.5]);
- skin.render("honeycomb",4,0,state,null,6.3,true,.5);expect(paint.frames).toEqual([1,1,0]);
+ skin.render("honeycomb",4,0,state,null,6.2,false,.5);expect(paint.frames).toEqual([3,4,0]);
+ skin.render("honeycomb",4,0,state,null,6.3,true,.5);expect(paint.frames).toEqual([2,2,0]);
  skin.reset();state.hits=3;state.cells=255;skin.render("balloons",4,0,state,null,7,false);
  expect(paint.previousHits).toBe(3);expect(paint.popAt).toBe(-Infinity);expect(paint.previousCells).toBe(255);
  scene.dispose();engine.dispose();

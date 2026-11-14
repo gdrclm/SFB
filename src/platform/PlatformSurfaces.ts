@@ -1,4 +1,3 @@
-import type { DepthLocation } from "../scene/DepthLocations";
 export const SURFACES = ["island", "cloud", "bubble", "storm", "nest", "balloons", "web", "crystal", "hologram", "laser", "honeycomb", "spikes", "magnet", "liquid", "resonance"] as const;
 export type PlatformSurface = typeof SURFACES[number];
 export interface SurfaceState { hits: number; cells: number; charge: number; infection: number }
@@ -12,16 +11,6 @@ export const SURFACE_INFO: Record<PlatformSurface, readonly [string, string, str
  magnet: ["Магнит", "Притягивает; удерживай направление или разбей", "∩"], liquid: ["Жидкий кристалл", "Растекается; лужа ненадолго вязкая", "≈"],
  resonance: ["Резонанс", "Разрушает соседей с таким же символом", "◎"],
 };
-export function surfaceForCourse(location: DepthLocation, depth: number, ordinal: number): PlatformSurface | undefined {
- const sky: PlatformSurface[] = depth < 65 ? ["island","cloud","bubble","island"]
-  : depth < 160 ? ["island","cloud","bubble","nest","balloons","island"]
-  : ["island","cloud","bubble","storm","nest","balloons","web","island"];
- const crystal: PlatformSurface[] = depth < 620 ? ["crystal","hologram","crystal","laser"]
-  : depth < 900 ? ["crystal","laser","honeycomb","magnet","liquid","hologram"]
-  : ["crystal","hologram","laser","honeycomb","spikes","magnet","liquid","resonance"];
- const list = location === "sky" ? sky : location === "crystal" ? crystal : [];
- return list[((Math.floor(ordinal) % list.length) + list.length) % list.length];
-}
 export function surfaceHits(surface: PlatformSurface | undefined, seed: number): number {
  return surface === "balloons" ? 3 : surface === "island" && Math.abs(seed) % 4 === 3 ? 3 : 1;
 }

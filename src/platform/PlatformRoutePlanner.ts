@@ -5,7 +5,8 @@ import { speedAfterBreak } from "../collision/BreakResistance";
 import { courseMechanic, type PlatformMechanic, type TurretVolley } from "./PlatformMechanic";
 import { courseOverlay, type CourseOverlay } from "./CourseOverlays";
 import { skyPlatformAppearance, type SkyPlatformAppearance } from "./SkyPlatformAppearance";
-import { surfaceForCourse, type PlatformSurface } from "./PlatformSurfaces";
+import type { PlatformSurface } from "./PlatformSurfaces";
+import { SurfaceIntroduction } from "./SurfaceIntroduction";
 import { createEncounterLayout, createMovingGapLayout, type EncounterLayout } from "./EncounterLayout";
 import type {
   GameConfig,
@@ -131,6 +132,7 @@ const SAFE_TIME_SLOW: RowMember = Object.freeze({
 export class PlatformRoutePlanner {
   readonly #config: GameConfig;
   readonly #random: () => number;
+  readonly #surfaceIntroduction:SurfaceIntroduction;
   #nextY: number;
   #previousPassageX: number | null = null;
   #previousBandDepth = 0;
@@ -166,6 +168,7 @@ export class PlatformRoutePlanner {
 
     this.#nextY = initialLowestY;
     this.#config = config;
+    this.#surfaceIntroduction=new SurfaceIntroduction(config.startDepth);
     this.#random = random;
     this.#progress = worldProgression(config.startDepth + config.ball.startPosition.y - initialLowestY);
     this.#phaseBaselines.set(this.#progress.location,this.#progress.phase);
@@ -272,15 +275,15 @@ export class PlatformRoutePlanner {
         Math.min(difficulty.platformStrength, predictedSpeedAtCollision), this.#config.successfulHit.maximumSpeedLossFraction, this.#config.successfulHit.maximumSpeedLoss);
     }
     const reactionWindowSeconds = worldSpeed <= Number.EPSILON ? Number.POSITIVE_INFINITY : clearSpacing / worldSpeed;
-    // A stride coprime to both the six- and eight-type palettes avoids repeating
-    // only the first few surfaces whenever a short encounter phrase restarts.
     const surfaceBase=this.#zoneCycle*5+Math.floor(themeRowIndex/2);
-    const row = this.#planRowMembers(blueprint, layout, bandDepth, predictedSpeedAtCollision, difficulty).map((member,index) => {
+    const members=this.#planRowMembers(blueprint,layout,bandDepth,predictedSpeedAtCollision,difficulty);
+    const surfaces=this.#surfaceIntroduction.row({location:this.#progress.location,phase:this.#progress.phase,section:this.#section,
+      sequence:this.#sequenceId,row:themeRowIndex,rows:this.#getEncounterLength(theme),ordinal:surfaceBase,machine:mechanic!==undefined,
+      eligible:members.map(member=>member.kind==="standard"&&mechanic===undefined)});
+    const row = members.map((member,index) => {
       const appearance=skyPlatformAppearance(this.#progress.location,member.kind,mechanic,this.#zoneCycle*8+Math.floor(themeRowIndex/2)+index);
       const ordinal=surfaceBase+index;
-      const depth=this.#config.startDepth+this.#config.ball.startPosition.y-this.#nextY;
-      const groupSurface=surfaceForCourse(this.#progress.location,depth,surfaceBase);
-      const surface=member.kind==="standard"&&!mechanic?(groupSurface==="resonance"?groupSurface:surfaceForCourse(this.#progress.location,depth,ordinal)):undefined;
+      const surface=surfaces[index];
       return {
       ...member,
       ...(surface?{surface,surfaceSeed:surface==="resonance"?Math.floor(themeRowIndex/2)%3:ordinal}:{}),

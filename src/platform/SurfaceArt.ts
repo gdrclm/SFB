@@ -1,11 +1,10 @@
 import skyUrl from "../assets/platforms/surfaces-sky.webp";
 import specialUrl from "../assets/platforms/surfaces-special.webp";
 import crystalUrl from "../assets/platforms/surfaces-crystal.webp";
-import breakUrl from "../assets/platforms/surfaces-break.webp";
 import type { PlatformSurface } from "./PlatformSurfaces";
 
 export const SURFACE_ATLAS_SIZE = 1254;
-export const SURFACE_ART_URLS = [skyUrl, specialUrl, crystalUrl, breakUrl] as const;
+export const SURFACE_ART_URLS = [skyUrl, specialUrl, crystalUrl] as const;
 export interface SurfaceArt {
   readonly atlas: 0 | 1 | 2;
   readonly rect: readonly [number, number, number, number];
@@ -35,9 +34,4 @@ export function surfaceArtLayout(art:SurfaceArt,width:number):readonly [number,n
 }
 export function surfaceUVRect(rect:SurfaceArt["rect"]):readonly [number,number,number,number]{
   return [rect[0]/SURFACE_ATLAS_SIZE,1-(rect[1]+rect[3])/SURFACE_ATLAS_SIZE,rect[2]/SURFACE_ATLAS_SIZE,rect[3]/SURFACE_ATLAS_SIZE];
-}
-/** Four painted keyframes, blended continuously instead of snapping frames. */
-export function surfaceBreakFrames(progress:number):readonly [number,number,number]{
-  const frame=Math.max(0,Math.min(3,progress*3));
-  return [Math.floor(frame),Math.min(3,Math.floor(frame)+1),frame-Math.floor(frame)];
 }

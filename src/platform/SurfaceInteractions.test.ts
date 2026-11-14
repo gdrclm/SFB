@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import { BallController } from "../ball/BallController";
 import { gameConfig } from "../config/gameConfig";
 import type { PlatformController } from "./PlatformController";
-import { surfaceForCourse, surfaceHits, SURFACES, type PlatformSurface } from "./PlatformSurfaces";
+import { surfaceHits, type PlatformSurface } from "./PlatformSurfaces";
 import { SurfaceInteractions } from "./SurfaceInteractions";
 function platform(surface:PlatformSurface,strength=15,seed=0):PlatformController{
  const p={surface,surfaceSeed:seed,strength,isActive:true,activationId:1,width:4,size:{height:.3,depth:1,width:4},surfaceLockX:0,
@@ -22,13 +22,6 @@ function fixture(type:PlatformSurface,strength=15,seed=0){
  return {p,ball,position,platforms,actions,system,hit:(speed=ball.fallSpeed,x=0)=>system.beforeHit({platform:p,ballSpeed:speed,assessment:speed>=p.strength?"sufficient":"insufficient",contact:{x,y:.65,z:0}}),
   disable:()=>{enabled=false;},protect:()=>{immune=true;},depth:(value:number)=>{depth=value;}};
 }
-it("generates every requested surface in its world, progressively, and preserves later-world themes",()=>{
- const found=new Set<PlatformSurface>();
- for(const [location,depth]of[["sky",0],["sky",80],["sky",200],["crystal",510],["crystal",700],["crystal",1000]]as const)
-  for(let i=0;i<32;i++){const s=surfaceForCourse(location,depth,i);if(s)found.add(s);}
- expect([...found].sort()).toEqual([...SURFACES].sort());
- for(let i=0;i<20;i++){expect(surfaceForCourse("sky",0,i)).not.toBe("storm");expect(surfaceForCourse("lava",4000,i)).toBeUndefined();}
-});
 it("makes clouds harmless and cushions vertical travel without erasing earned speed",()=>{
  const f=fixture("cloud",100);expect(f.hit()).toBe(false);expect(f.p.strength).toBe(1);
  f.system.destroyed(f.p);f.ball.fixedUpdate(.02);
