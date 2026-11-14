@@ -9,7 +9,9 @@ import { surfaceAnimation } from "./SurfaceAnimation";
 type Metadata={surface:{kind:number;angle:number;rect:readonly number[];idleFrames:readonly number[];frames:readonly number[];layout:readonly number[]}};
 it("paints every machine variant with six poses while keeping rotors, aiming, colliders and pooled buffers independent",()=>{
  const engine=new NullEngine(),scene=new Scene(engine),parent=new Mesh("test",scene);parent.scaling.x=.4;parent.position.set(2,-7,0);
- const skin=new PlatformMechanicSkin(parent,.6,1,scene),count=[scene.meshes.length,scene.materials.length,scene.textures.length],buffer=skin.body.getVertexBuffer(VertexBuffer.PositionKind);
+ const skin=new PlatformMechanicSkin(parent,.6,1,scene),buffer=skin.body.getVertexBuffer(VertexBuffer.PositionKind);
+ skin.render("moving",3,null,0,false);skin.prepareBreak(20,.5);skin.renderBreak(0);
+ const count=[scene.meshes.length,scene.materials.length,scene.textures.length];skin.reset();
  const regions:string[]=[];
  for(const kind of ["moving","wind-right","wind-left","turret"] as PlatformMechanic[]){
   skin.render(kind,3,"breakable",0,false);regions.push(JSON.stringify((skin.body.metadata as Metadata).surface.rect));

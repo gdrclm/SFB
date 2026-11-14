@@ -25,9 +25,11 @@ export class PlatformMechanicSkin{
  }
  #updateAim():void{
   const angle=this.#kind==="turret"?this.#aim?-Math.atan2(this.#aim.x-this.parent.position.x,this.#aim.y-this.parent.position.y):0:this.#reduced?0:this.#time*8*(this.#kind==="wind-left"?-1:1);
-  this.#partSkin.aim(angle);
+  this.#partSkin.aim(angle);this.#bodySkin.aim(angle);
  }
  public aim(x:number,y:number):void{if(this.#kind==="turret"){this.#aim={x,y};this.#updateAim();}}
+ public prepareBreak(speed:number,contactX:number,power=false):void{this.#bodySkin.prepareBreak(speed,contactX,power);}
+ public impact(time:number,force:number,contactX:number):void{this.#bodySkin.impact(time,force,contactX);}
  public renderBreak(progress:number):void{
   this.#partSkin.hide();this.#bodySkin.render(this.#kind,this.#width,0,STATE,this.#state,this.#time+progress,this.#reduced,progress);
  }

@@ -30,6 +30,8 @@ for(const [bank,group]of SURFACE_ANIMATION_LAYOUT.entries())for(const [row,kind]
  const [height=1.65,rim=.25]=parameters[kind]??[];
  animations.set(kind,{bank,row,idle:rects(group.idle,row),destroy:rects(group.destroy,row),body:group.destroy.body[row]??[0,0,1,1],destroyBounds:group.destroy.bounds[row]??[0,0,1,1],height,rim});
 }
+const crystalArt=animations.get("hologram");
+if(crystalArt)animations.set("crystal",{...crystalArt,height:2.2});
 export function surfaceAnimation(kind:SurfaceSprite):SurfaceAnimation|undefined{return animations.get(kind.startsWith("wind")?"wind":kind);}
 export function surfaceAnimationLayout(art:SurfaceAnimation,width:number):AnimationRect{
  const height=art.height*Math.min(1,Math.max(.5,width/2.3));return [width+.12,height,.15+(art.rim-.5)*height,art.bank];

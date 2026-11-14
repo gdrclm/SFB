@@ -18,6 +18,8 @@ import { HavokPlugin, PhysicsBody, PhysicsMotionType, PhysicsShapeBox } from "@b
 import type { Scene } from "@babylonjs/core/scene";
 import { customSurfaceArt, surfaceHits, surfaceUsesStrength, type PlatformSurface, type SurfaceState } from "./PlatformSurfaces";
 import { SurfaceSkin } from "./SurfaceSkin";
+import { getPlatformCrystalBlend } from "./PlatformCrystalSkin";
+import type { SurfaceSprite } from "./SurfaceAnimation";
 import type { GameConfig, PlatformKind, PlatformStrengthLevel, StaticPlatformConfig } from "../config/gameConfig";
 
 export type PlatformRouteKind = "mandatory" | "bypass" | "boost";
@@ -70,6 +72,7 @@ export class PlatformController {
   #surface: PlatformSurface | undefined;
   #surfaceSeed=0;
   #surfaceSkin: SurfaceSkin | null = null;
+  #visualKind:SurfaceSprite|undefined;
   readonly #surfaceState:SurfaceState={hits:1,cells:255,charge:0,infection:0};
   #collisionRevision=0;
   #surfaceSpans: {offset:number;width:number}[]=[];
@@ -129,10 +132,14 @@ export class PlatformController {
     this.setSurfaceStrength(strength);this.#updateSurfaceSpans();this.#sky?.hide();
     this.#renderSurface(this.#elapsed);
   }
-  public get breakEffectSeconds(): number | undefined { return customSurfaceArt(this.#surface)?.85:this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
+  public get usesPaintedBreak():boolean{return this.#visualKind!==undefined||this.#mechanic!==undefined;}
+  public get breakEffectSeconds(): number | undefined { return this.usesPaintedBreak?.85:this.#appearance==="bubble"?WATER_SPLASH_SECONDS+this.#ruptureSeconds:this.#appearance==="cloud"?CLOUD_BURST_SECONDS:this.#materialBreak?this.#ruptureSeconds+.36:undefined; }
   public get breakDelaySeconds():number{return this.#ruptureSeconds;}
   public prepareMaterialBreak(speed:number,contactX:number,power=false):void{
-    if(this.#mechanic||this.#appearance==="cloud"||customSurfaceArt(this.#surface))return;
+    if(this.usesPaintedBreak){
+      this.#surfaceSkin?.prepareBreak(speed,contactX-this.mesh.position.x,power);this.#machine?.prepareBreak(speed,contactX-this.mesh.position.x,power);return;
+    }
+    if(this.#appearance==="cloud")return;
     const timing=materialBreakTiming(speed,this.#strength);
     this.#materialBreak=true;this.#pressSeconds=timing.press*(power?.7:1);this.#ruptureSeconds=timing.rupture*(power?.8:1);this.#materialForce=power?1.3:1;
     this.#breakContactX=Math.max(-this.width/2,Math.min(this.width/2,contactX-this.mesh.position.x));
@@ -172,16 +179,25 @@ export class PlatformController {
   }
   #renderSurface(elapsedSeconds:number):void{
     this.#surfaceSkin?.hide();
+    this.#visualKind=undefined;
+    const crystalBlend=getPlatformCrystalBlend(this.#scene);
+    const crystal=this.#surface==="crystal"||this.#surface===undefined&&crystalBlend>0;
     if(this.#mechanic) {
       this.#machine?.render(this.#mechanic,this.width,this.#approachState,elapsedSeconds,this.#reduced);
       this.#sprite.mesh.isVisible=false;
     } else if(this.#appearance) {
       this.#sky?.render(this.#appearance,this.width,this.#approachState,elapsedSeconds,this.#reduced,this.#surfaceState.infection);
       this.#sprite.mesh.isVisible=false;
-    } else if(customSurfaceArt(this.#surface)&&this.#surface){
-      this.#surfaceSkin??=new SurfaceSkin(this.mesh,this.#scene);
-      this.#surfaceSkin.render(this.#surface,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,elapsedSeconds,this.#reduced);
-      this.#sprite.mesh.isVisible=false;
+    } else if(customSurfaceArt(this.#surface)&&this.#surface||crystal){
+      this.#surfaceSkin??=new SurfaceSkin(this.mesh,this.#scene,"surface",0,this.size.height/2);
+      this.#visualKind=crystal?(this.#kind==="super-heavy"?"spikes":"crystal"):this.#surface;
+      if(this.#visualKind){
+        this.#surfaceSkin.material(crystal?platformSpriteRow(this.#kind,this.#approachState):0,crystal);
+        this.#surfaceSkin.opacity(crystal&&this.#surface!=="crystal"?crystalBlend:1);
+        this.#surfaceSkin.render(this.#visualKind,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,elapsedSeconds,this.#reduced);
+      }
+      this.#sprite.mesh.isVisible=crystal&&this.#surface!=="crystal"&&crystalBlend<1;
+      this.#sprite.mesh.visibility=this.#sprite.mesh.isVisible?1-crystalBlend:1;
     } else {
       this.#sprite.mesh.isVisible=true;
     }
@@ -201,19 +217,20 @@ export class PlatformController {
   public beginBreak(): boolean {
     if (!this.#isActive) return false;
     this.#sprite.renderBreak(this.width, 0);
-    if(this.#mechanic||this.#appearance||customSurfaceArt(this.#surface))this.#sprite.mesh.isVisible=false;
+    if(this.usesPaintedBreak||this.#appearance)this.#sprite.mesh.isVisible=false;
     this.#disposePhysicsResources(); this.#isActive = false; this.#isBreaking = true;
     return true;
   }
   public playImpact(force = 1, contactX = this.mesh.position.x): void {
     this.#sprite.impact(this.#elapsed, force);
-    this.#surfaceSkin?.impact(this.#elapsed,force);
+    this.#surfaceSkin?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
+    this.#machine?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
     if(this.#appearance)this.#sky?.impact(this.#elapsed,force,contactX-this.mesh.position.x);
   }
 
   public renderBreak(progress: number): void {
-    if(customSurfaceArt(this.#surface)&&this.#surface){
-      this.#surfaceSkin?.render(this.#surface,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,this.#elapsed+progress,this.#reduced,progress);
+    if(this.#visualKind){
+      this.#surfaceSkin?.render(this.#visualKind,this.width,this.#surfaceSeed,this.#surfaceState,this.#approachState,this.#elapsed+progress,this.#reduced,progress);
       return;
     }
     if(this.#materialBreak){
