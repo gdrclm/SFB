@@ -34,6 +34,30 @@ async function world(strength = 7) {
   const feedback = { playPlatformBreak: (_p: PlatformController, done: () => void) => { done(); }, playBallReaction: () => {}, playCameraReaction: () => {} };
   return { scene, platforms, pool, sweep, feedback, dispose: () => { sweep.dispose(); platforms.forEach(p => { p.dispose(); }); scene.dispose(); engine.dispose(); } };
 }
+it.each([7, 60, 100])("applies ordinary break/life rules to a moving platform of strength %s before a scene render", async strength => {
+  const w = await world(strength);
+  try {
+    w.platforms.forEach(p => { p.deactivate(); });
+    const platform = w.platforms[0]; if (!platform) throw Error("Missing platform");
+    platform.reactivate(new Vector3(-2, 1, 0), { strength, strengthLevel: "high", widthScale: 1 / 7.5,
+      lateralMotion: { amplitude: 3, period: 4, phase: 0 } });
+    platform.advanceMotion(1); expect(platform.mesh.position.x).toBeCloseTo(1);
+    platform.setApproachFeedback(50, 0, true, 1.5, .2);
+    expect(platform.approachState).toBe(strength === 7 ? "breakable" : strength === 60 ? "boost" : "danger");
+    const config = { ...gameConfig, ball: { ...gameConfig.ball, startPosition: { x: 1, y: 4.5 } } };
+    const ball = new BallController({ position: { x: 0, y: 0, z: 0 } }, { normalizedPosition: 0, isActive: false }, config);
+    const lives = new LifeCounter(3), state = new GameStateController(); state.transitionTo(GameState.Playing);
+    const success = new SuccessfulPlatformHitHandler(ball, w.pool, w.feedback, config);
+    const failed = new UnsuccessfulPlatformHitHandler(ball, state, lives, { playErrorReaction: () => {} }, config);
+    const resolver = new CollisionResolver(ball, w.sweep);
+    resolver.onCollision(c => { if (!success.handle(c)) failed.handle(c); });
+    ball.fallSpeed = 50; ball.fixedUpdate(.2); resolver.fixedUpdate();
+    expect(lives.remainingLives).toBe(strength === 7 ? 3 : 2);
+    expect(platform.isActive).toBe(strength !== 7);
+    expect(ball.isBouncing).toBe(strength !== 7);
+  } finally { w.dispose(); }
+});
+
 it("processes every platform crossed by an invulnerable ball in a single real Havok sweep", async () => {
   const w = await world();
   try {

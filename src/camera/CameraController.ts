@@ -53,6 +53,9 @@ export class CameraController implements FixedSimulationSystem {
   #boostZoomOffset = 0;
   #boostStartZoomOffset = 0;
   #boostZoomElapsedSeconds: number | null = null;
+  #speedKickAge = 1;
+  #speedKickStrength = 0;
+  #speedKickDelay = 0;
 
   public constructor(
     camera: CameraProjection,
@@ -89,10 +92,18 @@ export class CameraController implements FixedSimulationSystem {
     this.#behavior = active ? "phase-transition" : "gameplay";
   }
 
-  public playBoostReaction(): void {
+  public playBoostReaction(withKick = true): void {
+    if (withKick) this.playSpeedKick(1);
     this.#boostStartZoomOffset = this.#boostZoomOffset;
     this.#boostZoomElapsedSeconds = 0;
     this.resizeViewport();
+  }
+
+  /** Brief follow overshoot conveys acceleration without changing collision speed. */
+  public playSpeedKick(strength = .5, delay = 0): void {
+    this.#speedKickAge = 0;
+    this.#speedKickStrength = Math.max(0, Math.min(1, strength));
+    this.#speedKickDelay = Math.max(0, delay);
   }
 
   public fixedUpdate(
@@ -110,7 +121,10 @@ export class CameraController implements FixedSimulationSystem {
     const boostDelay = this.#boostZoomElapsedSeconds !== null && this.#boostZoomElapsedSeconds < this.#config.boostZoomDelaySeconds;
     if (!boostDelay && !this.#target.isBouncing) this.#baseOrthographicSize = lerp(this.#baseOrthographicSize, targetSize, zoomAmount);
     this.#updateBoostZoom(realFixedDeltaSeconds);
-    const desiredY = this.#target.position.y - this.#lookAhead();
+    this.#speedKickAge += realFixedDeltaSeconds;
+    const kickProgress = Math.max(0, Math.min(1, (this.#speedKickAge - this.#speedKickDelay) / .24));
+    const kick = Math.sin(kickProgress * Math.PI) * (1 - kickProgress) * this.#speedKickStrength * this.#getVisibleVerticalHalfSize() * .045;
+    const desiredY = this.#target.position.y - this.#lookAhead() - kick;
     const smoothedY = lerp(this.#rig.position.y, desiredY, smoothFactor(this.#config.followSharpness * (this.#target.isBouncing ? .12 : 1), fixedDeltaSeconds));
     const maximumOffset = this.#getVisibleVerticalHalfSize() * (this.#target.isBouncing ? .16 : this.#config.safeVerticalRatio);
     this.#rig.position.y = Math.max(desiredY - maximumOffset, Math.min(desiredY + maximumOffset, smoothedY));

@@ -12,6 +12,7 @@ import { getBallFace } from "./BallFace";
 import type { SuccessfulBoostResult } from "../boost/BoostController";
 import type { GameConfig, RgbColor } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
+import type { BreakFeedback } from "../effects/BreakFeedback";
 
 interface BallMotion {
   readonly fallSpeed: number;
@@ -131,8 +132,8 @@ export class BallVisualController implements FixedSimulationSystem {
     this.#boostElapsedSeconds = 0;
   }
 
-  public react(event: BallExpression): void {
-    this.#fx.trigger(event);
+  public react(event: BallExpression, feedback?: BreakFeedback): void {
+    this.#fx.trigger(event, feedback?.power ?? 0);
     if (event === "break" || event === "hurt" || event === "defeat") getBallLimbs(this.#ball)?.tuck(event === "defeat");
     // Contact still deforms the body while a higher-priority facial pose is held.
     if (event === "hurt" || event === "break") {

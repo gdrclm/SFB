@@ -47,18 +47,18 @@ export class BallController implements FixedSimulationSystem {
 
   public get verticalVelocity(): number { return this.#verticalVelocity; }
   public get impactCompression(): number {
-    if (this.#bounceElapsedSeconds !== null) return this.#bounceElapsedSeconds < .045 ? 1 : 0;
+    if (this.#bounceElapsedSeconds !== null) return this.#bounceElapsedSeconds < .06 ? 1 : 0;
     return this.#breakElapsed !== null && this.#breakElapsed < this.#breakHold ? 1 : 0;
   }
-  public startBreakImpact(contactY: number, resistance: number, contactX?: number): void {
+  public startBreakImpact(contactY: number, resistance: number, contactX?: number, holdSeconds = 0): void {
     if (!Number.isFinite(contactY) || this.isBouncing) return;
     this.#transform.position.y = contactY;
     if (contactX !== undefined) this.#transform.position.x = contactX;
     this.#breakElapsed = 0;
     const impact = breakImpactProfile(resistance);
-    this.#breakHold = impact.hold;
+    this.#breakHold = holdSeconds > 0 ? holdSeconds : impact.hold;
     this.#breakRecovery = impact.recovery;
-    this.#breakTransmission = impact.minimumTransmission;
+    this.#breakTransmission = holdSeconds > 0 ? 0 : impact.minimumTransmission;
     this.#verticalVelocity = -this.#fallSpeed * this.#config.movementScale * this.#breakTransmission;
   }
 
@@ -154,14 +154,14 @@ export class BallController implements FixedSimulationSystem {
       this.#transform.position.x = clampedX;
     }
     if (this.#bounceElapsedSeconds !== null) {
-      this.#updateBounce(fixedDeltaSeconds);
+      this.#updateBounce(realFixedDeltaSeconds);
       return;
     }
 
     this.#fallSpeed += this.#config.naturalAcceleration * fixedDeltaSeconds;
     let transmission = 1;
     if (this.#breakElapsed !== null) {
-      this.#breakElapsed += fixedDeltaSeconds;
+      this.#breakElapsed += realFixedDeltaSeconds;
       const t = Math.max(0, (this.#breakElapsed - this.#breakHold) / this.#breakRecovery);
       transmission = t >= 1 ? 1 : this.#breakTransmission + (1 - this.#breakTransmission) * t * t * (3 - 2 * t);
       if (t >= 1) this.#breakElapsed = null;
@@ -177,7 +177,7 @@ export class BallController implements FixedSimulationSystem {
     }
 
     const duration = this.#bounceConfig.bounceDurationSeconds;
-    const hold = .045;
+    const hold = .06;
     const nextElapsed = Math.min(duration, elapsedSeconds + fixedDeltaSeconds);
     this.#bounceElapsedSeconds = nextElapsed;
     const flight = Math.max(0, nextElapsed - hold);

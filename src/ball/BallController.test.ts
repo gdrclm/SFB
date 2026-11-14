@@ -157,6 +157,36 @@ describe("BallController", () => {
     expect(controller.verticalVelocity).toBeCloseTo(-controller.fallSpeed * gameConfig.ball.movementScale, 8);
   });
 
+  it.each([30, 60, 120])("holds an ideal contact for 65ms with live steering at %s Hz, including SLOW", frequency => {
+    for (const timeScale of [1, .1]) {
+      const transform = createTransform();
+      const input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
+      const ball = new BallController(transform, input, gameConfig);
+      ball.fallSpeed = 50;
+      ball.startBreakImpact(0, .95, 0, .065);
+      const heldTicks = Math.floor(.065 * frequency);
+      for (let i = 0; i < heldTicks; i++) ball.fixedUpdate(timeScale / frequency, 1 / frequency);
+      expect(ball.position.y).toBe(0);
+      expect(ball.position.x).toBeCloseTo(16 * heldTicks / frequency);
+      expect(ball.verticalVelocity).toBe(0);
+      for (let i = 0; i < Math.ceil(.18 * frequency); i++) ball.fixedUpdate(timeScale / frequency, 1 / frequency);
+      expect(ball.position.y).toBeLessThan(0);
+      expect(ball.verticalVelocity).toBeCloseTo(-ball.fallSpeed * gameConfig.ball.movementScale);
+    }
+  });
+
+  it("freezes a failed impact briefly but accepts an immediate change of direction", () => {
+    const input = { isActive: true, isImmediate: true, normalizedPosition: 1 };
+    const ball = new BallController(createTransform(), input, gameConfig);
+    ball.fallSpeed = 90; ball.startBounce(0);
+    ball.fixedUpdate(.02);
+    expect(ball.position.y).toBe(0); expect(ball.position.x).toBeCloseTo(.32);
+    input.normalizedPosition = -1; ball.fixedUpdate(.02);
+    expect(ball.position.y).toBe(0); expect(ball.position.x).toBeCloseTo(0);
+    ball.fixedUpdate(.04);
+    expect(ball.position.y).toBeGreaterThan(0);
+  });
+
   it("converts incoming speed into rebound height and passes through an apex before falling", () => {
     const peak = (speed: number, frequency: number): number => {
       const transform = createTransform(), controller = new BallController(transform, createInput(), gameConfig);

@@ -27,6 +27,15 @@ function createFixture(aspectRatio = 16 / 9) {
 }
 
 describe("CameraController", () => {
+  it("delays the acceleration kick until contact release and returns without camera drift", () => {
+    const { controller, rig, target } = createFixture(.5);
+    const start = rig.position.y, speed = target.fallSpeed;
+    controller.playSpeedKick(.8, .065);
+    controller.fixedUpdate(.03); expect(rig.position.y).toBeCloseTo(start);
+    controller.fixedUpdate(.08); expect(rig.position.y).toBeLessThan(start);
+    for (let i = 0; i < 180; i++) controller.fixedUpdate(1 / 60);
+    expect(rig.position.y).toBeCloseTo(start, 8); expect(target.fallSpeed).toBe(speed);
+  });
   it("lets a rebound travel visibly upward instead of pinning the ball to the HUD", () => {
     const { controller, rig, target } = createFixture();
     const start = target.position.y - rig.position.y;

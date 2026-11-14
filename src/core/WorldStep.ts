@@ -7,10 +7,11 @@ export class WorldStep implements FixedSimulationSystem {
     private readonly collisions: Tick,
     private readonly coins: Tick,
     private readonly coinCleanup: Tick,
-    private readonly platforms: Tick,
+    private readonly platforms: Tick & { advanceMotion?(seconds: number): void },
     private readonly continuing: () => boolean = () => true,
   ) {}
   public fixedUpdate(seconds: number, realSeconds = seconds): void {
+    this.platforms.advanceMotion?.(seconds);
     this.ball.fixedUpdate(seconds, realSeconds);
     this.collisions.fixedUpdate(seconds, realSeconds);
     if (!this.continuing()) return;

@@ -134,6 +134,7 @@ export class PlatformController {
     this.#body = new PhysicsBody(this.mesh, PhysicsMotionType.STATIC, false, this.#scene);
     this.#shape = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), new Vector3(this.width, this.size.height, this.size.depth), this.#scene);
     this.#body.shape = this.#shape;
+    this.#shape.filterMembershipMask = this.#motion ? 2 : 1;
     if (this.#motion) this.#body.disablePreStep = false;
   }
   #disposePhysicsResources(): void {

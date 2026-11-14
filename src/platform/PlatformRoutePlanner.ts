@@ -175,13 +175,19 @@ export class PlatformRoutePlanner {
     const theme = this.#getActiveTheme();
     const themeRowIndex = this.#encounterRowIndex;
     const layoutTheme = theme === "climax" ? climaxTheme(themeRowIndex) : theme;
-    const blueprint = this.#getPendingBlueprint();
+    let blueprint = this.#getPendingBlueprint();
     const generation = this.#config.platformGeneration;
     const worldSpeed = ballSpeed * this.#config.ball.movementScale;
     const cascading = layoutTheme === "break-run";
     const variant = cascadeVariant(this.#progress.phase);
     const movingAmplitude = !this.#externalEncounter && this.#progress.location !== "sky" && this.#progress.phase !== "introduction"
       && (this.#section === "maneuver" || cascading) && themeRowIndex % 3 === 1 ? .35 : 0;
+    if (movingAmplitude > 0 && blueprint.lanes.length > 1) {
+      const variant = Math.floor(themeRowIndex / 3) % 3;
+      const optionalLane = (blueprint.primaryLaneIndex + 1) % blueprint.lanes.length;
+      blueprint = { ...blueprint, lanes: blueprint.lanes.map((lane, index) => index === optionalLane
+        ? variant === 0 ? BOOST_STANDARD : variant === 1 ? DEADLY_BLACK : lane : lane) };
+    }
     const layout = createEncounterLayout(layoutTheme, themeRowIndex + this.#zoneCycle * 3,
       this.#encounterVariant, blueprint.lanes.length, this.#config.playSpace.halfWidth,
       this.#config.ball.radius, generation.multiRowSideMargin, {

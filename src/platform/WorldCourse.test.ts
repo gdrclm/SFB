@@ -23,6 +23,15 @@ it("varies the physical course from a wide cascade to a winding combo route and 
   expect(peak.some(p => members(p).some(m => m.routeKind === "boost") && (p.coinTrail?.count ?? 0) >= 7)).toBe(true);
   expect(middle.some(p => p.lateralMotion)).toBe(true);
 });
+it("gives moving crystal groups safe, BOOST and dangerous members while retaining an open passage", () => {
+  const moving = plansAt(1400, 70).filter(p => p.lateralMotion);
+  const choices = moving.flatMap(members);
+  expect(choices.some(p => p.routeKind === "boost")).toBe(true);
+  expect(choices.some(p => p.kind === "super-heavy")).toBe(true);
+  expect(choices.some(p => p.routeKind === "mandatory" && p.kind === "standard")).toBe(true);
+  expect(moving.every(p => (p.passage?.width ?? 0) >= 1.8)).toBe(true);
+});
+
 it("combines several recognizable tests in a climax and always gives a recovery section afterwards", () => {
   const plans = plansAt(25000, 60);
   const climax = plans.filter(p => p.section === "climax");

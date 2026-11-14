@@ -5,11 +5,14 @@ import type { SuccessfulHitFeedback } from "../collision/SuccessfulPlatformHitHa
 import type { GameConfig } from "../config/gameConfig";
 import type { FixedSimulationSystem } from "../core/FixedStepRunner";
 import type { PlatformController } from "../platform/PlatformController";
+import type { BreakFeedback } from "./BreakFeedback";
 
 interface PlatformBreakState {
   readonly platform: Pick<PlatformController, "renderBreak">;
   readonly onComplete: () => void;
   elapsedSeconds: number;
+  readonly holdSeconds: number;
+  readonly durationSeconds: number;
 }
 
 function clamp01(value: number): number {
@@ -45,10 +48,12 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
     this.#cameraBasePosition = camera.position.clone();
   }
 
-  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak"> & Partial<Pick<PlatformController, "playImpact">>, onComplete: () => void, force = 1): void {
+  public playPlatformBreak(platform: Pick<PlatformController, "renderBreak"> & Partial<Pick<PlatformController, "playImpact">>, onComplete: () => void, force = 1, feedback?: BreakFeedback): void {
     platform.playImpact?.(force);
     platform.renderBreak(0);
-    this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0 });
+    this.#platformBreaks.add({ platform, onComplete, elapsedSeconds: 0,
+      holdSeconds: feedback?.holdSeconds ?? 0,
+      durationSeconds: this.#config.platformEffectSeconds * (feedback?.durationScale ?? 1) });
   }
 
   public playBallReaction(): void {
@@ -66,7 +71,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   public fixedUpdate(fixedDeltaSeconds: number, realDeltaSeconds = fixedDeltaSeconds): void {
     this.#updatePlatformBreaks(realDeltaSeconds);
     this.#updateBallReaction(fixedDeltaSeconds);
-    this.#updateCameraReaction(fixedDeltaSeconds);
+    this.#updateCameraReaction(realDeltaSeconds);
   }
 
   public dispose(): void {
@@ -81,7 +86,7 @@ export class SuccessfulHitEffects implements SuccessfulHitFeedback, FixedSimulat
   #updatePlatformBreaks(realDeltaSeconds: number): void {
     for (const state of this.#platformBreaks) {
       state.elapsedSeconds += realDeltaSeconds;
-      const progress = clamp01(state.elapsedSeconds / this.#config.platformEffectSeconds);
+      const progress = clamp01((state.elapsedSeconds - state.holdSeconds) / state.durationSeconds);
       state.platform.renderBreak(progress);
       if (progress >= 1) {
         this.#platformBreaks.delete(state);

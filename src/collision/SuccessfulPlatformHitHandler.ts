@@ -3,14 +3,15 @@ import type { GameConfig } from "../config/gameConfig";
 import type { PlatformController } from "../platform/PlatformController";
 import type { PlatformPool } from "../platform/PlatformPool";
 import type { PlatformCollision } from "./CollisionResolver";
+import { breakFeedback, type BreakFeedback } from "../effects/BreakFeedback";
 
 export interface SuccessfulHitBall {
   fallSpeed: number;
-  startBreakImpact?(contactY: number, resistance: number, contactX?: number): void;
+  startBreakImpact?(contactY: number, resistance: number, contactX?: number, holdSeconds?: number): void;
 }
 
 export interface SuccessfulHitFeedback {
-  playPlatformBreak(platform: PlatformController, onComplete: () => void, force?: number): void;
+  playPlatformBreak(platform: PlatformController, onComplete: () => void, force?: number, feedback?: BreakFeedback): void;
   playBallReaction(): void;
   playCameraReaction(force?: number): void;
 }
@@ -22,12 +23,22 @@ export class SuccessfulPlatformHitHandler {
   readonly #maximumSpeedLossFraction: number;
   readonly #maximumSpeedLoss: number;
   readonly #radius: number;
+  readonly #reducedMotion: boolean;
+  #perfectCooldown = 0;
+  #lastFeedback: BreakFeedback | null = null;
+
+  public get lastFeedback(): BreakFeedback | null { return this.#lastFeedback; }
+
+  public fixedUpdate(delta: number, realDelta = delta): void {
+    this.#perfectCooldown = Math.max(0, this.#perfectCooldown - realDelta);
+  }
 
   public constructor(
     ball: SuccessfulHitBall,
     platformPool: Pick<PlatformPool, "beginRelease" | "completeRelease">,
     feedback: SuccessfulHitFeedback,
     config: GameConfig,
+    reducedMotion = false,
   ) {
     this.#ball = ball;
     this.#platformPool = platformPool;
@@ -35,6 +46,7 @@ export class SuccessfulPlatformHitHandler {
     this.#maximumSpeedLossFraction = config.successfulHit.maximumSpeedLossFraction;
     this.#maximumSpeedLoss = config.successfulHit.maximumSpeedLoss;
     this.#radius = config.ball.radius;
+    this.#reducedMotion = reducedMotion;
   }
 
   public handle(collision: PlatformCollision, powered = false): boolean {
@@ -46,14 +58,21 @@ export class SuccessfulPlatformHitHandler {
       return false;
     }
 
-    const force = Math.max(.75, Math.min(1.6, collision.ballSpeed / Math.max(1, collision.platform.strength)));
+    const feedback = breakFeedback(collision.ballSpeed, collision.platform.strength, !powered && !this.#reducedMotion && this.#perfectCooldown <= 0);
+    this.#lastFeedback = feedback;
+    if (feedback.perfect) this.#perfectCooldown = .65;
+    const force = feedback.force;
     this.#feedback.playPlatformBreak(collision.platform, () => {
       this.#platformPool.completeRelease(collision.platform);
-    }, force);
+    }, force, feedback);
 
     if (!powered) this.#ball.fallSpeed = speedAfterBreak(collision.ballSpeed, collision.platform.strength, this.#maximumSpeedLossFraction, this.#maximumSpeedLoss);
-    if (!powered) this.#ball.startBreakImpact?.(collision.contact?.y ?? collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius,
-      breakResistance(collision.ballSpeed, collision.platform.strength), collision.contact?.x);
+    if (!powered && this.#ball.startBreakImpact) {
+      const contactY = collision.contact?.y ?? collision.platform.mesh.position.y + collision.platform.size.height / 2 + this.#radius;
+      const resistance = breakResistance(collision.ballSpeed, collision.platform.strength);
+      if (feedback.perfect) this.#ball.startBreakImpact(contactY, resistance, collision.contact?.x, feedback.holdSeconds);
+      else this.#ball.startBreakImpact(contactY, resistance, collision.contact?.x);
+    }
     this.#feedback.playBallReaction();
     this.#feedback.playCameraReaction(force);
     return true;

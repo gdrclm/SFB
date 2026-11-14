@@ -32,6 +32,23 @@ function createFeedback(): {
 }
 
 describe("SuccessfulPlatformHitHandler", () => {
+  it("rate limits ideal hit stops across a cascade and disables them in reduced motion and plasma", () => {
+    const platform = { isActive: true, strength: 49, mesh: { position: { y: 0 } }, size: { height: .3 } } as PlatformController;
+    const collision = { platform, ballSpeed: 50, assessment: "sufficient" as const };
+    const handler = new SuccessfulPlatformHitHandler({ fallSpeed: 50, startBreakImpact: vi.fn() },
+      { beginRelease: () => true, completeRelease: () => true }, createFeedback().feedback, gameConfig);
+    expect(handler.handle(collision)).toBe(true);
+    expect(handler.lastFeedback?.perfect).toBe(true);
+    handler.fixedUpdate(.01, .1); handler.handle(collision);
+    expect(handler.lastFeedback?.holdSeconds).toBe(0);
+    handler.fixedUpdate(.06, .6); handler.handle(collision);
+    expect(handler.lastFeedback?.perfect).toBe(true);
+    const reduced = new SuccessfulPlatformHitHandler({ fallSpeed: 50 },
+      { beginRelease: () => true, completeRelease: () => true }, createFeedback().feedback, gameConfig, true);
+    reduced.handle(collision); expect(reduced.lastFeedback?.holdSeconds).toBe(0);
+    handler.fixedUpdate(1); handler.handle(collision, true);
+    expect(handler.lastFeedback?.holdSeconds).toBe(0);
+  });
   it("releases the platform and spends momentum in proportion to resistance", () => {
     const ball = { fallSpeed: 10 };
     const platform = { isActive: true, strength: 7 } as PlatformController;
@@ -51,9 +68,9 @@ describe("SuccessfulPlatformHitHandler", () => {
     expect(ball.fallSpeed).toBeCloseTo(9.902);
     expect(beginRelease).toHaveBeenCalledWith(platform);
     expect(completeRelease).toHaveBeenCalledWith(platform);
-    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), 10 / 7);
+    expect(feedback.playPlatformBreak).toHaveBeenCalledWith(platform, expect.any(Function), expect.any(Number), expect.objectContaining({ perfect: false, holdSeconds: 0 }));
     expect(feedback.playBallReaction).toHaveBeenCalledOnce();
-    expect(feedback.playCameraReaction).toHaveBeenCalledWith(10 / 7);
+    expect(feedback.playCameraReaction).toHaveBeenCalledWith(1.2);
   });
 
   it("does nothing when the ball speed is insufficient", () => {
@@ -101,7 +118,8 @@ it("barely slows a fast ball on a weak panel, preserves the run even on a near-l
     const pool = { beginRelease: () => true, completeRelease: () => true };
     const handler = new SuccessfulPlatformHitHandler(ball, pool, createFeedback().feedback, gameConfig);
     handler.handle({ platform, ballSpeed: 50, assessment: "sufficient" });
-    expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50, undefined);
+    if (strength === 49) expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50, undefined, .065);
+    else expect(ball.startBreakImpact).toHaveBeenCalledWith(.65, strength / 50, undefined);
     return ball.fallSpeed;
   };
   expect(remaining(10)).toBeCloseTo(49.96);

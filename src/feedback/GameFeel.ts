@@ -2,6 +2,7 @@ import { getRenderQuality } from "../rendering/AdaptiveQuality";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { getGameSounds } from "./GameSounds";
+import type { BreakFeedback } from "../effects/BreakFeedback";
 
 export class GameFeel {
   readonly #scene: Scene;
@@ -90,16 +91,18 @@ export class GameFeel {
     ], 320);
     this.#animate(this.#root, [{ boxShadow: "inset 0 0 55px #68edff88" }, { boxShadow: "inset 0 0 0 transparent" }], 300, false);
   }
-  public breakAt(position: { x: number; y: number; z: number }, heavy: boolean): void {
-    getGameSounds().play("break", heavy ? 1.5 : 1);
+  public breakAt(position: { x: number; y: number; z: number }, feedback: BreakFeedback): void {
+    getGameSounds().play("break", feedback.force);
     const point = this.screenPoint(position);
     this.#particle(point, "ring", [{ transform: "translate(-50%, -50%) scale(.3)", opacity: .8 },
-      { transform: `translate(-50%, -50%) scale(${this.#reduced ? "1" : heavy ? "3.5" : "2.5"})`, opacity: 0 }], 180);
-    if (this.#reduced || getRenderQuality(this.#scene.getEngine()) === "low") return;
-    for (let i = 0; i < (heavy ? 5 : 3); i++) {
+      { transform: `translate(-50%, -50%) scale(${String(this.#reduced ? 1 : 2 + feedback.power * 2.5)})`, opacity: 0 }], 150 + feedback.power * 80);
+    if (this.#reduced) return;
+    const lowQuality = getRenderQuality(this.#scene.getEngine()) === "low";
+    const count = lowQuality ? 2 : feedback.fragments;
+    for (let i = 0; i < count; i++) {
       const angle = i * 2.4;
-      this.#particle(point, "spark", [{ opacity: 1, transform: "scale(1)" },
-        { opacity: 0, transform: `translate(${String(Math.cos(angle) * 65)}px, ${String(Math.sin(angle) * 40)}px) rotate(130deg) scale(.2)` }], 230);
+      this.#particle(point, "shard", [{ opacity: 1, transform: `scale(${String(2.2 - feedback.power * .5)})` },
+        { opacity: 0, transform: `translate(${String(Math.cos(angle) * feedback.spread)}px, ${String(Math.sin(angle) * feedback.spread * .6 - feedback.power * 55)}px) rotate(190deg) scale(.15)` }], 520 - feedback.power * 180);
     }
   }
   public setPaused(paused: boolean): void {

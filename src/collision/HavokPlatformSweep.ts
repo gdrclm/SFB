@@ -8,6 +8,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { BallPosition } from "../ball/BallController";
 import type { PlatformController } from "../platform/PlatformController";
 import type { PlatformSweep } from "./CollisionResolver";
+import { sphereBoxFraction } from "./SphereBoxSweep";
 
 export class HavokPlatformSweep implements PlatformSweep {
   readonly #plugin: HavokPlugin;
@@ -20,6 +21,8 @@ export class HavokPlatformSweep implements PlatformSweep {
   readonly #end = Vector3.Zero();
   readonly #inputResult = new ShapeCastResult();
   readonly #hitResult = new ShapeCastResult();
+  readonly #radius: number;
+  #fraction = 1;
 
   public constructor(
     scene: Scene,
@@ -30,12 +33,16 @@ export class HavokPlatformSweep implements PlatformSweep {
     this.#plugin = plugin;
     this.#platforms = platforms; this.#knownCount = platforms.length;
     this.#shape = new PhysicsShapeSphere(Vector3.Zero(), ballRadius, scene);
+    this.#radius = ballRadius;
+    // Moving platforms use an exact current-pose sweep below: Havok's broadphase
+    // only refreshes on scene renders, which may follow several simulation ticks.
+    this.#shape.filterCollideMask = 1;
     this.#platformByTransform = new Map(
       platforms.map((platform) => [platform.mesh, platform]),
     );
   }
 
-  public get hitFraction(): number { return Math.max(0, Math.min(1, this.#hitResult.hitFraction)); }
+  public get hitFraction(): number { return this.#fraction; }
 
   public cast(start: BallPosition, end: BallPosition): PlatformController | null {
     while (this.#knownCount < this.#platforms.length) {
@@ -57,9 +64,22 @@ export class HavokPlatformSweep implements PlatformSweep {
     );
 
     const body = this.#hitResult.body;
-    return body === undefined
-      ? null
-      : (this.#platformByTransform.get(body.transformNode) ?? null);
+    let nearest = body === undefined ? null : (this.#platformByTransform.get(body.transformNode) ?? null);
+    this.#fraction = nearest ? Math.max(0, Math.min(1, this.#hitResult.hitFraction)) : 1;
+    for (const platform of this.#platforms) {
+      if (!platform.isActive || !platform.lateralMotion) continue;
+      const center = platform.mesh.position;
+      if (Math.min(start.y, end.y) - this.#radius > center.y + platform.size.height / 2
+        || Math.max(start.y, end.y) + this.#radius < center.y - platform.size.height / 2
+        || Math.min(start.x, end.x) - this.#radius > center.x + platform.width / 2
+        || Math.max(start.x, end.x) + this.#radius < center.x - platform.width / 2) continue;
+      const fraction = sphereBoxFraction(start, end,
+        center, { x: platform.width / 2, y: platform.size.height / 2, z: platform.size.depth / 2 }, this.#radius);
+      if (fraction !== null && (nearest === null || fraction < this.#fraction)) {
+        nearest = platform; this.#fraction = fraction;
+      }
+    }
+    return nearest;
   }
 
   public dispose(): void {

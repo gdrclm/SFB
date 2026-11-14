@@ -79,9 +79,13 @@ export class PlatformGenerator implements FixedSimulationSystem {
     this.enabled = true;
   }
 
-  public fixedUpdate(seconds = 0): void {
+  public advanceMotion(seconds: number): void {
     if (!this.enabled) return;
     for (const platform of this.#pool.platforms) if (platform.isActive && platform.lateralMotion) platform.advanceMotion(seconds);
+  }
+
+  public fixedUpdate(): void {
+    if (!this.enabled) return;
     this.#pool.beginGeneration?.();
     this.#recyclePlatformsAbovePlayWindow();
     this.#fillLookAheadWindow();

@@ -4,6 +4,34 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { expect, it } from "vitest";
 import { BallDynamicsFX } from "./BallDynamicsFX";
+import { trailGlitchPower } from "./BallCometFX";
+
+it("introduces trail shake and glitch bands strictly above 70, increasing with speed", () => {
+  expect(trailGlitchPower(70)).toBe(0);
+  expect(trailGlitchPower(71)).toBeGreaterThan(0);
+  expect(trailGlitchPower(140)).toBeGreaterThan(trailGlitchPower(90));
+  expect(trailGlitchPower(1e12)).toBe(1);
+  expect(trailGlitchPower(Infinity)).toBe(0);
+});
+
+it("keeps slow destruction chunky and readable while fast destruction throws more debris", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const ball = MeshBuilder.CreateSphere("ball", {}, scene), fx = new BallDynamicsFX(ball, 1);
+  const resources = scene.meshes.length;
+  const motion = { speed: 0, look: 0, boost: 0, anticipating: false, slow: false, danger: false };
+  const sample = (power: number) => {
+    fx.trigger("break", power); fx.update(.04, motion);
+    const visible = scene.meshes.filter(m => m.name.startsWith("BallFXShard-") && m.visibility > 0);
+    return { count: visible.length, size: Math.max(...visible.map(m => m.scaling.y)), spread: Math.max(...visible.map(m => Math.abs(m.position.x))) };
+  };
+  const low = sample(0); fx.update(1, motion); const high = sample(1);
+  expect(high.count).toBeGreaterThan(low.count);
+  expect(low.size).toBeGreaterThan(high.size);
+  expect(low.size).toBeGreaterThan(3);
+  expect(high.spread).toBeGreaterThan(low.spread);
+  expect(scene.meshes.length).toBe(resources);
+  fx.dispose(); scene.dispose(); engine.dispose();
+});
 
 it("adds more, longer and thicker side wind as speed doubles", () => {
   const engine = new NullEngine(), scene = new Scene(engine);

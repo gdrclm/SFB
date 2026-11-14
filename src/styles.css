@@ -1972,6 +1972,8 @@ body[data-guide-combo="false"] #combo-panel { visibility: hidden; }
 .feel-ring, .feel-boost { width: 56px; height: 56px; border-radius: 50%; border: 3px solid #d9fff0; box-shadow: 0 0 12px #9fffec; }
 .feel-boost { width: 70px; height: 70px; border-color: #b2f8ff; }
 .feel-spark { width: 9px; height: 5px; border-radius: 2px; background: #ffe199; box-shadow: 0 0 7px #ffd372; }
+.feel-shard { width: 13px; height: 9px; background: #b9faff; clip-path: polygon(0 25%, 65% 0, 100% 60%, 25% 100%); filter: drop-shadow(0 0 4px #16cfff); }
+html[data-quality="low"] .feel-shard { filter: none; }
 #boost-coach { width: 240px; font-size: 14px; bottom: 155px; }
 #boost-coach-art { display: none; }
 

@@ -144,7 +144,7 @@ export class BallDynamicsFX {
     this.#flash.material = white; this.#flash.position.y = -radius * .9; this.#flash.visibility = 0;
   }
 
-  public trigger(event: BallExpression): void {
+  public trigger(event: BallExpression, impactPower = 0): void {
     this.#root.position.copyFrom(this.#ball.position);
     this.#root.rotation.copyFrom(this.#ball.rotation);
     if (event === "break" || event === "hurt") {
@@ -153,22 +153,27 @@ export class BallDynamicsFX {
       this.#flash.scaling.set(this.#radius, this.#radius * .35, this.#radius);
     }
     if (event === "hurt" || event === "defeat") this.#hurtAge = 0;
-    if (event === "break") this.#emit(this.#shards, this.#reduced ? 3 : 8, false, .45);
+    if (event === "break") {
+      const power = clamp(impactPower);
+      this.#emit(this.#shards, this.#reduced ? 3 : power >= .4 ? 10 : 7, false,
+        .6 - power * .12, 1.25 + power * .35, 2.2 - power * .6);
+    }
     if (event === "coin" && this.#coinAge >= .14) { this.#coinAge = 0; this.#emit(this.#stars, this.#reduced ? 2 : 5, true, .45); }
     if (event === "combo" || event === "heal") this.#emit(this.#stars, this.#reduced ? 3 : 8, true, .65);
     if (event === "hurt" || event === "defeat") this.#emit(this.#stars, this.#reduced ? 2 : 4, true, .7);
   }
 
-  #emit(pool: Particle[], count: number, follow: boolean, life: number): void {
+  #emit(pool: Particle[], count: number, follow: boolean, life: number, intensity = 1, scale = 1): void {
     if (getRenderQuality(this.#ball.getScene().getEngine()) === "low") count = Math.min(count, 3);
     for (let i = 0; i < count; i++) {
       const cursor = follow ? this.#starCursor++ : this.#shardCursor++;
       const particle = pool[cursor % pool.length]; if (!particle) continue;
       const angle = i / count * Math.PI * 2 + this.#time * .8, r = this.#radius;
       particle.age = 0; particle.life = life; particle.follow = follow;
+      if (!follow) particle.scale = scale;
       particle.offset.set(Math.cos(angle) * r * (follow ? 1.2 : .25), follow ? Math.sin(angle) * r * 1.2 : -r * .8, -.1 * r);
       if (!follow) particle.offset.addInPlace(this.#ball.position);
-      const force = this.#reduced ? .25 : 1;
+      const force = (this.#reduced ? .25 : 1) * intensity;
       particle.velocity.set(Math.cos(angle) * r * (follow ? 1.8 : 7) * force, (follow ? Math.sin(angle) * 1.8 : 2 + Math.sin(angle) * 4) * r * force, Math.sin(angle * 2) * r);
       particle.mesh.rotation.set(i * .7, i * .3, angle);
       particle.mesh.position.copyFrom(particle.offset);
@@ -187,7 +192,7 @@ export class BallDynamicsFX {
     const smooth = 1 - Math.exp(-16 * delta);
     const burst = motion.anticipating ? .15 : motion.boost;
     const speedPower = speedVisualPower(motion.speed, this.#baselineSpeed);
-    this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || motion.speed <= 0, this.#reduced);
+    this.#comet.update(t, speedPower, burst, this.#ball.scaling.y, motion.slow || motion.speed <= 0, this.#reduced, motion.speed);
     this.#updateEmbers(delta, speedPower, motion.speed > 0 && !motion.slow, low);
     const arcTarget = motion.slow ? .8 : Math.max(Math.abs(motion.look) * .65, motion.anticipating ? 1 : burst * .45, this.#hurtAge < .4 ? .75 : 0);
     this.#arcAmount += (arcTarget - this.#arcAmount) * smooth;

@@ -6,8 +6,26 @@ import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it, vi } from "vitest";
 import { gameConfig } from "../config/gameConfig";
 import { SuccessfulHitEffects } from "./SuccessfulHitEffects";
+import { breakFeedback } from "./BreakFeedback";
 
 describe("SuccessfulHitEffects", () => {
+  it("holds the intact contact pose before fracture, then returns pooled artwork exactly once", () => {
+    const engine = new NullEngine(), scene = new Scene(engine);
+    const camera = new FreeCamera("camera", new Vector3(0, 0, -10), scene);
+    const ball = MeshBuilder.CreateSphere("ball", { diameter: 1 }, scene);
+    const effects = new SuccessfulHitEffects(ball, camera, gameConfig);
+    const platform = { renderBreak: vi.fn() }, done = vi.fn();
+    const profile = breakFeedback(50, 48);
+    effects.playPlatformBreak(platform, done, profile.force, profile);
+    effects.fixedUpdate(.004, .04);
+    expect(platform.renderBreak).toHaveBeenLastCalledWith(0);
+    effects.fixedUpdate(.004, .04);
+    expect(platform.renderBreak.mock.lastCall?.[0]).toBeGreaterThan(0);
+    expect(done).not.toHaveBeenCalled();
+    effects.fixedUpdate(1, 1); effects.fixedUpdate(1, 1);
+    expect(done).toHaveBeenCalledOnce();
+    effects.dispose(); scene.dispose(); engine.dispose();
+  });
   it("starts platform, ball and camera reactions", () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);

@@ -239,7 +239,7 @@ it("moves the real Havok collider with the platform group without recreating mes
   const counts = [scene.meshes.length, scene.materials.length, scene.textures.length];
   platform.advanceMotion(1);
   expect(platform.mesh.position.x).toBeCloseTo(.35);
-  scene.getPhysicsEngine()?._step(1 / 60);
+  // No render/physics step: gameplay can execute several ticks before the next frame.
   expect(cast(-.9)?.id).toBeUndefined(); expect(cast(1.2)?.id).toBe(platform.id);
   for (let i = 0; i < 1000; i++) platform.advanceMotion(1 / 60);
   expect([scene.meshes.length, scene.materials.length, scene.textures.length]).toEqual(counts);

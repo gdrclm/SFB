@@ -6,6 +6,10 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 
+export function trailGlitchPower(speed: number): number {
+  return Number.isFinite(speed) ? Math.max(0, Math.min(1, Math.log2(Math.max(1, speed / 70)) / 2.3)) : 0;
+}
+
 Effect.ShadersStore.ballCometVertexShader = `
 precision highp float;
 attribute vec3 position;
@@ -22,9 +26,15 @@ uniform float time;
 uniform float strength;
 uniform float stretch;
 uniform float crossSection;
+uniform float glitch;
 float glow(float x, float width) { return exp(-x*x/(width*width)); }
 void main() {
   vec2 p = vec2((vUV.x-.5)*4.8, vUV.y*11.0-1.5);
+  float tick = floor(time * (26.0 + glitch * 30.0));
+  float band = floor(p.y * 3.3);
+  float tear = step(.78, fract(sin(band * 7.7 + tick * 13.3) * 43758.54)) * glitch;
+  p.x += glitch * (sin(time * 151.0) * .14 + sin(time * 237.0) * .08);
+  p.x += (fract(sin(tick * 25.3 + band) * 127.1) - .5) * .9 * tear;
   float core = 0.0, cyan = 0.0, halo = 0.0;
   for (int i = 0; i < 5; i++) {
     float seed = float(i);
@@ -50,6 +60,8 @@ void main() {
   halo += aura*.65;
   cyan += aura*.24;
   vec3 light = vec3(.015,.22,.9)*halo*.8 + vec3(.025,.78,1.0)*cyan*1.3 + vec3(.88,.98,1.0)*core*2.2;
+  light *= 1.0 - .7 * tear * step(.45, fract(p.y * 3.3));
+  light += vec3(.4,.03,.6) * cyan * tear * .8;
   // Fade the outer boundary of the quad, even during the strongest boost.
   float edge = smoothstep(0.0,.2,vUV.y)*(1.0-smoothstep(.9,1.0,vUV.y))
     *smoothstep(0.0,.18,vUV.x)*(1.0-smoothstep(.82,1.0,vUV.x));
@@ -72,14 +84,14 @@ export class BallCometFX {
     this.#mesh.isPickable = false;
     this.#mesh.visibility = 0;
     this.#material = new ShaderMaterial("BallFXCometMaterial", scene, "ballComet", {
-      attributes: ["position", "uv"], uniforms: ["worldViewProjection", "time", "power", "strength", "stretch", "crossSection"], needAlphaBlending: true,
+      attributes: ["position", "uv"], uniforms: ["worldViewProjection", "time", "power", "strength", "stretch", "crossSection", "glitch"], needAlphaBlending: true,
     });
     this.#material.alphaMode = Constants.ALPHA_ONEONE;
     this.#material.disableDepthWrite = true;
     this.#material.backFaceCulling = false;
     this.#mesh.material = this.#material;
   }
-  public update(time: number, power: number, boost: number, stretch: number, suppressed: boolean, reducedMotion = false): void {
+  public update(time: number, power: number, boost: number, stretch: number, suppressed: boolean, reducedMotion = false, speed = 0): void {
     const amount = Math.max(.04 + .96 * Math.pow(power, 1.6), boost);
     this.#mesh.visibility = suppressed ? 0 : 1;
     // A widening orthographic camera must not shrink the character's jet to a few pixels.
@@ -96,6 +108,7 @@ export class BallCometFX {
     this.#material.setFloat("strength", amount + boost * .35);
     this.#material.setFloat("stretch", Math.max(.4, stretch) / heightScale);
     this.#material.setFloat("crossSection", 1 / Math.sqrt(Math.max(.7, stretch)));
+    this.#material.setFloat("glitch", reducedMotion || suppressed ? 0 : trailGlitchPower(speed));
   }
   public dispose(): void { this.#mesh.dispose(); this.#material.dispose(); }
 }

@@ -36,6 +36,8 @@ export class SpeedFeedback {
 
   public draw(deltaSeconds: number): void { this.#wind.draw(deltaSeconds); }
 
+  public playBreak(power: number): void { this.#wind.pulse(.25 + power * .45); }
+
   public playBoost(): void {
     this.#wind.boost();
     this.#label.textContent = "ϟ";

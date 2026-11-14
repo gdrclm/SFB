@@ -521,7 +521,7 @@ export class GameApplication {
           else {
             this.#feel?.boost(this.#ballController.position);
             this.#ballVisualController?.react("combo");
-            this.#cameraController?.playBoostReaction(); this.#speedFeedback?.playBoost();
+            this.#cameraController?.playBoostReaction(!this.#reducedMotion); this.#speedFeedback?.playBoost();
           }
         }
         this.#haptics.request(kind === "annihilation" ? "heavyBreak" : "boost");
@@ -550,6 +550,7 @@ export class GameApplication {
       this.#platformPool,
       this.#successfulHitEffects,
       this.#config,
+      this.#reducedMotion,
     );
     this.#unsuccessfulHitEffects = new UnsuccessfulHitEffects(
       ballMesh,
@@ -564,6 +565,7 @@ export class GameApplication {
       this.#config,
     );
     this.#unsubscribeCollision = this.#collisionResolver.onCollision(this.#handleCollision);
+    this.#fixedStep.register(this.#successfulHitHandler);
     this.#fixedStep.register(new WorldStep(this.#ballController, this.#collisionResolver, this.#coinCollectionController,
       this.#coinGenerator, this.#platformGenerator, () => this.#gameState.current !== GameState.GameOver));
     this.#fixedStep.register(updateRunState);
@@ -600,7 +602,7 @@ export class GameApplication {
       this.#haptics.request("boost");
       this.#ballVisualController?.playBoostReaction(result);
       this.#speedFeedback?.playBoost();
-      this.#cameraController?.playBoostReaction();
+      this.#cameraController?.playBoostReaction(!this.#reducedMotion);
     });
     this.#boostButton = new BoostButtonController(
       this.#boostButtonElement,
@@ -761,6 +763,8 @@ export class GameApplication {
     isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
     this.#lastFrameTimeMs = nowMs;
     this.#quality?.update(realDeltaSeconds, !isPaused && this.#gameState.current !== GameState.GameOver);
+    getGameSounds().updateSpeed(this.#ballController?.fallSpeed ?? 0,
+      this.#runStarted && !isPaused && this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Results);
     const updateHud = nowMs - this.#lastHudTime >= 1000 / 15;
     if (updateHud) {
       this.#lastHudTime = nowMs;
@@ -879,8 +883,13 @@ export class GameApplication {
     const destroyed = this.#successfulHitHandler?.handle(collision, powered) ?? false;
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
-      this.#ballVisualController?.react("break");
-      this.#feel?.breakAt(collision.platform.mesh.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75);
+      const feedback = this.#successfulHitHandler?.lastFeedback;
+      this.#ballVisualController?.react("break", feedback ?? undefined);
+      if (feedback) {
+        this.#feel?.breakAt(collision.platform.mesh.position, feedback);
+        this.#speedFeedback?.playBreak(feedback.power);
+        if (!this.#reducedMotion) this.#cameraController?.playSpeedKick(.25 + feedback.power * .5, feedback.holdSeconds);
+      }
       this.#destroyedPlatformCount += 1;
       this.#runProgress.observeSpeed(collision.ballSpeed);
       // Invulnerable hits destroy scenery but do not masquerade as skill hits or recharge BOOST.
@@ -1144,6 +1153,8 @@ export class GameApplication {
     this.#haptics.cancel();
     this.#stateBeforePause = currentState;
     this.#gameState.transitionTo(GameState.Paused);
+    getGameSounds().stop();
+    this.#feel?.setPaused(true);
     this.#syncRunClock(performance.now());
     this.#pauseMenuElement.hidden = false;
     this.#pauseButtonElement.setAttribute("aria-label", "Игра на паузе");

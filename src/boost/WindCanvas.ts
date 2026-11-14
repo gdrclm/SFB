@@ -71,7 +71,12 @@ export class WindCanvas {
     this.#frozen = frozen;
   }
 
-  public boost(): void { this.#burst = .5; this.#dirty = true; }
+  public boost(): void { this.pulse(1); }
+
+  public pulse(strength: number): void {
+    this.#burst = Math.max(this.#burst, .5 * Math.max(0, Math.min(1, strength)));
+    this.#dirty = true;
+  }
 
   public draw(deltaSeconds: number): void {
     const ctx = this.#context;
@@ -79,7 +84,7 @@ export class WindCanvas {
     const reduced = this.#motion.matches;
     if ((this.#frozen || reduced && this.#burst === 0) && !this.#dirty) return;
     const dt = this.#frozen ? 0 : Math.min(.05, Math.max(0, deltaSeconds));
-    this.#phase = (this.#phase + dt / this.#feedback.duration) % 1;
+    this.#phase = (this.#phase + dt * (1 + this.#burst * 2) / this.#feedback.duration) % 1;
     this.#burst = Math.max(0, this.#burst - dt);
     this.#dirty = false;
     ctx.clearRect(0, 0, this.#width, this.#height);
