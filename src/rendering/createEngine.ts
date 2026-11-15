@@ -74,6 +74,10 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<EngineRes
   const compatible = compatibility || engine.webGLVersion === 1;
   if (compatible) {
     engine.disableVertexArrayObjects = true;
+    // Match the initial geometry path to the one _initGLContext will select
+    // after restoration. Setting only the flag leaves cached VAOs active until
+    // the first loss, then the same meshes bind invalid extension objects.
+    engine.getCaps().vertexArrayObject = false;
     getGraphicsSettings().setCompatibility(true);
   }
   watchGraphicsContext(engine, canvas);

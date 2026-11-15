@@ -35,6 +35,11 @@ if (!(canvasElement instanceof HTMLCanvasElement)) {
 }
 
 const canvas = canvasElement;
+const settingsOnlyBoot = window.location.hash === "#settings";
+if (settingsOnlyBoot) {
+  const url = new URL(window.location.href); url.hash = "";
+  window.history.replaceState(null, "", url);
+}
 const status = requireElement("#status");
 const boostButtonElement = requireElement("#boost-button");
 if (!(boostButtonElement instanceof HTMLButtonElement)) {
@@ -67,7 +72,7 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
 const restartButton = restartButtonElement;
 initializeHudArt();
 initializeGraphicsControls(restartGraphics);
-initializeGraphicsRecovery(canvas, restartGraphics);
+initializeGraphicsRecovery(canvas, restartGraphics, saveAndOpenGraphicsSettings);
 const music = initializeFeedbackControls();
 getGameSounds();
 const network = new NetworkView();
@@ -109,10 +114,22 @@ const lifecycle = new ApplicationLifecycle(
 );
 
 function restartGraphics(): void {
+  reloadGraphics(false);
+}
+
+function saveAndOpenGraphicsSettings(): void {
+  reloadGraphics(true);
+}
+
+function reloadGraphics(settings: boolean): void {
+  // Finish and credit the interrupted run before disposing the damaged GPU.
   lifecycle.dispose();
   disposeGameScene(canvas);
   const url = new URL(window.location.href);
-  if (url.searchParams.get("renderer") === "webgl1") { url.searchParams.delete("renderer"); window.history.replaceState(null, "", url); }
+  if (url.searchParams.get("renderer") === "webgl1") url.searchParams.delete("renderer");
+  if (settings) url.hash = "settings";
+  window.history.replaceState(null, "", url);
+  // A fresh canvas is required when changing WebGL versions.
   window.location.reload();
 }
 
@@ -178,16 +195,18 @@ if (!(startButton instanceof HTMLButtonElement)) {
   throw new TypeError("#start-run-button must be a button element.");
 }
 interfaceLayer.inert = true;
-const settingsDialog = requireElement("#game-settings");
-if (!(settingsDialog instanceof HTMLDialogElement)) throw new TypeError("#game-settings must be a dialog.");
+const settingsDialogElement = requireElement("#game-settings");
+if (!(settingsDialogElement instanceof HTMLDialogElement)) throw new TypeError("#game-settings must be a dialog.");
+const settingsDialog = settingsDialogElement;
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-open-settings]")) {
-  button.addEventListener("click", () => {
-    requireElement("#interface-toggle").hidden = !startScreen.hidden;
-    const developerModeInput = requireInput("#developer-mode");
-    developerModeInput.disabled = startScreen.hidden;
-    developerModeInput.title = startScreen.hidden ? "Режим можно менять в главном меню" : "";
-    settingsDialog.showModal();
-  });
+  button.addEventListener("click", openSettings);
+}
+function openSettings(): void {
+  requireElement("#interface-toggle").hidden = !startScreen.hidden;
+  const developerModeInput = requireInput("#developer-mode");
+  developerModeInput.disabled = startScreen.hidden;
+  developerModeInput.title = startScreen.hidden ? "Режим можно менять в главном меню" : "";
+  settingsDialog.showModal();
 }
 requireElement("#settings-close").addEventListener("click", () => { settingsDialog.close(); });
 const resetDialog = requireElement("#reset-data-dialog");
@@ -319,11 +338,13 @@ numbersToggle?.addEventListener("click", () => {
   applyPlatformNumbers();
 });
 applyPlatformNumbers();
+if (settingsOnlyBoot) openSettings();
 
 // Prepare only the reusable renderer/physics/assets while the menu is idle.
 // No run entities, animation loop or rewards are started here.
 const warmScene = (): void => {
-  if (document.hidden || startScreen.hidden) return;
+  // Recovery settings must remain usable without starting another GPU context.
+  if (settingsOnlyBoot || document.hidden || startScreen.hidden) return;
   const profile = getPlayerProfile();
   void acquireGameScene(canvas, gameConfig, { theme: profile.equipment.world }).then(
     session => waitForPlatformSprites(session.mainScene.scene),

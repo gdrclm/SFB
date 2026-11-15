@@ -2275,14 +2275,15 @@ html[data-quality="low"] .feel-shard { filter: none; }
 .graphics-settings .graphics-compatibility { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: .75rem; font-weight: 600; }
 #graphics-compatibility { width: 20px; height: 20px; flex-shrink: 0; accent-color: #24e4d7; }
 .graphics-compatibility-note { grid-column: 1 / -1; color: #a2d7ed; font-size: .65rem; line-height: 1.35; }
-#graphics-restart, #graphics-recovery-retry { grid-column: 1 / -1; min-height: 44px; padding: 10px; border: 1px solid #6bffe7; border-radius: 12px; background: linear-gradient(#0b968a, #034d63); color: #edffff; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+#graphics-restart, #graphics-recovery-settings, #graphics-recovery-retry { grid-column: 1 / -1; min-height: 44px; padding: 10px; border: 1px solid #6bffe7; border-radius: 12px; background: linear-gradient(#0b968a, #034d63); color: #edffff; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+#graphics-recovery-retry { border-color: #39beef; background: linear-gradient(#10466b, #03253e); }
 #graphics-restart[hidden], #graphics-recovery[hidden] { display: none; }
 #graphics-recovery { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; width: 100dvw; height: 100dvh; max-width: none; max-height: none; margin: 0; border: 0; padding: 18px; background: #010c20ed; color: #eaffff; }
 .graphics-recovery-card { display: grid; gap: 16px; width: min(360px, 100%); max-height: calc(100dvh - 36px); overflow: auto; padding: 24px; border: 2px solid #26dcff; border-radius: 22px; background: linear-gradient(#074f87, #031c3a); box-shadow: 0 0 18px #00bcff66; text-align: center; }
 .graphics-recovery-card h1 { margin: 0; font-size: 1.35rem; }
 .graphics-recovery-card p { margin: 0; font-size: .9rem; line-height: 1.45; }
 .graphics-recovery-card small { color: #a6d6e9; font-size: .7rem; }
-#graphics-recovery-retry:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }
+#graphics-recovery-settings:focus-visible, #graphics-recovery-retry:focus-visible { outline: 3px solid #ffe57a; outline-offset: 3px; }
 #game-settings .feedback-controls button { min-height: 48px; border: 1px solid #29c6f0; border-radius: 14px; background: linear-gradient(#084679, #032347); box-shadow: inset 0 1px 2px #a0eaff88, 0 2px 0 #01152e; padding: 9px 12px; }
 #game-settings .feedback-controls button > :first-child { color: #68e9ff; font-size: 20px; }
 #game-settings .feedback-controls .setting-state { min-width: 45px; padding: 4px 7px; border: 1px solid #b5ffed; border-radius: 11px; background: linear-gradient(#72ffda, #00dc9d 40%, #00946e); color: #003f36; font-size: .62rem; box-shadow: 0 0 7px #00e8aa55, inset 0 1px 2px #e2fff7; }

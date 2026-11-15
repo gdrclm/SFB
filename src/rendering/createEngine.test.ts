@@ -10,8 +10,10 @@ vi.mock("@babylonjs/core/Engines/engine",async()=>{
     readonly webGLVersion=state.version;
     readonly onDisposeObservable=new Observable();readonly onContextLostObservable=new Observable();readonly onContextRestoredObservable=new Observable();
     disableVertexArrayObjects=false;
+    readonly caps={vertexArrayObject:true};
     constructor(_canvas:unknown,antialias:boolean,options:Record<string,unknown>){state.calls.push({antialias,options});}
     setHardwareScalingLevel():void{}
+    getCaps(){return this.caps;}
     dispose():void{this.onDisposeObservable.notifyObservers(undefined);}
   }};
 });
@@ -35,6 +37,7 @@ it("starts directly on WebGL1 with conservative buffers when compatibility is se
   state.version=1;state.settings.compatibility=true;state.settings.mode="ultra";
   const c=canvas(),result=await createEngine(c.element);
   expect(c.getContext.mock.calls[0]?.[0]).toBe("webgl");expect(result.renderer).toBe("webgl1");
+  expect(result.engine.getCaps().vertexArrayObject).toBe(false);
   expect(state.calls[0]).toMatchObject({antialias:false,options:{disableWebGL2Support:true}});
   expect(document.documentElement.dataset.graphicsCompatibility).toBe("true");result.engine.dispose();
 });
