@@ -8,7 +8,7 @@ function player() {
   return { audio, music: new BackgroundMusic(audio) };
 }
 
-it("waits for interaction, loops quietly and does not duplicate playback requests", () => {
+it("loops quietly once playback is requested and does not duplicate requests", () => {
   const { audio, music } = player();
   music.setEnabled(true);
   expect(audio.play).not.toHaveBeenCalled();
@@ -231,7 +231,12 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
   const music = initializeBackgroundMusic();
   expect(gains[0]?.gain.value).toBe(0);
   expect(gains[1]?.gain.value).toBe(0);
+  // Initialization leaves a saved music-off preference silent, including the
+  // AudioContext. Enabling music starts the title without a user gesture.
+  music.setEnabled(false);expect(resume).not.toHaveBeenCalled();
   music.setEnabled(true);
+  expect(resume).toHaveBeenCalled();expect(title.play).toHaveBeenCalledOnce();
+  expect(sky.play).not.toHaveBeenCalled();expect(crystal.play).not.toHaveBeenCalled();
   handlers.get("pointerdown")?.({ isTrusted: true } as Event);
   await settle();expect(title.play).toHaveBeenCalledOnce();
   music.setMenu(false);

@@ -146,6 +146,9 @@ export function initializeBackgroundMusic(): BackgroundMusic {
   let context: AudioContext | null = null;
   try { if (typeof AudioContext !== "undefined") context = new AudioContext(); }
   catch { /* Fall back to the media element on devices without Web Audio. */ }
+  const resumeContext = (): void => {
+    if (context?.state === "suspended") void context.resume().catch(() => {});
+  };
   const createAudio = (name: string): MusicMedia => {
     const audio = document.createElement("audio");
     audio.dataset.audioChannel = "music";
@@ -162,7 +165,7 @@ export function initializeBackgroundMusic(): BackgroundMusic {
     audioContext.createMediaElementSource(audio).connect(gain);
     gain.connect(audioContext.destination);
     return {
-      play: () => audio.play(), pause: () => { audio.pause(); },
+      play: () => { resumeContext(); return audio.play(); }, pause: () => { audio.pause(); },
       get loop() { return audio.loop; }, set loop(value: boolean) { audio.loop = value; },
       get currentTime() { return audio.currentTime; }, set currentTime(value: number) { audio.currentTime = value; },
       get volume() { return gain.gain.value; },
@@ -176,23 +179,21 @@ export function initializeBackgroundMusic(): BackgroundMusic {
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
-  let unlocked = false;
-  const resumeContext = (): void => {
-    if (context?.state === "suspended") void context.resume().catch(() => {});
-  };
   const unlock = (event: Event): void => {
     if (!event.isTrusted) return;
-    unlocked = true; resumeContext(); music.unlock();
+    resumeContext(); music.unlock();
   };
   document.addEventListener("pointerdown", unlock, { passive: true });
   document.addEventListener("keydown", unlock);
   const visibility = (): void => {
-    if (!document.hidden && unlocked) resumeContext();
     music.setVisible(!document.hidden);
   };
   document.addEventListener("visibilitychange", visibility);
   window.addEventListener("pagehide", () => { music.setVisible(false); });
   window.addEventListener("pageshow", visibility);
   visibility();
+  // Start when persisted settings enable music, without waiting for input.
+  // A browser autoplay rejection is retried by the trusted gesture handlers.
+  music.unlock();
   return music;
 }
