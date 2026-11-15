@@ -8,6 +8,7 @@ import { initializeHudArt } from "./ui/HudArt";
 import { getGameSounds } from "./feedback/GameSounds";
 import { initializeFeedbackControls } from "./feedback/FeedbackControls";
 import "./styles.css";
+import "./ui/MainMenu.css";
 import { getBrowserRunHistory } from "./run/RunHistory";
 import { renderRunHistory } from "./run/renderRunHistory";
 import { hasFinishedOpening } from "./tutorial/StagedOpening";
@@ -134,6 +135,7 @@ function reloadGraphics(settings: boolean): void {
 }
 
 function showStartupError(error: unknown): void {
+  music.setMenu(true);
   lifecycle.dispose();
   disposeGameScene(canvas);
   const message = error instanceof Error ? error.message : "Unknown startup error";
@@ -160,6 +162,7 @@ async function restartApplication(guided = false): Promise<void> {
 }
 
 function exitApplication(): void {
+  music.setMenu(true);
   lifecycle.dispose();
   startScreen.hidden = false;
   network.showMenu();
@@ -292,6 +295,8 @@ const startRun = (guided = !network.wantsRanked && !hasFinishedOpening()): void 
   }
   requestedGuidedRun = requestedDeveloperDepth === undefined && guided;
   requestedRanked = requestedDeveloperDepth === undefined && network.wantsRanked && !guided;
+  // Start the run's media inside the trusted click (also required on iOS).
+  music.setMenu(false);
   startButton.disabled = true;
   requireElement("#start-error").textContent = "Загрузка…";
   void (async () => {

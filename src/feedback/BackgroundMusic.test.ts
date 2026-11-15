@@ -18,6 +18,30 @@ it("waits for interaction, loops quietly and does not duplicate playback request
   expect(audio.volume).toBeLessThan(.5);
 });
 
+it("plays the musician's title only in the menu, then restores the run's music and mute preference",async()=>{
+  const {audio:sky}=player(),{audio:crystal}=player(),{audio:title}=player();
+  const music=new BackgroundMusic(sky,crystal,title);
+  music.setEnabled(true);music.unlock();await settle();
+  expect(title.play).toHaveBeenCalledOnce();expect(sky.play).not.toHaveBeenCalled();
+  expect(title.volume).toBeCloseTo(.32);expect(sky.volume).toBe(0);expect(crystal.volume).toBe(0);
+  title.currentTime=37;
+  music.setMenu(false);await settle();
+  expect(title.pause).toHaveBeenCalled();expect(title.volume).toBe(0);expect(sky.volume).toBeCloseTo(.32);
+  music.setPaused(true);music.setMenu(true);music.setPaused(false);await settle();
+  expect(title.currentTime).toBe(37);expect(title.volume).toBeCloseTo(.32);expect(sky.volume).toBe(0);
+  music.setEnabled(false);const calls=title.play.mock.calls.length;
+  music.setMenu(false);music.setMenu(true);expect(title.play).toHaveBeenCalledTimes(calls);
+});
+
+it("does not revive delayed title playback after leaving the menu",async()=>{
+  const {audio:sky}=player(),{audio:crystal}=player(),{audio:title}=player();
+  let resolve!:()=>void;title.play.mockImplementationOnce(()=>new Promise<void>(done=>{resolve=done;}));
+  const music=new BackgroundMusic(sky,crystal,title);music.setEnabled(true);music.unlock();
+  music.setMenu(false);const pauses=title.pause.mock.calls.length;
+  resolve();await settle();expect(title.pause.mock.calls.length).toBeGreaterThan(pauses);
+  expect(title.volume).toBe(0);expect(sky.volume).toBeCloseTo(.32);
+});
+
 it("pauses when disabled or hidden and resumes without resetting the track", () => {
   const { audio, music } = player();
   music.unlock();
@@ -181,25 +205,25 @@ it("does not revive a pending play after the page hides or jump after a long fra
 });
 
 it("mixes through Web Audio gains when a mobile browser cannot set element volume", async () => {
-  const { audio: sky } = player(), { audio: crystal } = player();
-  const elements = [sky, crystal].map(audio => Object.assign(audio, {
+  const { audio: sky } = player(), { audio: crystal } = player(), {audio:title}=player();
+  const elements = [sky, crystal, title].map(audio => Object.assign(audio, {
     dataset: {}, preload: "", src: "", hidden: false, canPlayType: () => "",
   }));
   for (const element of elements) Object.defineProperty(element, "volume", {
     get: () => 1, set: () => { throw new Error("Element volume unsupported"); },
   });
-  const gains = [0, 1].map(() => ({ gain: { value: 1, setTargetAtTime: vi.fn() }, connect: vi.fn() }));
+  const gains = [0, 1, 2].map(() => ({ gain: { value: 1, setTargetAtTime: vi.fn() }, connect: vi.fn() }));
   const resume = vi.fn().mockResolvedValue(undefined);
   const audioContext = {
     currentTime: 0, state: "suspended", resume, destination: {},
-    createGain: vi.fn().mockReturnValueOnce(gains[0]).mockReturnValueOnce(gains[1]),
+    createGain: vi.fn().mockReturnValueOnce(gains[0]).mockReturnValueOnce(gains[1]).mockReturnValueOnce(gains[2]),
     createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
   };
   const handlers = new Map<string, (event: Event) => void>();
   vi.stubGlobal("AudioContext", vi.fn(function () { return audioContext; }));
   vi.stubGlobal("document", {
     hidden: false, body: { append: vi.fn() },
-    createElement: vi.fn().mockReturnValueOnce(elements[0]).mockReturnValueOnce(elements[1]),
+    createElement: vi.fn().mockReturnValueOnce(elements[0]).mockReturnValueOnce(elements[1]).mockReturnValueOnce(elements[2]),
     addEventListener: (name: string, handler: (event: Event) => void) => { handlers.set(name, handler); },
   });
   vi.stubGlobal("window", { addEventListener: vi.fn() });
@@ -209,6 +233,8 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
   expect(gains[1]?.gain.value).toBe(0);
   music.setEnabled(true);
   handlers.get("pointerdown")?.({ isTrusted: true } as Event);
+  await settle();expect(title.play).toHaveBeenCalledOnce();
+  music.setMenu(false);
   await settle(); music.setCrystalBlend(1); advance(music, 4);
   expect(resume).toHaveBeenCalled();
   expect(crystal.play).toHaveBeenCalledTimes(1);

@@ -6,6 +6,9 @@ export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused"> 
 /** Enter crystal with two seconds of fade-out, then two seconds of fade-in. */
 export class BackgroundMusic {
   readonly #tracks: MusicTrack[];
+  readonly #menuTrack: MusicTrack | null;
+  readonly #allTracks: MusicTrack[];
+  #menu = false;
   #enabled = false;
   #unlocked = false;
   #visible = true;
@@ -20,12 +23,27 @@ export class BackgroundMusic {
     this.#duckTarget=Math.min(this.#duckTarget,1-Math.max(0,Math.min(.45,depth)));this.#duckHold=.06;
   }
 
-  public constructor(media: MusicMedia, crystal?: MusicMedia) {
-    this.#tracks = [media, ...(crystal === undefined ? [] : [crystal])].map(audio => {
+  public constructor(media: MusicMedia, crystal?: MusicMedia, title?: MusicMedia) {
+    const track = (audio: MusicMedia): MusicTrack => {
       audio.loop = true;
       return { media: audio, requested: false, playing: false, failed: false, generation: 0 };
-    });
+    };
+    this.#tracks = [media, ...(crystal === undefined ? [] : [crystal])].map(track);
+    this.#menuTrack = title === undefined ? null : track(title);
+    this.#allTracks = [...this.#tracks, ...(this.#menuTrack === null ? [] : [this.#menuTrack])];
+    this.#menu = this.#menuTrack !== null;
     this.#volumes();
+  }
+  public setMenu(menu: boolean): void {
+    const next = menu && this.#menuTrack !== null;
+    if (next === this.#menu) return;
+    this.#menu = next;
+    if (next) {
+      this.#transition = null; this.#targetCrystal = false;
+      this.#skyGain = 1; this.#crystalGain = 0;
+      this.#duck = this.#duckTarget = 1; this.#duckHold = 0;
+    }
+    this.#volumes(); this.#apply();
   }
   public setEnabled(enabled: boolean): void { this.#enabled = enabled; this.#apply(); }
   public setVisible(visible: boolean): void { this.#visible = visible; this.#apply(); }
@@ -35,7 +53,7 @@ export class BackgroundMusic {
   }
   public unlock(): void {
     this.#unlocked = true;
-    for (const track of this.#tracks) track.failed = false;
+    for (const track of this.#allTracks) track.failed = false;
     this.#apply();
   }
   public setCrystalBlend(blend: number): void {
@@ -47,7 +65,7 @@ export class BackgroundMusic {
     this.#transition = { entering: next, elapsed: 0, sky: this.#skyGain, crystal: this.#crystalGain, introStarted: false };
   }
   public update(seconds: number): void {
-    if (!this.#canPlay() || !Number.isFinite(seconds) || seconds <= 0) return;
+    if (this.#menu || !this.#canPlay() || !Number.isFinite(seconds) || seconds <= 0) return;
     const dt=Math.min(.1,seconds);
     const target=this.#duckHold>0?this.#duckTarget:1;
     this.#duckHold=Math.max(0,this.#duckHold-dt);
@@ -84,16 +102,19 @@ export class BackgroundMusic {
   }
 
   #canPlay(): boolean { return this.#enabled && this.#unlocked && this.#visible && !this.#paused; }
+  #canPlayTrack(track: MusicTrack): boolean { return this.#canPlay() && (this.#menu ? track === this.#menuTrack : track !== this.#menuTrack); }
   #volumes(): void {
     const crystalAvailable = this.#tracks[1]?.playing === true;
+    const gain = this.#menu ? 0 : .32 * this.#duck;
     const sky = this.#tracks[0];
-    if (sky !== undefined) sky.media.volume = .32 * (crystalAvailable ? this.#skyGain : 1)*this.#duck;
-    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = .32 * (crystalAvailable ? this.#crystalGain : 0)*this.#duck;
+    if (sky !== undefined) sky.media.volume = gain * (crystalAvailable ? this.#skyGain : 1);
+    if (this.#tracks[1] !== undefined) this.#tracks[1].media.volume = gain * (crystalAvailable ? this.#crystalGain : 0);
+    if (this.#menuTrack !== null) this.#menuTrack.media.volume = this.#menu ? .32 : 0;
   }
 
   #apply(): void {
-    for (const track of this.#tracks) {
-      if (!this.#canPlay()) {
+    for (const track of this.#allTracks) {
+      if (!this.#canPlayTrack(track)) {
         track.generation++;
         track.requested = false;
         track.playing = false;
@@ -106,7 +127,7 @@ export class BackgroundMusic {
       // Unlock both elements in the trusted gesture, including the silent track.
       void track.media.play().then(() => {
         if (generation !== track.generation) {
-          if (!this.#canPlay()) track.media.pause();
+          if (!this.#canPlayTrack(track)) track.media.pause();
           return;
         }
         track.playing = true;
@@ -128,7 +149,8 @@ export function initializeBackgroundMusic(): BackgroundMusic {
   const createAudio = (name: string): MusicMedia => {
     const audio = document.createElement("audio");
     audio.dataset.audioChannel = "music";
-    audio.preload = "auto";
+    audio.dataset.musicTrack = name;
+    audio.preload = name === "miny-original" ? "metadata" : "auto";
     audio.src = `${import.meta.env.BASE_URL}music-demo/${name}.${audio.canPlayType("audio/ogg; codecs=vorbis") ? "ogg" : "mp3"}`;
     audio.hidden = true;
     document.body.append(audio);
@@ -147,7 +169,7 @@ export function initializeBackgroundMusic(): BackgroundMusic {
       set volume(value: number) { gain.gain.setTargetAtTime(value, audioContext.currentTime, .01); },
     };
   };
-  const music = new BackgroundMusic(createAudio("sfb-freefall-30s"), createAudio("sfb-crystal-canyon-v2"));
+  const music = new BackgroundMusic(createAudio("sfb-freefall-30s"), createAudio("sfb-crystal-canyon-v2"), createAudio("miny-original"));
   let previous = performance.now();
   const tick = (now: number): void => {
     music.update((now - previous) / 1000); previous = now;
