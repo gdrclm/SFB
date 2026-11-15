@@ -8,8 +8,8 @@
     />
     <meta name="theme-color" content="#087ee8" />
     <title>Speed Fall Ball</title>
-    <script type="module" crossorigin src="./assets/index-BX_Shg5K.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D_8vB477.css">
+    <script type="module" crossorigin src="./assets/index-B8Ujoqhs.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CLwvqfJv.css">
   </head>
   <body>
     <main id="app">
@@ -213,6 +213,9 @@
             <option value="ultra">Ультра</option>
           </select>
           <p id="graphics-quality-hint" role="status">Подбирает чёткость по скорости устройства.</p>
+          <label class="graphics-compatibility"><input id="graphics-compatibility" type="checkbox"> Совместимость с устройством</label>
+          <small class="graphics-compatibility-note">При сбоях графики. Изменение — после перезапуска.</small>
+          <button id="graphics-restart" type="button" hidden>Применить и перезапустить</button>
         </div>
         <div class="feedback-controls">
           <button class="pause-setting" type="button" data-feedback-setting="music" aria-pressed="true"><span aria-hidden="true">♫</span><span>Музыка</span><strong class="setting-state">ВКЛ</strong></button>
@@ -280,5 +283,13 @@
         </nav>
       </dialog>
     </main>
+    <dialog id="graphics-recovery" role="alertdialog" aria-labelledby="graphics-recovery-title" hidden>
+      <div class="graphics-recovery-card">
+        <h1 id="graphics-recovery-title">Графика восстанавливается</h1>
+        <p>Забег на паузе. Если экран не вернулся, запусти совместимый режим.</p>
+        <button id="graphics-recovery-retry" type="button">Перезапустить в совместимом режиме</button>
+        <small>Монеты и покупки сохранятся.</small>
+      </div>
+    </dialog>
   </body>
 </html>

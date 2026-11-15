@@ -105,6 +105,12 @@ export class PointerHorizontalInput implements HorizontalInput {
     if (event.pointerType === "mouse") this.#mouseActive = false;
   };
   readonly #onBlur = (): void => { this.#activePointerId = null; this.#mouseActive = false; };
+  public cancel(): void {
+    const pointer = this.#activePointerId;
+    this.#onBlur();
+    this.#normalizedPosition = clamp(this.#options.getPosition?.() ?? this.#normalizedPosition);
+    if (pointer !== null && this.#canvas.hasPointerCapture(pointer)) this.#canvas.releasePointerCapture(pointer);
+  }
   public dispose(): void {
     this.#canvas.removeEventListener("pointerdown", this.#onPointerDown);
     this.#canvas.removeEventListener("pointermove", this.#onPointerMove);

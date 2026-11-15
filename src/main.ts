@@ -19,6 +19,7 @@ import { getPlayerProfile } from "./shop/PlayerProfile";
 import { renderMissionBoard } from "./run/renderMissionBoard";
 import { resetGameData } from "./storage/resetGameData";
 import { initializeGraphicsControls } from "./rendering/GraphicsControls";
+import { initializeGraphicsRecovery } from "./rendering/GraphicsRecoveryView";
 
 function requireElement(selector: string): HTMLElement {
   const element = document.querySelector<HTMLElement>(selector);
@@ -65,7 +66,8 @@ if (!(restartButtonElement instanceof HTMLButtonElement)) {
 }
 const restartButton = restartButtonElement;
 initializeHudArt();
-initializeGraphicsControls();
+initializeGraphicsControls(restartGraphics);
+initializeGraphicsRecovery(canvas, restartGraphics);
 const music = initializeFeedbackControls();
 getGameSounds();
 const network = new NetworkView();
@@ -105,6 +107,14 @@ const lifecycle = new ApplicationLifecycle(
     },
   ); },
 );
+
+function restartGraphics(): void {
+  lifecycle.dispose();
+  disposeGameScene(canvas);
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("renderer") === "webgl1") { url.searchParams.delete("renderer"); window.history.replaceState(null, "", url); }
+  window.location.reload();
+}
 
 function showStartupError(error: unknown): void {
   lifecycle.dispose();

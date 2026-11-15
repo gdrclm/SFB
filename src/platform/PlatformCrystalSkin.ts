@@ -5,6 +5,7 @@ import type { UniformBuffer } from "@babylonjs/core/Materials/uniformBuffer";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { SubMesh } from "@babylonjs/core/Meshes/subMesh";
 import type { Scene } from "@babylonjs/core/scene";
+import { pluginUniforms } from "../rendering/PluginUniforms";
 
 const crystalWeights = new WeakMap<Scene, number>();
 const lavaWeights = new WeakMap<Scene, number>();
@@ -40,8 +41,8 @@ export class PlatformCrystalSkin extends MaterialPluginBase {
     this._enable(true);
   }
   public override isCompatible(): boolean { return true; }
-  public override getUniforms(): { ubo: { name: string; size: number; type: string }[] } {
-    return { ubo: [{ name: "platformCrystalTint", size: 4, type: "vec4" },{name:"platformLavaTint",size:4,type:"vec4"}] };
+  public override getUniforms() {
+    return pluginUniforms(this._material, [{ name: "platformCrystalTint", size: 4, type: "vec4" },{name:"platformLavaTint",size:4,type:"vec4"}]);
   }
   public override hardBindForSubMesh(buffer: UniformBuffer, scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
     const sample = subMesh.getMesh().metadata as { row?: number; previousRow?: number; rowBlend?: number } | null;

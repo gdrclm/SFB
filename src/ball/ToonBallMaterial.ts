@@ -3,6 +3,7 @@ import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 
 import type { UniformBuffer } from "@babylonjs/core/Materials/uniformBuffer";
+import { pluginUniforms } from "../rendering/PluginUniforms";
 
 const crystalBlends = new WeakMap<StandardMaterial, number>();
 const lavaBlends = new WeakMap<StandardMaterial, number>();
@@ -22,8 +23,8 @@ export class ToonBallMaterial extends MaterialPluginBase {
     this.registerForExtraEvents = true;
     this._enable(true);
   }
-  public override getUniforms(): { ubo: { name: string; size: number; type: string }[] } {
-    return { ubo: [{ name: "ballCrystalBlend", size: 1, type: "float" },{name:"ballLavaBlend",size:1,type:"float"}] };
+  public override getUniforms() {
+    return pluginUniforms(this._material, [{ name: "ballCrystalBlend", size: 1, type: "float" },{name:"ballLavaBlend",size:1,type:"float"}]);
   }
   public override hardBindForSubMesh(buffer: UniformBuffer): void {
     buffer.updateFloat("ballCrystalBlend", crystalBlends.get(this.#ballMaterial) ?? 0);

@@ -17,10 +17,9 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { WorldAppearance } from "./createPhaseOneBackdrop";
 
-export function preloadCrystalBackdrop(): void {
-  const image = new Image();
-  image.src = crystalUrl;
-  for (const url of [crystalObjectUrl, crystalCloudUrl,ruinsDistanceUrl,ruinsAtlasUrl]) {
+export function preloadBackdrop(location: "crystal" | "lava"): void {
+  const urls = location === "crystal" ? [crystalUrl, crystalObjectUrl, crystalCloudUrl] : [ruinsDistanceUrl, ruinsAtlasUrl];
+  for (const url of urls) {
     const image = new Image(); image.src = url;
   }
 }

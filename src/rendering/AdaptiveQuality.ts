@@ -13,12 +13,13 @@ export function initialQuality(memory?: number, cores?: number): QualityTier {
   if (memory !== undefined && memory <= 2 || cores !== undefined && cores <= 4) return "low";
   return memory !== undefined && memory <= 4 ? "medium" : "high";
 }
-export function renderScale(tier: RenderQuality, width: number, height: number, dpr: number, manual = false): number {
+export function renderScale(tier: RenderQuality, width: number, height: number, dpr: number, manual = false, compatibility = false): number {
   // Auto retains its conservative budget. Explicit High/Ultra allow a sharper
   // framebuffer without adding game objects or changing their collision range.
   const budget = tier === "high" && !manual ? AUTO_HIGH_BUDGET : RENDER_BUDGETS[tier];
-  const ratio = Math.min(Math.max(1, Number.isFinite(dpr) ? dpr : 1), budget.ratio);
-  return Math.max(1 / ratio, Math.sqrt(Math.max(1, width * height) / budget.pixels));
+  const ratio = Math.min(Math.max(1, Number.isFinite(dpr) ? dpr : 1), budget.ratio, compatibility ? 2 : Infinity);
+  const pixels = compatibility ? Math.min(2_000_000, budget.pixels) : budget.pixels;
+  return Math.max(1 / ratio, Math.sqrt(Math.max(1, width * height) / pixels));
 }
 /** Sustained frame times drive quality, never an isolated collection/loading stall. */
 export class QualityBudget {
@@ -62,9 +63,12 @@ export class AdaptiveQuality {
   readonly #canvas: HTMLCanvasElement;
   #budget: QualityBudget;
   readonly #settings: GraphicsSettings;
-  public constructor(engine: AbstractEngine, canvas: HTMLCanvasElement, settings = getGraphicsSettings()) {
+  public constructor(engine: AbstractEngine, canvas: HTMLCanvasElement, settings = getGraphicsSettings(), private readonly compatibility = false) {
     this.#engine = engine; this.#canvas = canvas; this.#settings = settings; this.#budget = new QualityBudget(deviceQuality());
+    let mode = settings.mode;
     const unsubscribe = settings.subscribe(() => {
+      if (mode === settings.mode) return;
+      mode = settings.mode;
       this.#budget = new QualityBudget(deviceQuality());
       this.resize();
     });
@@ -78,8 +82,9 @@ export class AdaptiveQuality {
   }
   public resize(): void {
     const bounds = this.#canvas.getBoundingClientRect();
-    this.#engine.setHardwareScalingLevel(renderScale(this.tier, bounds.width, bounds.height, window.devicePixelRatio || 1, this.mode !== "auto"));
+    this.#engine.setHardwareScalingLevel(renderScale(this.tier, bounds.width, bounds.height, window.devicePixelRatio || 1, this.mode !== "auto", this.compatibility));
     document.documentElement.dataset.quality = this.tier;
     document.documentElement.dataset.graphicsMode = this.mode;
+    document.documentElement.dataset.graphicsCompatibility = String(this.compatibility);
   }
 }

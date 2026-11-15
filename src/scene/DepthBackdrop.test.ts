@@ -6,9 +6,10 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { afterEach, expect, it, vi } from "vitest";
 import { DepthBackdrop } from "./DepthBackdrop";
+import { preloadBackdrop } from "./createIllustratedBackdrop";
 const readiness=vi.hoisted(()=>({lava:true}));
 
-vi.mock("./createIllustratedBackdrop", () => ({ preloadCrystalBackdrop: vi.fn() }));
+vi.mock("./createIllustratedBackdrop", () => ({ preloadBackdrop: vi.fn() }));
 vi.mock("./createPhaseOneBackdrop", async () => {
   const { MeshBuilder } = await import("@babylonjs/core/Meshes/meshBuilder");
   const { StandardMaterial } = await import("@babylonjs/core/Materials/standardMaterial");
@@ -19,7 +20,7 @@ vi.mock("./createPhaseOneBackdrop", async () => {
     return mesh;
   } };
 });
-afterEach(() => { vi.unstubAllGlobals();readiness.lava=true; });
+afterEach(() => { vi.unstubAllGlobals();readiness.lava=true;vi.mocked(preloadBackdrop).mockClear(); });
 function setup(reduced: boolean, startDepth = 0) {
   vi.stubGlobal("matchMedia", () => ({ matches: reduced }));
   const engine = new NullEngine(); const scene = new Scene(engine);
@@ -36,6 +37,14 @@ function setup(reduced: boolean, startDepth = 0) {
   };
   return { scene, camera, backdrop, root, dispose: () => { backdrop.dispose(); scene.dispose(); engine.dispose(); } };
 }
+it("preloads only the next location near its boundary, avoiding all future images at startup",()=>{
+  const world=setup(false);
+  try{
+    expect(preloadBackdrop).not.toHaveBeenCalled();world.backdrop.update(100,1/60);expect(preloadBackdrop).not.toHaveBeenCalled();
+    world.backdrop.update(400,1/60);world.backdrop.update(401,1/60);expect(preloadBackdrop).toHaveBeenCalledTimes(1);expect(preloadBackdrop).toHaveBeenLastCalledWith("crystal");
+    world.backdrop.update(500,1/60);world.backdrop.update(2750,1/60);expect(preloadBackdrop).toHaveBeenCalledTimes(2);expect(preloadBackdrop).toHaveBeenLastCalledWith("lava");
+  }finally{world.dispose();}
+});
 it.each([false, true])("slides both scenes over two seconds even with reduced motion = %s", reduced => {
   const world = setup(reduced);
   try {

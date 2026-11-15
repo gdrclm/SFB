@@ -1,5 +1,5 @@
 import { BackdropBirds } from "./BackdropBirds";
-import { preloadCrystalBackdrop } from "./createIllustratedBackdrop";
+import { preloadBackdrop } from "./createIllustratedBackdrop";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
@@ -24,6 +24,7 @@ export class DepthBackdrop {
   #travel = 0;
   #steeringX = 0;
   #previousCameraY: number;
+  readonly #prefetched = new Set<string>();
   readonly #reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   public constructor(scene: Scene, rig: TransformNode, appearance: WorldAppearance, startDepth = 0) {
@@ -33,7 +34,6 @@ export class DepthBackdrop {
     this.#current = createPhaseOneBackdrop(scene, rig, appearance, this.#location);
     this.#birds = this.#location === "sky" ? new BackdropBirds(scene, this.#reduced) : null;
     this.#birds?.update(0, 1);
-    preloadCrystalBackdrop();
   }
   public get crystalBlend(): number {
     return this.#locationBlend("crystal");
@@ -45,6 +45,9 @@ export class DepthBackdrop {
   }
   public update(depth: number, realSeconds: number, cameraX = 0): void {
     const location = this.#locations.observe(depth);
+    // Do not decode every future world's large images in the first seconds.
+    const upcoming = location === "sky" && depth >= 400 ? "crystal" : location === "crystal" && depth >= 2750 ? "lava" : null;
+    if (upcoming && !this.#prefetched.has(upcoming)) { this.#prefetched.add(upcoming); preloadBackdrop(upcoming); }
     // Finish an in-flight page before starting the next, including very fast runs.
     if (location !== this.#location && this.#next === null) {
       this.#next = createPhaseOneBackdrop(this.#scene, this.#rig, this.#appearance, location);

@@ -7,8 +7,11 @@ class TestPointer extends Event {
   }
 }
 class Canvas extends EventTarget {
+  readonly captured = new Set<number>();
   public getBoundingClientRect(): { left: number; width: number } { return { left: 0, width: 400 }; }
-  public setPointerCapture(): void { /* EventTarget fixture does not emulate browser capture. */ }
+  public setPointerCapture(id:number): void { this.captured.add(id); }
+  public hasPointerCapture(id:number):boolean{return this.captured.has(id);}
+  public releasePointerCapture(id:number):void{this.captured.delete(id);}
 }
 afterEach(() => { vi.unstubAllGlobals(); });
 function setup(position: number | (() => number) = 0, map: (x: number) => number = x => x) {
@@ -20,6 +23,13 @@ function setup(position: number | (() => number) = 0, map: (x: number) => number
   };
   return { input, send, canvas, idle: (ms: number) => { time += ms; } };
 }
+it("releases an interrupted finger when graphics stops and accepts a new gesture after recovery",()=>{
+  const {input,send,canvas}=setup(.25);
+  send("pointerdown",100);send("pointermove",180);expect(input.isActive).toBe(true);expect(canvas.hasPointerCapture(1)).toBe(true);
+  input.cancel();expect(input.isActive).toBe(false);expect(input.normalizedPosition).toBe(.25);expect(canvas.hasPointerCapture(1)).toBe(false);
+  send("pointerdown",300,"touch",2);send("pointermove",320,"touch",2);expect(input.isActive).toBe(true);expect(input.normalizedPosition).toBeGreaterThan(.25);
+  input.dispose();
+});
 it("starts a swipe at the ball, independent of where the finger touches the screen", () => {
   for (const origin of [20, 180, 320]) {
     const { input, send } = setup(.2);

@@ -5,12 +5,13 @@ import type {UniformBuffer} from "@babylonjs/core/Materials/uniformBuffer";
 import type {AbstractEngine} from "@babylonjs/core/Engines/abstractEngine";
 import type {SubMesh} from "@babylonjs/core/Meshes/subMesh";
 import type {Scene} from "@babylonjs/core/scene";
+import {pluginUniforms} from "../rendering/PluginUniforms";
 
 /** Per-platform sharp cracks and a small delayed-rupture hole on the idle art. */
 export class PlatformImpactSkin extends MaterialPluginBase {
  public constructor(material:StandardMaterial){super(material,"PlatformImpactSkin",205,{},true,false);this.registerForExtraEvents=true;this._enable(true);}
  public override isCompatible(language:ShaderLanguage):boolean{return language===ShaderLanguage.GLSL;}
- public override getUniforms(){return{ubo:[{name:"platformImpact",size:4,type:"vec4"}]};}
+ public override getUniforms(){return pluginUniforms(this._material,[{name:"platformImpact",size:4,type:"vec4"}]);}
  public override hardBindForSubMesh(buffer:UniformBuffer,_scene:Scene,_engine:AbstractEngine,subMesh:SubMesh):void{
   const data=subMesh.getMesh().metadata as {impactX?:number;impactY?:number;impactCrack?:number;impactHole?:number}|null;
   buffer.updateFloat4("platformImpact",data?.impactX??0,data?.impactY??0,data?.impactCrack??0,data?.impactHole??0);

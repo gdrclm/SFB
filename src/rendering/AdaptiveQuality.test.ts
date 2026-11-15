@@ -46,6 +46,7 @@ it("renders manual High/Ultra more sharply while bounding native-DPI and 4K allo
   expect((automatic/ultra)**2).toBeCloseTo(4);
   expect(renderScale("ultra",360,800,4,true)).toBe(.25);
   expect(renderScale("ultra",3840,2160,1,true)).toBe(1);
+  expect(2560*1600/renderScale("ultra",2560,1600,2,true,true)**2).toBeLessThanOrEqual(2_000_001);
   expect(7680*4320/renderScale("ultra",7680,4320,4,true)**2).toBeLessThanOrEqual(8_500_001);
   expect(renderScale("high",390,844,3)).toBe(automatic);
   expect(Number.isFinite(renderScale("ultra",390,844,NaN,true))).toBe(true);

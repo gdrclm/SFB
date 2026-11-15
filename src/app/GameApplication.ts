@@ -19,6 +19,7 @@ import { PowerUpView } from "../powers/PowerUpView";
 import { PowerVisuals } from "../powers/PowerVisuals";
 import type { RunResult } from "../run/RunHistory";
 import type { AdaptiveQuality } from "../rendering/AdaptiveQuality";
+import { GRAPHICS_LOST_EVENT, GRAPHICS_RESTORED_EVENT } from "../rendering/GraphicsContext";
 import { hudArt } from "../ui/HudArt";
 import { DepthBackdrop } from "../scene/DepthBackdrop";
 import { GameFeel } from "../feedback/GameFeel";
@@ -223,6 +224,7 @@ export class GameApplication {
 
   #engine: AbstractEngine | null = null;
   #quality: AdaptiveQuality | null = null;
+  #graphicsLost = false;
   #lastCurrencyKey = "";
   #lastHudTime = -Infinity;
   #lastOverlayTime = -Infinity;
@@ -320,6 +322,8 @@ export class GameApplication {
     this.#pauseButtonElement.setAttribute("aria-expanded", "false");
     this.#applyInterfacePreference();
     this.#pauseButtonElement.addEventListener("click", this.#pauseGame);
+    canvas.addEventListener(GRAPHICS_LOST_EVENT, this.#onGraphicsLost);
+    canvas.addEventListener(GRAPHICS_RESTORED_EVENT, this.#onGraphicsRestored);
     this.#resumeButtonElement.addEventListener("click", this.#resumeGame);
     this.#pauseRestartButtonElement.addEventListener("click", this.#restartGame);
     this.#exitButtonElement.addEventListener("click", this.#exitGame);
@@ -751,6 +755,8 @@ export class GameApplication {
     this.#pauseButtonElement.setAttribute("aria-expanded", "false");
     if (!keepScene) {
       this.#pauseButtonElement.removeEventListener("click", this.#pauseGame);
+      this.#canvas.removeEventListener(GRAPHICS_LOST_EVENT, this.#onGraphicsLost);
+      this.#canvas.removeEventListener(GRAPHICS_RESTORED_EVENT, this.#onGraphicsRestored);
       this.#resumeButtonElement.removeEventListener("click", this.#resumeGame);
       this.#pauseRestartButtonElement.removeEventListener("click", this.#restartGame);
       this.#exitButtonElement.removeEventListener("click", this.#exitGame);
@@ -816,6 +822,7 @@ export class GameApplication {
   }
 
   readonly #renderFrame = (): void => {
+    if (this.#graphicsLost) return;
     this.#lifeFeedback?.removeShake();
     const nowMs = performance.now();
     const realDeltaSeconds = (nowMs - this.#lastFrameTimeMs) / 1_000;
@@ -1255,7 +1262,7 @@ export class GameApplication {
   };
 
   readonly #resumeGame = (): void => {
-    if (this.#gameState.current !== GameState.Paused) {
+    if (this.#graphicsLost || this.#gameState.current !== GameState.Paused) {
       return;
     }
 
@@ -1502,9 +1509,23 @@ export class GameApplication {
 
   readonly #dismissBoostCoach = (): void => { this.#boostCoach.dismiss(); };
 
+  readonly #onGraphicsLost = (): void => {
+    this.#graphicsLost = true;
+    this.#horizontalInput?.cancel(); this.#powerView?.cancelKeyboard();
+    this.#pauseGame();
+    this.#syncRunClock(performance.now());
+    this.#haptics.cancel(); getGameSounds().stop(); this.#actions.music.setPaused(true);
+  };
+  readonly #onGraphicsRestored = (): void => {
+    this.#graphicsLost = false;
+    this.#lastFrameTimeMs = performance.now();
+    this.#syncRunClock(this.#lastFrameTimeMs);
+    this.#quality?.resize();
+  };
+
   #syncRunClock(now: number): void {
     const state = this.#gameState.current;
-    this.#runClock.setActive(this.#runStarted && !document.hidden && state !== GameState.Loading && state !== GameState.Paused
+    this.#runClock.setActive(this.#runStarted && !this.#graphicsLost && !document.hidden && state !== GameState.Loading && state !== GameState.Paused
       && state !== GameState.Tutorial && state !== GameState.GameOver && state !== GameState.Results, now);
     this.#runSeconds = this.#actions.ranked ? Math.min(120, this.#runClock.seconds) : this.#runClock.seconds;
   }

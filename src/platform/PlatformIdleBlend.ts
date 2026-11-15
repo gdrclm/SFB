@@ -6,6 +6,7 @@ import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { SubMesh } from "@babylonjs/core/Meshes/subMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { IDLE_FRAME_COUNT } from "./PlatformIdle";
+import { pluginUniforms } from "../rendering/PluginUniforms";
 
 /** Cubic temporal filtering and short state crossfades in a single draw call. */
 export class PlatformIdleBlend extends MaterialPluginBase {
@@ -17,8 +18,8 @@ export class PlatformIdleBlend extends MaterialPluginBase {
 
   public override isCompatible(): boolean { return true; }
 
-  public override getUniforms(): { ubo: { name: string; size: number; type: string }[] } {
-    return { ubo: [{ name: "platformIdleMix", size: 4, type: "vec4" }, { name: "platformStateMix", size: 3, type: "vec3" }] };
+  public override getUniforms() {
+    return pluginUniforms(this._material, [{ name: "platformIdleMix", size: 4, type: "vec4" }, { name: "platformStateMix", size: 3, type: "vec3" }]);
   }
 
   public override hardBindForSubMesh(buffer: UniformBuffer, _scene: Scene, _engine: AbstractEngine, subMesh: SubMesh): void {
