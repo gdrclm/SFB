@@ -207,15 +207,21 @@ it("does not revive a pending play after the page hides or jump after a long fra
 it("mixes through Web Audio gains when a mobile browser cannot set element volume", async () => {
   const { audio: sky } = player(), { audio: crystal } = player(), {audio:title}=player();
   const elements = [sky, crystal, title].map(audio => Object.assign(audio, {
-    dataset: {}, preload: "", src: "", hidden: false, canPlayType: () => "",
+    dataset: {}, preload: "", src: "", hidden: false, canPlayType: () => "", tagName:"AUDIO", dispatchEvent:vi.fn(),
   }));
+  const earlyTitle=elements[2];
+  if(earlyTitle===undefined)throw Error("Missing title fixture");
+  earlyTitle.src="/music-demo/miny-original.mp3";earlyTitle.currentTime=37;
   for (const element of elements) Object.defineProperty(element, "volume", {
     get: () => 1, set: () => { throw new Error("Element volume unsupported"); },
   });
   const gains = [0, 1, 2].map(() => ({ gain: { value: 1, setTargetAtTime: vi.fn() }, connect: vi.fn() }));
-  const resume = vi.fn().mockResolvedValue(undefined);
+  const stateChanges=new Set<()=>void>();let state="suspended";
+  const resume = vi.fn().mockImplementation(()=>{state="running";for(const listener of stateChanges)listener();return Promise.resolve();});
   const audioContext = {
-    currentTime: 0, state: "suspended", resume, destination: {},
+    currentTime: 0, get state(){return state;}, resume, destination: {},
+    addEventListener:(_name:string,listener:()=>void)=>{stateChanges.add(listener);},
+    removeEventListener:(_name:string,listener:()=>void)=>{stateChanges.delete(listener);},
     createGain: vi.fn().mockReturnValueOnce(gains[0]).mockReturnValueOnce(gains[1]).mockReturnValueOnce(gains[2]),
     createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
   };
@@ -224,11 +230,15 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
   vi.stubGlobal("document", {
     hidden: false, body: { append: vi.fn() },
     createElement: vi.fn().mockReturnValueOnce(elements[0]).mockReturnValueOnce(elements[1]).mockReturnValueOnce(elements[2]),
+    getElementById:(id:string)=>id==="menu-music"?earlyTitle:null,
     addEventListener: (name: string, handler: (event: Event) => void) => { handlers.set(name, handler); },
   });
   vi.stubGlobal("window", { addEventListener: vi.fn() });
   vi.stubGlobal("requestAnimationFrame", vi.fn());
   const music = initializeBackgroundMusic();
+  expect(earlyTitle.currentTime).toBe(37);expect(earlyTitle.src).toBe("/music-demo/miny-original.mp3");
+  expect(earlyTitle.dispatchEvent).toHaveBeenCalledOnce();
+  expect(audioContext.createMediaElementSource).toHaveBeenCalledTimes(2);
   expect(gains[0]?.gain.value).toBe(0);
   expect(gains[1]?.gain.value).toBe(0);
   // Initialization leaves a saved music-off preference silent, including the
@@ -236,6 +246,7 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
   music.setEnabled(false);expect(resume).not.toHaveBeenCalled();
   music.setEnabled(true);
   expect(resume).toHaveBeenCalled();expect(title.play).toHaveBeenCalledOnce();
+  expect(audioContext.createMediaElementSource).toHaveBeenCalledTimes(3);
   expect(sky.play).not.toHaveBeenCalled();expect(crystal.play).not.toHaveBeenCalled();
   handlers.get("pointerdown")?.({ isTrusted: true } as Event);
   await settle();expect(title.play).toHaveBeenCalledOnce();

@@ -10,6 +10,9 @@
     <title>Speed Fall Ball</title>
   </head>
   <body>
+    <audio id="menu-music" data-audio-channel="music" data-music-track="miny-original" loop hidden></audio>
+    <!-- This small classic script starts independently of the game bundle. -->
+    <script src="./menu-music.js"></script>
     <main id="app">
       <canvas tabindex="0" id="game-canvas" aria-label="Игровая сцена Speed Fall Ball"></canvas>
       <div id="speed-feedback" class="speed-frozen">

@@ -9,6 +9,7 @@ export default tseslint.config(
     ignores: ["docs/**", "dist/**", "coverage/**", "eslint.config.js"],
   },
   { ...tseslint.configs.disableTypeChecked, files:["server/**/*.mjs"], languageOptions:{globals:globals.node} },
+  { ...tseslint.configs.disableTypeChecked, files:["public/menu-music.js"], languageOptions:{globals:globals.browser} },
   {
     files: ["src/**/*.ts", "*.config.ts"],
     languageOptions: {

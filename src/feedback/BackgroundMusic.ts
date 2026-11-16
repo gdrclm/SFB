@@ -150,29 +150,47 @@ export function initializeBackgroundMusic(): BackgroundMusic {
     if (context?.state === "suspended") void context.resume().catch(() => {});
   };
   const createAudio = (name: string): MusicMedia => {
-    const audio = document.createElement("audio");
+    const early = name === "miny-original" ? document.getElementById("menu-music") : null;
+    const existing = early?.tagName === "AUDIO" ? early as HTMLAudioElement : null;
+    const audio = existing ?? document.createElement("audio");
     audio.dataset.audioChannel = "music";
     audio.dataset.musicTrack = name;
-    audio.preload = name === "miny-original" ? "metadata" : "auto";
-    audio.src = `${import.meta.env.BASE_URL}music-demo/${name}.${audio.canPlayType("audio/ogg; codecs=vorbis") ? "ogg" : "mp3"}`;
+    if (existing === null) {
+      audio.preload = name === "miny-original" ? "auto" : "none";
+      const extension = name === "miny-original" ? "mp3" : audio.canPlayType("audio/ogg; codecs=vorbis") ? "ogg" : "mp3";
+      audio.src = `${import.meta.env.BASE_URL}music-demo/${name}.${extension}`;
+      document.body.append(audio);
+    } else audio.dispatchEvent(new Event("sfb:music-handoff"));
     audio.hidden = true;
-    document.body.append(audio);
     if (context === null) return audio;
-    // iOS does not support programmatic HTMLMediaElement.volume. Mix via gains.
     const audioContext = context;
-    const gain = audioContext.createGain();
-    gain.gain.value = 0;
-    audioContext.createMediaElementSource(audio).connect(gain);
-    gain.connect(audioContext.destination);
+    // Don't silence an already playing native title by routing it into a
+    // suspended AudioContext. Attach its iOS-compatible gain once it can run.
+    let gain: GainNode | null = null, volume = name === "miny-original" ? .32 : 0;
+    const attachGain = (): boolean => {
+      if (gain !== null) return true;
+      if (name === "miny-original" && audioContext.state !== "running") return false;
+      gain = audioContext.createGain(); gain.gain.value = volume;
+      audioContext.createMediaElementSource(audio).connect(gain);
+      gain.connect(audioContext.destination);
+      try { audio.volume = 1; } catch { /* Fixed native volume on some mobile browsers. */ }
+      audioContext.removeEventListener("statechange", attachGain);
+      return true;
+    };
+    if (!attachGain()) audioContext.addEventListener("statechange", attachGain);
     return {
       play: () => { resumeContext(); return audio.play(); }, pause: () => { audio.pause(); },
       get loop() { return audio.loop; }, set loop(value: boolean) { audio.loop = value; },
       get currentTime() { return audio.currentTime; }, set currentTime(value: number) { audio.currentTime = value; },
-      get volume() { return gain.gain.value; },
-      set volume(value: number) { gain.gain.setTargetAtTime(value, audioContext.currentTime, .01); },
+      get volume() { return volume; },
+      set volume(value: number) {
+        volume = value;
+        if (gain !== null) gain.gain.setTargetAtTime(value, audioContext.currentTime, .01);
+        else try { audio.volume = value; } catch { /* Apply through the gain after unlock. */ }
+      },
     };
   };
-  const music = new BackgroundMusic(createAudio("sfb-freefall-30s"), createAudio("sfb-crystal-canyon-v2"), createAudio("miny-original"));
+  const music = new BackgroundMusic(createAudio("fillaculla-sky"), createAudio("sfb-crystal-canyon-v2"), createAudio("miny-original"));
   let previous = performance.now();
   const tick = (now: number): void => {
     music.update((now - previous) / 1000); previous = now;
