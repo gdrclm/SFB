@@ -404,6 +404,7 @@ export class GameApplication {
       theme: this.#profile.equipment.world, lanterns: this.#profile.equipment.props === "props-lanterns",
     }, this.#actions.developerStartDepth ?? 0);
     this.#actions.music.setPaused(false);
+    this.#actions.music.setFallSpeed?.(this.#config.ball.startFallSpeed, this.#config.ball.startFallSpeed, true);
     this.#actions.music.setCrystalBlend(this.#backdrop.crystalBlend);
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach-art").innerHTML = tutorialArt.boost;
     requireMenuElement(this.#interfaceLayerElement, "#boost-coach").hidden = true;
@@ -871,6 +872,7 @@ export class GameApplication {
     requireMenuElement(this.#interfaceLayerElement, "#challenge-notice").hidden = hideNotices || this.#challengeRemaining <= 0;
     this.#backdrop?.update(this.#guidedRun ? 0 : this.#runProgress.depth, isPaused || this.#gameState.current === GameState.GameOver ? 0 : realDeltaSeconds, this.#mainScene?.camera.globalPosition.x ?? 0);
     this.#actions.music.setPaused(isPaused);
+    this.#actions.music.setFallSpeed?.((this.#ballController?.fallSpeed ?? this.#config.ball.startFallSpeed) * timeScale, this.#config.ball.startFallSpeed);
     this.#actions.music.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     this.#ballVisualController?.setCrystalBlend(this.#backdrop?.crystalBlend ?? 0);
     this.#ballVisualController?.setLavaBlend(this.#backdrop?.lavaBlend??0);

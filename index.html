@@ -10,9 +10,18 @@
     <title>Speed Fall Ball</title>
   </head>
   <body>
-    <audio id="menu-music" data-audio-channel="music" data-music-track="miny-original" loop hidden></audio>
-    <!-- This small classic script starts independently of the game bundle. -->
-    <script src="./menu-music.js"></script>
+    <audio id="menu-music" data-audio-channel="music" data-music-track="miny-original" muted loop hidden></audio>
+    <dialog id="music-consent" aria-labelledby="music-consent-title" aria-describedby="music-consent-description">
+      <div class="music-consent-icon" aria-hidden="true">♫</div>
+      <h1 id="music-consent-title">Включить звук?</h1>
+      <p id="music-consent-description">Музыка в меню и забеге</p>
+      <div class="music-consent-actions">
+        <button id="music-consent-no" type="button" autofocus>Нет</button>
+        <button id="music-consent-yes" type="button">Да</button>
+      </div>
+    </dialog>
+    <!-- Preload music, but require this page's explicit Yes before playback. -->
+    <script src="./menu-music.js?v=consent-1"></script>
     <main id="app">
       <canvas tabindex="0" id="game-canvas" aria-label="Игровая сцена Speed Fall Ball"></canvas>
       <div id="speed-feedback" class="speed-frozen">

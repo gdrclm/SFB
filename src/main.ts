@@ -343,17 +343,27 @@ numbersToggle?.addEventListener("click", () => {
   applyPlatformNumbers();
 });
 applyPlatformNumbers();
-if (settingsOnlyBoot) openSettings();
+const initialMenuReady = (): void => {
+  if (settingsOnlyBoot) openSettings();
+  else network.showMenu();
+};
+const musicConsentPending = (): boolean => document.documentElement.dataset.musicConsent === "pending";
+if (musicConsentPending()) document.getElementById("menu-music")?.addEventListener("sfb:music-choice", initialMenuReady, { once: true });
+else if (settingsOnlyBoot) openSettings();
 
 // Prepare only the reusable renderer/physics/assets while the menu is idle.
 // No run entities, animation loop or rewards are started here.
 const warmScene = (): void => {
   // Recovery settings must remain usable without starting another GPU context.
-  if (settingsOnlyBoot || document.hidden || startScreen.hidden) return;
+  if (settingsOnlyBoot || musicConsentPending() || document.hidden || startScreen.hidden) return;
   const profile = getPlayerProfile();
   void acquireGameScene(canvas, gameConfig, { theme: profile.equipment.world }).then(
     session => waitForPlatformSprites(session.mainScene.scene),
   ).catch(() => { /* A foreground start retries and reports any actual failure. */ });
 };
-if ("requestIdleCallback" in window) window.requestIdleCallback(warmScene, { timeout: 1500 });
-else setTimeout(warmScene, 300);
+const scheduleWarmScene = (): void => {
+  if ("requestIdleCallback" in window) window.requestIdleCallback(warmScene, { timeout: 1500 });
+  else setTimeout(warmScene, 300);
+};
+if (musicConsentPending()) document.getElementById("menu-music")?.addEventListener("sfb:music-choice", scheduleWarmScene, { once: true });
+else scheduleWarmScene();

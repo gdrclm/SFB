@@ -4,7 +4,7 @@ import { BackgroundMusic, initializeBackgroundMusic } from "./BackgroundMusic";
 afterEach(() => { vi.unstubAllGlobals(); });
 
 function player() {
-  const audio = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn(), loop: false, volume: 1, currentTime: 0 };
+  const audio = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn(), loop: false, volume: 1, currentTime: 0, playbackRate:1, preservesPitch:false };
   return { audio, music: new BackgroundMusic(audio) };
 }
 
@@ -40,6 +40,31 @@ it("does not revive delayed title playback after leaving the menu",async()=>{
   music.setMenu(false);const pauses=title.pause.mock.calls.length;
   resolve();await settle();expect(title.pause.mock.calls.length).toBeGreaterThan(pauses);
   expect(title.volume).toBe(0);expect(sky.volume).toBeCloseTo(.32);
+});
+
+it("smoothly follows fall speed on both location tracks while keeping the title at its original tempo",async()=>{
+  const {audio:sky}=player(),{audio:crystal}=player(),{audio:title}=player();
+  const music=new BackgroundMusic(sky,crystal,title);
+  music.setMenu(false);music.setEnabled(true);music.unlock();await settle();
+  expect(sky.playbackRate).toBe(.9);expect(crystal.playbackRate).toBe(.9);
+  music.setFallSpeed(150);music.update(.1);
+  expect(sky.playbackRate).toBeGreaterThan(.9);expect(sky.playbackRate).toBeLessThan(1.2);
+  advance(music,3);expect(sky.playbackRate).toBeCloseTo(1.2,3);expect(crystal.playbackRate).toBe(sky.playbackRate);
+  expect(title.playbackRate).toBe(1);
+  music.setPaused(true);const frozen=sky.playbackRate;music.setFallSpeed(10);advance(music,3);
+  expect(sky.playbackRate).toBe(frozen);
+  music.setPaused(false);advance(music,3);expect(sky.playbackRate).toBe(.9);
+  music.setFallSpeed(300,10,true);expect(sky.playbackRate).toBe(1.25);
+  music.setMenu(true);expect(title.playbackRate).toBe(1);expect(sky.playbackRate).toBe(.9);
+});
+
+it("keeps the same tempo response at low rendering frame rates",()=>{
+  const slow=player(),fast=player();
+  for(const {music} of [slow,fast]){music.setEnabled(true);music.unlock();music.setFallSpeed(150);}
+  for(let i=0;i<4;i++)slow.music.update(.25);
+  for(let i=0;i<60;i++)fast.music.update(1/60);
+  expect(slow.audio.playbackRate).toBe(fast.audio.playbackRate);
+  expect(slow.audio.playbackRate).toBeCloseTo(1.185,3);
 });
 
 it("pauses when disabled or hidden and resumes without resetting the track", () => {
@@ -226,9 +251,10 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
     createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
   };
   const handlers = new Map<string, (event: Event) => void>();
+  const consentState={musicConsent:"pending"};
   vi.stubGlobal("AudioContext", vi.fn(function () { return audioContext; }));
   vi.stubGlobal("document", {
-    hidden: false, body: { append: vi.fn() },
+    hidden: false, body: { append: vi.fn() }, documentElement:{dataset:consentState},
     createElement: vi.fn().mockReturnValueOnce(elements[0]).mockReturnValueOnce(elements[1]).mockReturnValueOnce(elements[2]),
     getElementById:(id:string)=>id==="menu-music"?earlyTitle:null,
     addEventListener: (name: string, handler: (event: Event) => void) => { handlers.set(name, handler); },
@@ -241,11 +267,14 @@ it("mixes through Web Audio gains when a mobile browser cannot set element volum
   expect(audioContext.createMediaElementSource).toHaveBeenCalledTimes(2);
   expect(gains[0]?.gain.value).toBe(0);
   expect(gains[1]?.gain.value).toBe(0);
-  // Initialization leaves a saved music-off preference silent, including the
-  // AudioContext. Enabling music starts the title without a user gesture.
+  // A pending prompt stays silent even when another click has unlocked Chrome.
   music.setEnabled(false);expect(resume).not.toHaveBeenCalled();
   music.setEnabled(true);
+  handlers.get("pointerdown")?.({ isTrusted: true } as Event);
+  expect(title.play).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();
+  consentState.musicConsent="accepted";music.unlock();
   expect(resume).toHaveBeenCalled();expect(title.play).toHaveBeenCalledOnce();
+  expect(earlyTitle.preservesPitch).toBe(true);
   expect(audioContext.createMediaElementSource).toHaveBeenCalledTimes(3);
   expect(sky.play).not.toHaveBeenCalled();expect(crystal.play).not.toHaveBeenCalled();
   handlers.get("pointerdown")?.({ isTrusted: true } as Event);

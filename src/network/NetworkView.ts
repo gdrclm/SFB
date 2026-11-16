@@ -30,7 +30,8 @@ export class NetworkView {
     get('#result-network-status').textContent=this.online.pending>0?`${this.online.status}${this.online.pending>1?` · ${String(this.online.pending)}`:''}`:this.online.status.includes('Результат')?this.online.status:'';
     getInput('#ranked-mode').disabled=player===null;
     if(player!==null&&this.#firstPrompt){getInput('#ranked-mode').checked=true;}
-    if(this.online.configured&&this.online.userId!==null&&player===null&&this.#firstPrompt&&!get("#start-screen").hidden){this.#firstPrompt=false;this.openIdentity();}
+    if(this.online.configured&&this.online.userId!==null&&player===null&&this.#firstPrompt&&!get("#start-screen").hidden
+      &&document.documentElement.dataset.musicConsent!=="pending"&&!document.querySelector('dialog[open]')){this.#firstPrompt=false;this.openIdentity();}
     if(player!==null)this.#firstPrompt=false;
   }
   public showMenu():void{this.#renderStatus();}

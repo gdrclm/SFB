@@ -1,32 +1,42 @@
-/* Keep first sound independent of Babylon, physics and the main JS download. */
+/* The question works before the game bundle loads. Consent never persists. */
 (() => {
   const audio = document.getElementById("menu-music");
-  if (!(audio instanceof HTMLAudioElement)) return;
-  let enabled = true;
-  try {
-    const saved = localStorage.getItem("speed-fall-ball.music-enabled")
-      ?? localStorage.getItem("speed-fall-ball.sound-enabled");
-    enabled = saved === null || saved === "true";
-  } catch { /* Use the same default as the game's settings. */ }
-  audio.preload = enabled ? "auto" : "none";
-  audio.muted = !enabled;
+  const dialog = document.getElementById("music-consent");
+  const yes = document.getElementById("music-consent-yes");
+  const no = document.getElementById("music-consent-no");
+  if (!(audio instanceof HTMLAudioElement) || !(dialog instanceof HTMLDialogElement) || !yes || !no) return;
+  document.documentElement.dataset.musicConsent = "pending";
+  let enabled = false, handedOff = false;
+  audio.preload = "auto";
+  audio.autoplay = false;
+  audio.muted = true;
+  audio.pause();
   try { audio.volume = .32; } catch { /* iOS gain is attached by the full controller. */ }
   audio.src = new URL("music-demo/miny-original.mp3", document.baseURI).href;
-  audio.autoplay = enabled;
   const start = () => {
-    if (enabled && !document.hidden) void audio.play().catch(() => {});
+    if (!handedOff && enabled && !document.hidden) void audio.play().catch(() => {});
   };
-  const retry = event => { if (event.isTrusted) start(); };
   const visibility = () => { if (document.hidden) audio.pause(); else start(); };
-  document.addEventListener("pointerdown", retry, { passive: true });
-  document.addEventListener("keydown", retry);
   document.addEventListener("visibilitychange", visibility);
-  // The full music controller adopts this exact player and playback position.
+  const choose = value => {
+    if (document.documentElement.dataset.musicConsent !== "pending") return;
+    enabled = value;
+    document.documentElement.dataset.musicConsent = value ? "accepted" : "declined";
+    try { localStorage.setItem("speed-fall-ball.music-enabled", String(value)); } catch { /* This page's choice still works. */ }
+    audio.muted = !value;
+    if (!value) { audio.pause(); audio.preload = "none"; }
+    dialog.close();
+    // The settings owner and AudioContext start synchronously in the Yes click.
+    audio.dispatchEvent(new CustomEvent("sfb:music-choice", { detail: value }));
+    start();
+    document.getElementById("start-run-button")?.focus({ preventScroll: true });
+  };
+  yes.addEventListener("click", () => { choose(true); });
+  no.addEventListener("click", () => { choose(false); });
+  dialog.addEventListener("cancel", event => { event.preventDefault(); });
   audio.addEventListener("sfb:music-handoff", () => {
-    audio.autoplay = false;
-    document.removeEventListener("pointerdown", retry);
-    document.removeEventListener("keydown", retry);
+    handedOff = true;
     document.removeEventListener("visibilitychange", visibility);
   }, { once: true });
-  start();
+  dialog.showModal();
 })();

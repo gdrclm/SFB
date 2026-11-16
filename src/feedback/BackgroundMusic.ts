@@ -1,7 +1,9 @@
-type MusicMedia = Pick<HTMLAudioElement, "play" | "pause" | "loop" | "volume" | "currentTime">;
+import { advanceMusicTempo, MIN_MUSIC_TEMPO, musicTempoForSpeed } from "./MusicTempo";
+
+type MusicMedia = Pick<HTMLAudioElement, "play" | "pause" | "loop" | "volume" | "currentTime" | "playbackRate">;
 interface MusicTrack { media: MusicMedia; requested: boolean; playing: boolean; failed: boolean; generation: number }
 interface MusicTransition { entering: boolean; elapsed: number; sky: number; crystal: number; introStarted: boolean }
-export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused"> & Partial<Pick<BackgroundMusic,"duck">>;
+export type SceneMusic = Pick<BackgroundMusic, "setCrystalBlend" | "setPaused"> & Partial<Pick<BackgroundMusic,"duck" | "setFallSpeed">>;
 
 /** Enter crystal with two seconds of fade-out, then two seconds of fade-in. */
 export class BackgroundMusic {
@@ -17,6 +19,8 @@ export class BackgroundMusic {
   #skyGain = 1;
   #crystalGain = 0;
   #transition: MusicTransition | null = null;
+  #tempo = MIN_MUSIC_TEMPO;
+  #targetTempo = MIN_MUSIC_TEMPO;
   #duck=1;#duckTarget=1;#duckHold=0;
   public duck(depth=.28):void{
     if(!this.#canPlay())return;
@@ -32,6 +36,7 @@ export class BackgroundMusic {
     this.#menuTrack = title === undefined ? null : track(title);
     this.#allTracks = [...this.#tracks, ...(this.#menuTrack === null ? [] : [this.#menuTrack])];
     this.#menu = this.#menuTrack !== null;
+    this.#rates();
     this.#volumes();
   }
   public setMenu(menu: boolean): void {
@@ -42,7 +47,9 @@ export class BackgroundMusic {
       this.#transition = null; this.#targetCrystal = false;
       this.#skyGain = 1; this.#crystalGain = 0;
       this.#duck = this.#duckTarget = 1; this.#duckHold = 0;
+      this.#tempo = this.#targetTempo = MIN_MUSIC_TEMPO;
     }
+    this.#rates();
     this.#volumes(); this.#apply();
   }
   public setEnabled(enabled: boolean): void { this.#enabled = enabled; this.#apply(); }
@@ -56,6 +63,10 @@ export class BackgroundMusic {
     for (const track of this.#allTracks) track.failed = false;
     this.#apply();
   }
+  public setFallSpeed(speed: number, baseSpeed = 10, immediate = false): void {
+    this.#targetTempo = musicTempoForSpeed(speed, baseSpeed);
+    if (immediate) { this.#tempo = this.#targetTempo; this.#rates(); }
+  }
   public setCrystalBlend(blend: number): void {
     if (!Number.isFinite(blend)) return;
     const next = blend > 0;
@@ -67,6 +78,8 @@ export class BackgroundMusic {
   public update(seconds: number): void {
     if (this.#menu || !this.#canPlay() || !Number.isFinite(seconds) || seconds <= 0) return;
     const dt=Math.min(.1,seconds);
+    this.#tempo = advanceMusicTempo(this.#tempo, this.#targetTempo, Math.min(1, seconds));
+    this.#rates();
     const target=this.#duckHold>0?this.#duckTarget:1;
     this.#duckHold=Math.max(0,this.#duckHold-dt);
     if(this.#duckHold===0)this.#duckTarget=1;
@@ -102,6 +115,11 @@ export class BackgroundMusic {
   }
 
   #canPlay(): boolean { return this.#enabled && this.#unlocked && this.#visible && !this.#paused; }
+  #rates(): void {
+    const rate = Math.round(this.#tempo * 1000) / 1000;
+    for (const track of this.#tracks) if (track.media.playbackRate !== rate) track.media.playbackRate = rate;
+    if (this.#menuTrack !== null && this.#menuTrack.media.playbackRate !== 1) this.#menuTrack.media.playbackRate = 1;
+  }
   #canPlayTrack(track: MusicTrack): boolean { return this.#canPlay() && (this.#menu ? track === this.#menuTrack : track !== this.#menuTrack); }
   #volumes(): void {
     const crystalAvailable = this.#tracks[1]?.playing === true;
@@ -162,6 +180,7 @@ export function initializeBackgroundMusic(): BackgroundMusic {
       document.body.append(audio);
     } else audio.dispatchEvent(new Event("sfb:music-handoff"));
     audio.hidden = true;
+    audio.preservesPitch = true;
     if (context === null) return audio;
     const audioContext = context;
     // Don't silence an already playing native title by routing it into a
@@ -182,6 +201,7 @@ export function initializeBackgroundMusic(): BackgroundMusic {
       play: () => { resumeContext(); return audio.play(); }, pause: () => { audio.pause(); },
       get loop() { return audio.loop; }, set loop(value: boolean) { audio.loop = value; },
       get currentTime() { return audio.currentTime; }, set currentTime(value: number) { audio.currentTime = value; },
+      get playbackRate() { return audio.playbackRate; }, set playbackRate(value: number) { audio.playbackRate = value; },
       get volume() { return volume; },
       set volume(value: number) {
         volume = value;
@@ -198,7 +218,7 @@ export function initializeBackgroundMusic(): BackgroundMusic {
   };
   requestAnimationFrame(tick);
   const unlock = (event: Event): void => {
-    if (!event.isTrusted) return;
+    if (!event.isTrusted || document.documentElement.dataset.musicConsent === "pending") return;
     resumeContext(); music.unlock();
   };
   document.addEventListener("pointerdown", unlock, { passive: true });
@@ -210,8 +230,6 @@ export function initializeBackgroundMusic(): BackgroundMusic {
   window.addEventListener("pagehide", () => { music.setVisible(false); });
   window.addEventListener("pageshow", visibility);
   visibility();
-  // Start when persisted settings enable music, without waiting for input.
-  // A browser autoplay rejection is retried by the trusted gesture handlers.
-  music.unlock();
+  // FeedbackControls unlocks music only after this page's explicit choice.
   return music;
 }

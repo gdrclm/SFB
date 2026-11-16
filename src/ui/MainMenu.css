@@ -1,5 +1,26 @@
 /* The welcome screen borrows the game's sky, without covering it in panels.
    Everything is scoped here so the in-run HUD and dialogs keep their design. */
+#music-consent {
+  width: min(340px, calc(100vw - 32px));
+  padding: 26px 24px 24px;
+  border: 1px solid #d1edff45;
+  border-radius: 24px;
+  background: #0b2b46;
+  color: #edf7ff;
+  box-shadow: 0 16px 60px #00152b66;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+}
+#music-consent::backdrop { background: #03172c55; backdrop-filter: blur(4px); }
+#music-consent .music-consent-icon { margin-bottom: 9px; color: #ffe189; font-size: 40px; line-height: 1; }
+#music-consent h1 { margin: 0; font-size: 23px; letter-spacing: -.025em; }
+#music-consent p { margin: 9px 0 23px; color: #b6d1e3; font-size: 14px; }
+.music-consent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.music-consent-actions button { min-height: 50px; padding: 11px 16px; border: 1px solid #b8ddf540; border-radius: 15px; background: #173d59; color: #e5f4ff; font: inherit; font-size: 17px; font-weight: 750; cursor: pointer; }
+#music-consent-yes { border-color: #ffedaa; background: #ffdb76; color: #173e5e; }
+.music-consent-actions button:focus-visible { outline: 3px solid #aee7ff; outline-offset: 3px; }
+.music-consent-actions button:active { transform: translateY(1px); }
+
 #start-screen {
   overflow-y: auto;
   overflow-x: hidden;
