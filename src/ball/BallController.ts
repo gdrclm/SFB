@@ -29,10 +29,13 @@ function moveTowards(current: number, target: number, maxDelta: number): number 
 
 export class BallController implements FixedSimulationSystem {
  readonly #flow=new BreakFlow();
+ #externalFlowClock=false;
  public get breakFlow():number{return this.#flow.reserve;}
  public get powerBreakSeconds():number{return this.#flow.powerSeconds;}
  public get perfectBreaks():number{return this.#flow.streak;}
- public recordBreak(resistance:number):void{this.#flow.hit(resistance);}
+ public recordBreak(resistance:number):void{this.#flow.hit(resistance,this.#fallSpeed);}
+ /** The app supplies active wall time so a slow frame cannot prolong flow. */
+ public advanceFlowTime(seconds:number):void{this.#externalFlowClock=true;this.#flow.update(seconds);}
   readonly #transform: BallTransform;
   readonly #input: HorizontalInput;
   readonly #config: GameConfig["ball"];
@@ -176,7 +179,7 @@ export class BallController implements FixedSimulationSystem {
     fixedDeltaSeconds: number,
     realFixedDeltaSeconds = fixedDeltaSeconds,
   ): void {
-    this.#flow.update(realFixedDeltaSeconds);
+    if(!this.#externalFlowClock)this.#flow.update(realFixedDeltaSeconds);
     this.#contactDragRemaining=Math.max(0,this.#contactDragRemaining-realFixedDeltaSeconds);
     if(this.#contactDragRemaining===0)this.#contactDrag=1;
     this.#copyCurrentPositionToPrevious();

@@ -840,6 +840,7 @@ export class GameApplication {
       ? 1
       : (this.#slowModeController?.update(realDeltaSeconds) ?? 1);
     if (!isPaused && this.#gameState.current !== GameState.GameOver) {
+      this.#ballController?.advanceFlowTime(realDeltaSeconds);
       this.#fixedStep.advance(realDeltaSeconds, timeScale, () => this.#gameState.current !== GameState.GameOver && this.#gameState.current !== GameState.Paused && this.#gameState.current !== GameState.Tutorial);
     }
     isPaused = this.#gameState.current === GameState.Paused || this.#gameState.current === GameState.Tutorial;
@@ -975,6 +976,7 @@ export class GameApplication {
       if(this.#surfaces?.beforeHit(collision,powered))return;
       collision={...collision,assessment:collision.ballSpeed>=collision.platform.strength?"sufficient":"insufficient"};
     }
+    const wasFlowing = (this.#ballController?.powerBreakSeconds ?? 0) > 0;
     const destroyed = !projectile && (this.#successfulHitHandler?.handle(collision, powered) ?? false);
     const strength = collision.platform.strength.toFixed(1);
     if (destroyed && this.#ballController !== null) {
@@ -982,6 +984,10 @@ export class GameApplication {
       const feedback = this.#successfulHitHandler?.lastFeedback;
       this.#ballVisualController?.react("break", feedback ?? undefined);
       const power=this.#ballController.powerBreakSeconds>0;
+      if (power && !wasFlowing) {
+        this.#feel?.flow(this.#ballController.position);
+        this.#ballVisualController?.react("combo");
+      }
       const audible=this.#feel?.breakAt(collision.contact??this.#ballController.position, collision.platform.kind === "super-heavy" || collision.ballSpeed >= collision.platform.strength * 1.75,
         collision.ballSpeed,collision.platform.appearance??"stone",power,feedback ?? undefined,collision.platform.surface);
       if(audible)this.#actions.music.duck?.(power?.40:.26);

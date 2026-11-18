@@ -75,6 +75,16 @@ export class GameFeel {
     const hearts = document.querySelector<HTMLElement>("#lives");
     if (hearts !== null) this.#animate(hearts, [{ filter: "drop-shadow(0 0 12px #9effa8)" }, { filter: "drop-shadow(0 0 0 transparent)" }], 450, false);
   }
+  public flow(position: { x: number; y: number; z: number }): void {
+    getGameSounds().play("zone-shatter");
+    const speed = document.querySelector<HTMLElement>("#speed-panel");
+    if (speed !== null) this.#animate(speed, this.#reduced
+      ? [{ borderColor: "#eaffff" }, { borderColor: "#1ee4ff" }]
+      : [{ transform: "scale(1.12)", filter: "drop-shadow(0 0 16px #77ffff)" }, { transform: "scale(1)", filter: "none" }], 480, false);
+    this.#particle(this.screenPoint(position), "boost", this.#reduced
+      ? [{ opacity: .5 }, { opacity: 0 }]
+      : [{ transform: "translate(-50%, -50%) scale(.4)", opacity: .8 }, { transform: "translate(-50%, -50%) scale(7)", opacity: 0 }], 480);
+  }
   public error(position: { x: number; y: number; z: number }): void {
     getGameSounds().play("impact");
     this.#particle(this.screenPoint(position), "danger", [{ transform: "translate(-50%, -50%) scale(.7)", opacity: .8 },

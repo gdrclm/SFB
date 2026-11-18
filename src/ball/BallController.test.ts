@@ -383,6 +383,17 @@ it("clears earned break flow on a real bounce while leaving fall speed and input
  ball.startBounce(0);expect(ball.powerBreakSeconds).toBe(0);expect(ball.breakFlow).toBe(0);
 });
 
+it("uses the active wall clock instead of extending flow with capped physics catch-up",()=>{
+ const ball=new BallController(createTransform(),createInput(),gameConfig);ball.fallSpeed=80;
+ for(let i=0;i<6;i++)ball.recordBreak(.3);
+ for(let frame=0;frame<3;frame++){
+  ball.advanceFlowTime(1);
+  for(let step=0;step<15;step++)ball.fixedUpdate(1/60);
+ }
+ expect(ball.powerBreakSeconds).toBeCloseTo(5);
+ ball.advanceFlowTime(5);expect(ball.powerBreakSeconds).toBe(0);
+});
+
 it.each([10, 45, 80])("uses gesture strength for fast traversals and gentle corrections at %s fall speed", speed => {
   const distances: number[] = [];
   for (const effort of [0, .5, 1]) {

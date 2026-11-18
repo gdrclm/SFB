@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-export const DEMO_VERSION = 'demo-2026-10-21';
+export const DEMO_VERSION = 'demo-2026-11-18-flow';
 const fail=(message,code='22023',status=400)=>{throw Object.assign(new Error(message),{code,status});};
 const hash=token=>createHash('sha256').update(token).digest('hex');
 export function createRatingServer({filename=':memory:',origins=['https://gdrclm.github.io'],now=()=>Date.now(),versions=[DEMO_VERSION]}={}) {

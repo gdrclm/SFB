@@ -1,5 +1,5 @@
 import { record, type NetworkConfig } from "./types";
-export const DEMO_VERSION = "demo-2026-10-21";
+export const DEMO_VERSION = "demo-2026-11-18-flow";
 export function parseNetworkConfig(value: unknown): NetworkConfig | null {
   if (!record(value)) return null;
   const demoVersion = typeof value.demoVersion === "string" && value.demoVersion ? value.demoVersion : DEMO_VERSION;
