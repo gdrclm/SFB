@@ -1,0 +1,56 @@
+SFB release audit, revision 438a107, completed 2026-11-18 (Europe/Moscow).
+
+Validation on 2026-11-18:
+
+Unit tests
+Test Files  114 passed (114)
+      Tests  602 passed (602)
+   Duration  23.90s (transform 4.77s, setup 0ms, collect 20.20s, tests 10.05s, environment 28ms, prepare 11.97s)
+
+Lint
+> speed-fall-ball@0.1.0 lint
+> eslint .
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice
+
+Server integration test
+> speed-fall-ball@0.1.0 test:server
+> node --test server/*.test.mjs
+
+✔ two anonymous players, authoritative scoring, version isolation, best-only and ownership (254.253798ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 441.818253
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice
+
+App TypeScript
+
+
+Build configuration TypeScript
+
+
+Browser observation digest from 2026-11-17 (not a retained raw profiler trace):
+Production docs via Vite preview, headless Chromium and software GPU.
+Viewports: 320x568, 390x844, 820x1180, 1366x768.
+No runtime/console errors during the tested menu/dialog and game/restart flows.
+First run from a new page: 8382 ms; preceding UI tests had already populated browser cache.
+Early scene: 22 observed live textures, 66.2611 MiB RGBA8 area equivalent.
+Repeated run observation: 22 textures retained, no count increase over three retries.
+Post-GC JS heap after repeats: approximately 12.53, 13.10, 13.10 MB.
+These are cloud/software-renderer observations, not real-phone FPS or total VRAM measurements.
+Prior production build succeeded in a separate output directory, with main index-JUjtxUA9.js unchanged.
+Prior npm audit --omit=dev returned zero reported vulnerabilities.
+Live network-config.json returned empty temporaryApiUrl/supabaseUrl/supabasePublishableKey.

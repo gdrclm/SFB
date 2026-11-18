@@ -1,0 +1,48 @@
+/** Read-only release probes. To reproduce, remove the final .txt suffix first.
+ * Run from the repository root:
+ * npx vite-node documentation/audits/probes/models.ts
+ * All saves use an isolated in-memory map, never the player's browser profile.
+ */
+import { PlayerProfile, PROFILE_KEY, SHOP_ITEMS } from "../../../src/shop/PlayerProfile";
+import { RunHistory, type RunResult } from "../../../src/run/RunHistory";
+import { ComboController } from "../../../src/combo/ComboController";
+import { BreakFlow } from "../../../src/collision/BreakFlow";
+
+const data = new Map<string, string>();
+let blocked = false;
+const storage = {
+  getItem: (key: string): string | null => data.get(key) ?? null,
+  setItem: (key: string, value: string): void => {
+    if (blocked) throw new Error("Simulated quota error");
+    data.set(key, value);
+  },
+};
+data.set(PROFILE_KEY, JSON.stringify({ coins: 100, owned: [], creditedRuns: [] }));
+const firstTab = new PlayerProfile(() => storage), secondTab = new PlayerProfile(() => storage);
+const purchaseA = firstTab.buy("energy"), purchaseB = secondTab.buy("ball-gold");
+const reloaded = new PlayerProfile(() => storage);
+const row = (id: string): RunResult => ({ id, finishedAt: "2026-11-18T00:00:00Z", depth: 10, coins: 1, platforms: 1, score: 45, outcome: "completed" });
+const historyA = new RunHistory(() => storage), historyB = new RunHistory(() => storage);
+historyA.save(row("a")); historyB.save(row("b"));
+const concurrentHistory = new RunHistory(() => storage).all().map(run => run.id);
+const historyC = new RunHistory(() => storage), runC = row("c");
+blocked = true; historyC.save(runC); blocked = false; historyC.save(runC);
+const costs = SHOP_ITEMS.map(item => ({ id: item.id, category: item.category,
+  cost: item.price * (item.maxLevel === undefined ? 1 : item.maxLevel * (item.maxLevel + 1) / 2) }));
+const combo = [35, 55, 70, 150, 300].map(speed => {
+  const chain = new ComboController(); let hit;
+  for (let i = 0; i < 20; i++) hit = chain.hit(speed, speed * .5);
+  return { speed, multiplier: chain.multiplier, points: hit?.points, speedMultiplier: hit?.speedMultiplier };
+});
+const flow = [.4, .95].map(resistance => {
+  const chain = new BreakFlow();
+  for (let i = 0; i < 6; i++) { chain.hit(resistance); chain.update(.5); }
+  return { resistance, reserve: chain.reserve, streak: chain.streak, powerSeconds: chain.powerSeconds };
+});
+console.log(JSON.stringify({
+  multiTab: { purchaseA, purchaseB, coins: reloaded.coins, energyLevel: reloaded.level("energy"), goldOwned: reloaded.owns("ball-gold"), concurrentHistory },
+  quotaRetry: { memory: historyC.all().map(run => run.id), persisted: new RunHistory(() => storage).all().map(run => run.id), storageAvailable: historyC.storageAvailable },
+  shop: { items: costs.length, total: costs.reduce((sum, item) => sum + item.cost, 0), functional: costs.filter(item => item.category === "upgrade" || item.category === "ability").reduce((sum, item) => sum + item.cost, 0), costs },
+  combo, flow,
+  cameraProjection: [10, 70, 150, 183, 300, 600].map(speed => ({ speed, undeformedBallDiameterCssPxAt390Width: 39 / Math.sqrt(speed / 10) })),
+}, null, 2));

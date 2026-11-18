@@ -1,0 +1,191 @@
+{
+  "multiTab": {
+    "purchaseA": true,
+    "purchaseB": true,
+    "coins": 50,
+    "energyLevel": 0,
+    "goldOwned": true,
+    "concurrentHistory": [
+      "b"
+    ]
+  },
+  "quotaRetry": {
+    "memory": [
+      "b",
+      "c"
+    ],
+    "persisted": [
+      "b"
+    ],
+    "storageAvailable": false
+  },
+  "shop": {
+    "items": 18,
+    "total": 6445,
+    "functional": 6065,
+    "costs": [
+      {
+        "id": "impact-retention",
+        "category": "upgrade",
+        "cost": 900
+      },
+      {
+        "id": "danger-scanner",
+        "category": "upgrade",
+        "cost": 250
+      },
+      {
+        "id": "slow",
+        "category": "ability",
+        "cost": 0
+      },
+      {
+        "id": "annihilation",
+        "category": "ability",
+        "cost": 1500
+      },
+      {
+        "id": "plasma",
+        "category": "ability",
+        "cost": 2500
+      },
+      {
+        "id": "combo-charge",
+        "category": "upgrade",
+        "cost": 300
+      },
+      {
+        "id": "energy",
+        "category": "upgrade",
+        "cost": 375
+      },
+      {
+        "id": "coin-energy",
+        "category": "upgrade",
+        "cost": 240
+      },
+      {
+        "id": "ball-classic",
+        "category": "ball",
+        "cost": 0
+      },
+      {
+        "id": "ball-gold",
+        "category": "ball",
+        "cost": 50
+      },
+      {
+        "id": "ball-mint",
+        "category": "ball",
+        "cost": 50
+      },
+      {
+        "id": "world-sky",
+        "category": "world",
+        "cost": 0
+      },
+      {
+        "id": "world-sunset",
+        "category": "world",
+        "cost": 80
+      },
+      {
+        "id": "world-night",
+        "category": "world",
+        "cost": 80
+      },
+      {
+        "id": "props-none",
+        "category": "props",
+        "cost": 0
+      },
+      {
+        "id": "props-lanterns",
+        "category": "props",
+        "cost": 60
+      },
+      {
+        "id": "vfx-none",
+        "category": "vfx",
+        "cost": 0
+      },
+      {
+        "id": "vfx-sparkles",
+        "category": "vfx",
+        "cost": 60
+      }
+    ]
+  },
+  "combo": [
+    {
+      "speed": 35,
+      "multiplier": 5,
+      "points": 187,
+      "speedMultiplier": 1.5
+    },
+    {
+      "speed": 55,
+      "multiplier": 5,
+      "points": 250,
+      "speedMultiplier": 2
+    },
+    {
+      "speed": 70,
+      "multiplier": 5,
+      "points": 250,
+      "speedMultiplier": 2
+    },
+    {
+      "speed": 150,
+      "multiplier": 5,
+      "points": 250,
+      "speedMultiplier": 2
+    },
+    {
+      "speed": 300,
+      "multiplier": 5,
+      "points": 250,
+      "speedMultiplier": 2
+    }
+  ],
+  "flow": [
+    {
+      "resistance": 0.4,
+      "reserve": 0.936,
+      "streak": 6,
+      "powerSeconds": 2.5
+    },
+    {
+      "resistance": 0.95,
+      "reserve": 0,
+      "streak": 0,
+      "powerSeconds": 0
+    }
+  ],
+  "cameraProjection": [
+    {
+      "speed": 10,
+      "undeformedBallDiameterCssPxAt390Width": 39
+    },
+    {
+      "speed": 70,
+      "undeformedBallDiameterCssPxAt390Width": 14.740614447359862
+    },
+    {
+      "speed": 150,
+      "undeformedBallDiameterCssPxAt390Width": 10.069756700139283
+    },
+    {
+      "speed": 183,
+      "undeformedBallDiameterCssPxAt390Width": 9.116729353137595
+    },
+    {
+      "speed": 300,
+      "undeformedBallDiameterCssPxAt390Width": 7.12039324756716
+    },
+    {
+      "speed": 600,
+      "undeformedBallDiameterCssPxAt390Width": 5.034878350069642
+    }
+  ]
+}

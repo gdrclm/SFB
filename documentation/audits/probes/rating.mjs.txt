@@ -1,0 +1,28 @@
+/** Isolated API audit; never contacts a deployed rating or writes a database file.
+ * To reproduce, remove the final .txt suffix first.
+ * Run: node documentation/audits/probes/rating.mjs
+ */
+import { createRatingServer, DEMO_VERSION } from '../../../server/rating.mjs';
+import { randomUUID } from 'node:crypto';
+let clock = 0;
+const server = createRatingServer({ now: () => clock });
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const base = 'http://127.0.0.1:' + server.address().port;
+try {
+  const auth = await (await fetch(base + '/auth', { method: 'POST' })).json();
+  const rpc = async (name, args) => {
+    const response = await fetch(base + '/rpc', { method: 'POST', headers: { Authorization: 'Bearer ' + auth.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ name, args }) });
+    return { status: response.status, data: await response.json() };
+  };
+  await rpc('register_player', { p_nickname: 'Audit Player' });
+  const id = randomUUID();
+  await rpc('start_ranked_run', { p_run_id: id, p_demo_version: DEMO_VERSION });
+  // Advance only this test server's injected clock; no gameplay has taken place.
+  clock = 120000;
+  const fabricated = await rpc('submit_ranked_score', { p_run_id: id, p_depth: 2000000, p_coins: 20000, p_platforms: 12000, p_combo_bonus: 120000000, p_best_combo: 12000, p_max_speed: 100000, p_stage: 10, p_duration_ms: 120000 });
+  const board = await rpc('get_demo_leaderboard', { p_demo_version: DEMO_VERSION });
+  const sameHeader = [];
+  for (let i = 0; i < 21; i++) sameHeader.push((await fetch(base + '/auth', { method: 'POST', headers: { 'cf-connecting-ip': 'Audit same IP' } })).status);
+  const changedHeader = (await fetch(base + '/auth', { method: 'POST', headers: { 'cf-connecting-ip': 'Audit other IP' } })).status;
+  console.log(JSON.stringify({ fabricated, acceptedScore: board.data.top?.[0]?.score, sameHeaderLastStatus: sameHeader.at(-1), changedHeaderStatus: changedHeader }, null, 2));
+} finally { await new Promise(resolve => server.close(resolve)); }

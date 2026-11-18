@@ -1,0 +1,12 @@
+{
+  "fabricated": {
+    "status": 200,
+    "data": {
+      "accepted": true,
+      "improved": true
+    }
+  },
+  "acceptedScore": 122500000,
+  "sameHeaderLastStatus": 429,
+  "changedHeaderStatus": 200
+}
